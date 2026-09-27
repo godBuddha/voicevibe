@@ -79,14 +79,16 @@ else:
     print("  note  workflow không dùng cache pip")
 
 # --------------------------------------------- 2. mọi lệnh trong CI có thật
-refs = re.findall(r"python\s+tests/(\w+)\.py", text)
+# Workflow liệt kê suite trong một mảng bash (`"tests/test_x.py"`), nên nhận cả
+# hai dạng: có tiền tố `python` lẫn tên trần trong dấu nháy.
+refs = set(re.findall(r"tests/(\w+)\.py", text))
 check(bool(refs), "workflow có gọi ít nhất một test")
-for name in refs:
+for name in sorted(refs):
     check((TESTS_DIR / f"{name}.py").is_file(),
           f"workflow gọi tests/{name}.py — file tồn tại")
 
-mods = re.findall(r"python\s+-m\s+(app\.pipelines\.\w+)", text)
-for mod in mods:
+mods = set(re.findall(r"(?:python\s+-m\s+|^\s*\")(app\.pipelines\.\w+)", text, re.M))
+for mod in sorted(mods):
     rel = pathlib.Path(*mod.split(".")).with_suffix(".py")
     check((REPO / "backend" / rel).is_file(),
           f"workflow gọi -m {mod} — module tồn tại")

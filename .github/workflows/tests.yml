@@ -33,21 +33,72 @@ jobs:
           PYTHONPATH: .
           YUPVOX_INLINE: "1"
         run: |
-          python tests/test_day2.py
-          python tests/test_providers.py
-          python tests/test_settings.py
-          python tests/test_ui_js.py
-          python tests/test_theme.py
-          python tests/test_license_compliance.py
-          python tests/test_auth.py
-          python tests/test_migrations.py
-          python tests/test_providers_admin.py
-          python tests/test_ci_config.py
-          python -m app.pipelines.dub --selftest
-          python -m app.pipelines.stt --selftest
-          python -m app.pipelines.translate --selftest
-          python -m app.pipelines.tts --selftest
-          python -m app.pipelines.dub_pipeline --selftest
+          # Chạy HẾT mọi suite rồi mới kết luận — không dừng ở suite đỏ đầu tiên.
+          # Một lần chạy cho biết toàn cảnh hỏng/hở, thay vì sửa xong mới lộ cái
+          # tiếp theo. `pipefail` để mã thoát là của python chứ không phải của tee.
+          set -o pipefail
+          SUITES=(
+            "tests/test_day2.py"
+            "tests/test_providers.py"
+            "tests/test_settings.py"
+            "tests/test_ui_js.py"
+            "tests/test_theme.py"
+            "tests/test_license_compliance.py"
+            "tests/test_auth.py"
+            "tests/test_migrations.py"
+            "tests/test_providers_admin.py"
+            "tests/test_ci_config.py"
+            "app.pipelines.dub --selftest"
+            "app.pipelines.stt --selftest"
+            "app.pipelines.translate --selftest"
+            "app.pipelines.tts --selftest"
+            "app.pipelines.dub_pipeline --selftest"
+          )
+          : > /tmp/results.txt
+          : > /tmp/selftest.log
+          for s in "${SUITES[@]}"; do
+            if [[ "$s" == tests/* ]]; then cmd=(python "$s"); else cmd=(python -m $s); fi
+            if "${cmd[@]}" 2>&1 | tee -a /tmp/selftest.log; then
+              echo "$s|PASS" >> /tmp/results.txt
+            else
+              echo "$s|FAIL" >> /tmp/results.txt
+            fi
+          done
+          echo
+          echo "===================== TỔNG HỢP ====================="
+          column -s'|' -t /tmp/results.txt
+      - name: Publish test summary
+        # `always()`: phải chạy kể cả khi bước trên đỏ — nếu không, lần chạy hỏng
+        # lại là lần duy nhất không có bảng kết quả để đọc.
+        if: always()
+        run: |
+          {
+            echo "## YupVox-Clone — offline test results"
+            echo
+            echo "| Suite | Result |"
+            echo "|---|---|"
+            if [[ -s /tmp/results.txt ]]; then
+              while IFS='|' read -r name status; do
+                if [[ "$status" == PASS ]]; then icon="✅"; else icon="❌"; fi
+                echo "| \`$name\` | $icon $status |"
+              done < /tmp/results.txt
+              pass=$(grep -c '|PASS$' /tmp/results.txt || true)
+              fail=$(grep -c '|FAIL$' /tmp/results.txt || true)
+              echo
+              echo "**$pass passed, $fail failed**"
+            else
+              echo "| _không có kết quả — bước cài đặt/khởi động đã hỏng_ | ❌ |"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Fail if any suite failed
+        if: always()
+        run: |
+          if [[ ! -s /tmp/results.txt ]] || grep -q '|FAIL$' /tmp/results.txt; then
+            echo "Có suite đỏ hoặc không chạy được suite nào:"
+            cat /tmp/results.txt 2>/dev/null || echo "(/tmp/results.txt trống)"
+            exit 1
+          fi
+          echo "Tất cả suite xanh."
       - name: Compose config sanity (bootstrap guards must be present)
         run: |
           cd ..

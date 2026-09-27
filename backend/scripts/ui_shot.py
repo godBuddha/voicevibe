@@ -87,6 +87,22 @@ def seed_demo() -> None:
                                      ("translate", JobStatus.queued, 0, 2, None)]:
             db.add(Job(user_id=u.id, type=t, status=st, progress=pr,
                        credits_charged=cost, result_s3_key=key, params={"type": t}))
+
+        # Nhà cung cấp AI demo để tab AI không trống trong ảnh chụp — khoá là giá trị
+        # GIẢ, và chỉ hiển thị dạng mask nên không lộ gì.
+        from app.models import AiProvider, StageModel
+        from app.providers_api import _encrypt, _hint
+
+        ds = AiProvider(name="DeepSeek API", kind="openai",
+                        base_url="https://api.deepseek.com/v1",
+                        api_key_enc=_encrypt("sk-demo-khong-phai-key-that-1234"),
+                        api_key_hint=_hint("sk-demo-khong-phai-key-that-1234"))
+        ol = AiProvider(name="Ollama local", kind="ollama",
+                        base_url="http://localhost:11434")
+        db.add_all([ds, ol])
+        db.flush()
+        db.add(StageModel(stage="translate", provider_id=ds.id,
+                          model="deepseek-chat", order=0))
         db.commit()
 
 
@@ -190,10 +206,15 @@ def main() -> int:
                 shot(name)
 
             # --- Trang quản trị: phiên đang là admin nên vào thẳng, không cần key.
+            # Tab mặc định là "AI" (nhà cung cấp/model/công đoạn/prompt).
             page.goto(f"{base}/admin")
+            page.wait_for_selector("#ai .card", timeout=20000)
+            page.wait_for_timeout(700)
+            shot("07-admin-ai")
+            page.click("#tab-settings")
             page.wait_for_selector("#content .card", timeout=20000)
             page.wait_for_timeout(500)
-            shot("07-admin-settings")
+            shot("11-admin-settings")
             page.click("#tab-users")
             page.wait_for_selector("#users table.users", timeout=20000)
             page.wait_for_timeout(500)

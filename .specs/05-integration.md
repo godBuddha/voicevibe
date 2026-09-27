@@ -52,3 +52,19 @@ Env mới (đều là bootstrap/ops, không phải cấu hình nghiệp vụ):
 
 **Đã bỏ mặc định:** `YUPVOX_ADMIN_KEY` (rỗng = tắt đường key) và `YUPVOX_API_KEYS`
 (rỗng = không dev key) — trước đây là `admin-dev-key` / `dev-key-1`, tức backdoor luôn mở.
+
+## Phase 3 — luồng cấu hình AI
+
+```
+/admin (tab AI) ──► POST /v1/admin/providers        (key mã hóa Fernet)
+                ──► POST …/{id}/test                 backend gọi {base}/models | /api/version
+                ──► GET  …/{id}/models               danh sách model
+                ──► POST …/{id}/pull                 proxy stream NDJSON → thanh tiến trình
+                ──► PUT  /v1/admin/stages/{stage}    gán công đoạn → model
+                ──► PUT  /v1/admin/prompts/{key}     sửa prompt hệ thống
+
+Pipeline dịch: build_translator()
+  stage_translator()  ← stage_models (provider+model, key giải mã tại chỗ)
+    └─ None → _pick_backend() → translate.* settings → LocalMarianTranslator
+  prompt: prompts.get_prompt('translate')  (DB → mặc định trong code)
+```

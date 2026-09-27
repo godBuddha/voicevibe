@@ -137,6 +137,72 @@ class MediaObject(Base):
     created_at: Mapped[int] = mapped_column(BigInteger, default=_now)
 
 
+# --------------------------------------------------- Phase 3: cấu hình AI (admin)
+
+PROVIDER_OPENAI = "openai"   # bất kỳ endpoint chuẩn OpenAI (OpenAI, DeepSeek, Groq, vLLM…)
+PROVIDER_OLLAMA = "ollama"   # Ollama native API (/api/tags, /api/pull, …)
+PROVIDER_KINDS = (PROVIDER_OPENAI, PROVIDER_OLLAMA)
+
+STAGES = ("stt", "translate", "retranslate", "tts", "dub")
+
+
+class AiProvider(Base):
+    """Nhà cung cấp AI do người vận hành cấu hình trong /admin.
+
+    API key mã hóa at rest bằng Fernet (dùng lại `_fernet()` của settings_service),
+    và chỉ lưu thêm 4 ký tự cuối để hiển thị — **giá trị thật không bao giờ trả ra API**.
+    """
+
+    __tablename__ = "ai_providers"
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=_uid)
+    name: Mapped[str] = mapped_column(String(120))
+    kind: Mapped[str] = mapped_column(String(16), default=PROVIDER_OPENAI)
+    base_url: Mapped[str] = mapped_column(String(512))
+    api_key_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    api_key_hint: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    prefix_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[int] = mapped_column(BigInteger, default=_now)
+    updated_at: Mapped[int] = mapped_column(BigInteger, default=_now, onupdate=_now)
+
+
+class StageModel(Base):
+    """Gắn một công đoạn của pipeline với (provider, model).
+
+    `order` cho phép khai chuỗi fallback: order=0 là lựa chọn chính, 1 là dự phòng.
+    Bảng này bổ sung — KHÔNG thay — các setting `translate.*` cũ, để deployment
+    đang chạy không vỡ khi nâng cấp (xem app/pipelines/translate.py).
+    """
+
+    __tablename__ = "stage_models"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    stage: Mapped[str] = mapped_column(String(24), index=True)
+    provider_id: Mapped[str | None] = mapped_column(
+        ForeignKey("ai_providers.id"), nullable=True)
+    model: Mapped[str] = mapped_column(String(200), default="")
+    params: Mapped[dict] = mapped_column(JSON, default=dict)
+    order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class Prompt(Base):
+    """Prompt hệ thống cho từng tác vụ LLM — sửa được trong /admin.
+
+    `is_default` = người vận hành chưa sửa (hoặc đã bấm Khôi phục mặc định), nên UI
+    luôn biết prompt nào đang lệch khỏi mặc định của code.
+    """
+
+    __tablename__ = "prompts"
+
+    task_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    content: Mapped[str] = mapped_column(Text, default="")
+    description: Mapped[str] = mapped_column(String(255), default="")
+    variables: Mapped[list] = mapped_column(JSON, default=list)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_at: Mapped[int] = mapped_column(BigInteger, default=_now, onupdate=_now)
+
+
 class Voice(Base):
     """Zero-shot voice profile cloned from a 5-10s reference clip."""
 

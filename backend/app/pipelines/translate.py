@@ -1,8 +1,12 @@
 """Day 5: translation stage — provider chain (cloud OpenAI-compatible or local Marian).
 
-Config (env for now — D6 Settings UI takes over):
-  TRANSLATE_BASE_URL + TRANSLATE_API_KEY + TRANSLATE_MODEL -> cloud chat provider
-  otherwise                                                -> local opus-mt (Apache-2.0)
+Cấu hình đọc theo thứ tự ưu tiên:
+  1. **Công đoạn** trong /admin → bảng `stage_models` (provider + model, có chuỗi fallback)
+  2. Setting `translate.*` (cách cấu hình cũ, vẫn hoạt động — không phá deployment đang chạy)
+  3. Không có gì → opus-mt local (Apache-2.0)
+
+Prompt hệ thống lấy từ bảng `prompts` (sửa được trong /admin), mặc định nằm trong code —
+xem app/prompts.py.
 
 Offline selftest (no model downloads):
   PYTHONPATH=. python -m app.pipelines.translate --selftest
@@ -11,6 +15,7 @@ from __future__ import annotations
 
 import os
 
+from .. import prompts as P
 from ..settings_service import get_setting
 
 _MARIAN = {
@@ -50,21 +55,61 @@ class LocalMarianTranslator:
 
 
 class CloudChatTranslator:
-    """OpenAI-compatible chat endpoint (cloud or local vLLM) via provider layer."""
+    """OpenAI-compatible chat endpoint (cloud hoặc local vLLM/Ollama) qua provider layer.
+
+    Prompt hệ thống lấy từ bảng `prompts` (task_key='translate') nên sửa được trong /admin
+    mà không phải deploy lại — xem app/prompts.py.
+    """
 
     def __init__(self, base_url: str, api_key: str, model: str,
-                 source: str, target: str):
+                 source: str, target: str, system_prompt: str | None = None):
         from ..providers.openai_compat import OpenAIChatProvider
 
         self._chat = OpenAIChatProvider(base_url, api_key, model)
-        self.system = (
-            f"You are a professional subtitle translator. Translate each line "
-            f"from {source} to {target}. Keep it short and natural — it will be "
-            f"spoken aloud. Reply with the translation only."
-        )
+        self.source, self.target = source, target
+        self._system_override = system_prompt
+
+    @property
+    def system(self) -> str:
+        if self._system_override is not None:
+            return self._system_override
+        return P.render("translate", source=self.source, target=self.target)
 
     def translate(self, text: str) -> str:
         return self._chat.complete(self.system, text, max_tokens=512).strip()
+
+    def retranslate_shorter(self, text: str, max_chars: int) -> str:
+        """Dịch lại ngắn hơn cho đoạn vượt thời lượng — dùng prompt 'retranslate_timing'."""
+        prompt = P.render("retranslate_timing", source=self.source, target=self.target,
+                          text=text, max_chars=max_chars)
+        return self._chat.complete("", prompt, max_tokens=512).strip()
+
+
+def stage_translator(source: str, target: str):
+    """Translator dựng từ cấu hình công đoạn trong /admin (nếu có).
+
+    Trả None khi công đoạn 'translate' chưa được gán — caller rơi về đường cũ
+    (`translate.*` settings / opus-mt local).
+
+    Bọc try/except rộng: hàm này chạy trong worker, và một DB chưa migrate hoặc
+    thiếu bảng KHÔNG được làm chết cả pipeline — cứ rơi về đường cũ là đúng.
+    """
+    try:
+        from ..db import SessionLocal
+        from ..providers_api import stage_chain
+
+        with SessionLocal() as db:
+            chain = stage_chain("translate", db)
+    except Exception:  # noqa: BLE001
+        return None
+    if not chain:
+        return None
+    first = chain[0]
+    base = first["base_url"].rstrip("/")
+    if first["kind"] != "openai":
+        # Ollama cũng nói được chuẩn OpenAI ở /v1 — quy về cùng một provider.
+        base = base + "/v1"
+    return CloudChatTranslator(base, first["api_key"], first["model"], source, target)
 
 
 def _cloud_cfg() -> tuple[str, str, str] | None:
@@ -101,6 +146,10 @@ def _pick_backend(source: str, target: str) -> str:
 
 
 def build_translator(source: str, target: str):
+    """Translator cho một cặp ngôn ngữ, theo thứ tự: công đoạn → settings → local."""
+    staged = stage_translator(source, target)
+    if staged is not None:
+        return staged
     backend = _pick_backend(source, target)
     if backend == "cloud":
         base, key, model = _cloud_cfg()  # type: ignore[misc]
@@ -143,6 +192,14 @@ def _selftest() -> None:
     print("cloud path (mock) .......... OK")
     print("local fallback pick ........ OK")
     print("unsupported dir raises ..... OK")
+
+    # Prompt lấy từ bảng `prompts` (sửa được trong /admin), không hardcode trong class.
+    t2 = CloudChatTranslator("http://mock/v1", "k", "m", "vi", "en")
+    assert "from vi to en" in t2.system, t2.system
+    t3 = CloudChatTranslator("http://mock/v1", "k", "m", "vi", "en",
+                             system_prompt="DỊCH NGẮN GỌN")
+    assert t3.system == "DỊCH NGẮN GỌN", "prompt override không được tôn trọng"
+    print("prompt đọc từ bảng prompts .. OK")
     print("TRANSLATE SELFTEST PASSED")
 
 

@@ -40,3 +40,14 @@ không alert; 401 → reset về gate.
 | Toast | `app_ui.py` + `admin_ui.py` | `#toast` dùng chung thay cho `.status` cục bộ |
 
 Bỏ: **Gate (API key)** ở cả hai UI — thay bằng cổng server-side + phiên cookie.
+
+## Phase 3 — components tab AI
+
+| Component | Ghi chú |
+|---|---|
+| ProviderList | card/nhà cung cấp: chấm trạng thái, badge loại, hint key, nút Kiểm tra kết nối · Quản lý model (Ollama) · Sửa · Xoá |
+| ProviderModal | Tên · Loại · Base URL (kèm helper "Sẽ gọi: {url}/chat/completions") · API key write-only · Prefix ID |
+| OllamaModels | liệt kê model (dung lượng/số tham số/lượng tử) · ô tải model + **thanh tiến trình từ NDJSON** · nút Xoá |
+| StageTable | mỗi công đoạn: select provider + input model + Lưu/Bỏ gán; dòng **tóm tắt đọc được** |
+| PromptEditor | textarea + bảng biến + Lưu + Khôi phục mặc định; badge "đã sửa" khi `is_default=false` |
+| Modal | `#modal-bg` dùng chung cho mọi hộp thoại của tab AI |

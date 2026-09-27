@@ -23,12 +23,17 @@ tách & clone nhiều người nói, API developer) — dựng bằng stack open
 |---|---|
 | ![jobs](docs/screenshots/05-jobs.png) | ![api](docs/screenshots/06-api-keys.png) |
 
-### Admin Settings — `/admin`
+### Trang quản trị — `/admin`
 
-Mọi cấu hình lưu DB, secret mã hóa Fernet at rest, mỗi dòng có tag nguồn
-(`db` / `env` / `default` / `unset`) — **không hardcode .env**.
+Ba tab: **AI** (nhà cung cấp + model + prompt) · **Cấu hình hệ thống** · **Người dùng**.
 
-![admin settings](docs/screenshots/07-admin-settings.png)
+| AI — nhà cung cấp, công đoạn, prompt | Cấu hình hệ thống |
+|---|---|
+| ![admin ai](docs/screenshots/07-admin-ai.png) | ![admin settings](docs/screenshots/11-admin-settings.png) |
+
+| Người dùng | Đăng nhập |
+|---|---|
+| ![admin users](docs/screenshots/10-admin-users.png) | ![login](docs/screenshots/00-login.png) |
 
 ### Chế độ tối (dark mode)
 
@@ -274,6 +279,53 @@ docker compose up -d --build   # postgres + redis + minio + api + worker
   File upload mới có dạng `media/{user_id}/…`; kết quả job và clip giọng vẫn đọc được
   bình thường vì tra được chủ qua `jobs` / `voices`.
 - `/docs` **tắt mặc định** (bật bằng `YUPVOX_ENABLE_DOCS=1`).
+
+## 🔌 Cấu hình AI (Cloud API + Ollama)
+
+Vào `/admin` → tab **AI**. Mọi thứ ở đây lưu DB, đổi xong **không cần restart**.
+
+### 1. Nhà cung cấp
+
+| Loại | Dùng cho | Base URL ví dụ |
+|---|---|---|
+| **OpenAI-compatible** | OpenAI, DeepSeek, Groq, Together, OpenRouter, vLLM, LM Studio… | `https://api.deepseek.com/v1` |
+| **Ollama** | Ollama chạy local | `http://localhost:11434` |
+
+Mỗi nhà cung cấp có nút **Kiểm tra kết nối** (gọi nhẹ nhất: OpenAI `GET /models`,
+Ollama `GET /api/version`) và chấm trạng thái xanh/đỏ.
+
+> **API key chỉ gửi một chiều.** Giao diện không bao giờ nhận lại key thật — chỉ thấy
+> `••••1234`. Ô nhập để trống = **giữ nguyên** key cũ; muốn gỡ hẳn thì bấm **Xoá key**.
+> Key được mã hóa Fernet at rest.
+
+### 2. Ollama — tải và xoá model ngay trong giao diện
+
+Bấm **Quản lý model** trên card Ollama: xem model đã cài (kèm dung lượng, số tham số,
+mức lượng tử hóa), **tải model mới có thanh tiến trình** (proxy stream `/api/pull`), và
+**xoá model** (`/api/delete`). Không cần vào terminal.
+
+### 3. Công đoạn → model
+
+Gán model cho từng công đoạn. Dưới bảng luôn có dòng tóm tắt đọc được
+(ví dụ *"Dịch phụ đề: deepseek-chat qua DeepSeek API"*), để bạn biết hệ thống đang thật sự dùng gì.
+
+| Công đoạn | Thay được bằng cloud? |
+|---|---|
+| Nhận dạng giọng nói (STT) | ✅ OpenAI/Groq… — bỏ trống = faster-whisper local |
+| Dịch phụ đề | ✅ bất kỳ endpoint chuẩn OpenAI |
+| Dịch lại cho khớp timing | ✅ cần model viết ngắn gọn |
+| Tổng hợp giọng nói (TTS) | ⚠️ **chỉ giọng preset** — clone giọng bắt buộc local |
+| Lồng tiếng (pipeline) | ❌ chạy local, core IP |
+
+Thứ tự ưu tiên khi chạy: **công đoạn** → setting `translate.*` cũ → engine local mặc định.
+Nhờ vậy deployment đang chạy không vỡ khi nâng cấp.
+
+### 4. Prompt hệ thống
+
+Hai prompt sửa được ngay trong giao diện: **dịch** và **dịch lại cho khớp timing**.
+Mỗi prompt có bảng biến dùng được (`{source}`, `{target}`, `{text}`, `{max_chars}`) và nút
+**Khôi phục mặc định** (trả về bản trong code). Prompt mặc định nằm trong
+`backend/app/prompts.py` — đó là nguồn sự thật để khôi phục.
 
 ## ⚖️ Trách nhiệm khi dùng voice cloning
 

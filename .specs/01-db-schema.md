@@ -93,3 +93,20 @@ COLUMN` cho cột thiếu (**luôn nullable, không DEFAULT inline**: SQLite t�
 `ADD COLUMN … NOT NULL` không default trên bảng có dữ liệu) + backfill theo default của model
 (callable `_now` → mốc thời gian hiện tại) + tạo index thiếu. Idempotent. Postgres siết
 `SET NOT NULL` sau backfill. **Không dùng Alembic.**
+
+## Phase 3 — cấu hình AI
+
+### ai_providers
+`id` PK · `name` · `kind` (`openai` \| `ollama`) · `base_url` · `api_key_enc` (**Fernet**,
+dùng lại `_fernet()` của settings_service) · `api_key_hint` (4 ký tự cuối) · `prefix_id` ·
+`enabled` · `created_at`/`updated_at`.
+
+### stage_models
+`id` PK autoincrement · `stage` (index) · `provider_id` FK NULL · `model` · `params` JSON ·
+`order` (0 = chính, >0 = dự phòng). Xoá provider thì gỡ luôn các gán trỏ tới nó.
+
+### prompts
+`task_key` PK · `content` · `description` · `variables` JSON · `is_default` · `updated_at`.
+Prompt **mặc định nằm trong code** (`app/prompts.py::DEFAULT_PROMPTS`) — đó là nguồn sự thật
+để nút "Khôi phục mặc định" luôn có đích; `is_default` cho biết row đang lệch khỏi bản gốc.
+Seed lúc khởi động (`seed_prompts()`, idempotent).

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from .theme import THEME_BOOT, THEME_CSS, THEME_JS
 
-ADMIN_HTML = """<!DOCTYPE html>
+ADMIN_HTML = r"""<!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="utf-8">
@@ -50,6 +50,33 @@ __THEME_CSS__
   .badge.off { border-color:var(--err); color:var(--err); }
   .row-actions { display:flex; gap:6px; flex-wrap:wrap; }
   .row-actions button { padding:5px 10px; font-size:12.5px; }
+  /* --- tab AI --- */
+  .prov { display:flex; justify-content:space-between; gap:14px; align-items:center;
+          padding:12px 0; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .prov:last-child { border-bottom:none; }
+  .prov .meta { min-width:240px; flex:1; }
+  .prov .meta b { display:block; }
+  .prov .meta code { font-size:12px; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%;
+         background:var(--mut); margin-right:6px; }
+  .dot.ok { background:var(--ok); } .dot.bad { background:var(--err); }
+  .grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:14px; }
+  .hint { color:var(--mut); font-size:12px; margin-top:4px; }
+  textarea { background:var(--input); border:1px solid var(--line); color:var(--fg);
+             border-radius:8px; padding:10px; width:100%; min-height:110px;
+             font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; resize:vertical; }
+  .vars { color:var(--mut); font-size:12px; margin:6px 0 0; }
+  .vars code { margin-right:6px; }
+  .progress { height:8px; border-radius:99px; background:var(--track); margin-top:8px;
+              overflow:hidden; display:none; }
+  .progress.on { display:block; }
+  .progress i { display:block; height:100%; background:var(--acc); width:0; }
+  .modal-bg { position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:200;
+              display:none; align-items:flex-start; justify-content:center; padding:40px 16px; }
+  .modal-bg.on { display:flex; }
+  .modal { background:var(--card); border:1px solid var(--line); border-radius:14px;
+           padding:22px; width:100%; max-width:560px; max-height:85vh; overflow-y:auto; }
+  .modal h2 { margin-top:0; }
   #toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%);
            background:var(--card); border:1px solid var(--line); border-radius:12px;
            padding:12px 20px; font-size:13.5px; z-index:100; display:none; }
@@ -72,13 +99,16 @@ __THEME_CSS__
     </div>
   </div>
   <div class="tabs">
-    <button id="tab-settings" class="on" onclick="showTab('settings')">Cấu hình hệ thống</button>
+    <button id="tab-ai" class="on" onclick="showTab('ai')">AI (nhà cung cấp &amp; model)</button>
+    <button id="tab-settings" onclick="showTab('settings')">Cấu hình hệ thống</button>
     <button id="tab-users" onclick="showTab('users')">Người dùng</button>
   </div>
-  <div id="pane-settings"><div id="content"></div></div>
+  <div id="pane-ai"><div id="ai"></div></div>
+  <div id="pane-settings" style="display:none"><div id="content"></div></div>
   <div id="pane-users" style="display:none"><div id="users"></div></div>
 </div>
 <div id="toast"></div>
+<div id="modal-bg" class="modal-bg"><div class="modal" id="modal"></div></div>
 <script>
 __THEME_JS__
 const $ = (id) => document.getElementById(id);
@@ -101,11 +131,13 @@ function flash(msg, cls) { const el = $("toast");
 function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML.replace(/"/g, "&quot;"); }
 
 function showTab(name) {
-  $("pane-settings").style.display = name === "settings" ? "" : "none";
-  $("pane-users").style.display = name === "users" ? "" : "none";
-  $("tab-settings").classList.toggle("on", name === "settings");
-  $("tab-users").classList.toggle("on", name === "users");
+  ["ai", "settings", "users"].forEach(n => {
+    $("pane-" + n).style.display = n === name ? "" : "none";
+    $("tab-" + n).classList.toggle("on", n === name);
+  });
   if (name === "users") loadUsers();
+  if (name === "settings") load();
+  if (name === "ai") loadAi();
 }
 
 async function load() {
@@ -246,7 +278,274 @@ async function logout() {
   location.href = "/login";
 }
 
-load();               // trang chỉ được server trả khi đã là Admin
+// ============================================================== tab AI
+// Ba khối: Nhà cung cấp (Cloud + Ollama) · Công đoạn · Prompt hệ thống.
+// Ghi chú: API key chỉ gửi MỘT CHIỀU lên server — khi sửa mà để trống thì giữ nguyên
+// (đúng PATCH semantics phía backend), nên UI không bao giờ cần biết key thật.
+const KIND_LABEL = { openai: "OpenAI-compatible", ollama: "Ollama" };
+const STAGE_LABEL = { stt: "Nhận dạng giọng nói (STT)", translate: "Dịch phụ đề",
+                      retranslate: "Dịch lại cho khớp timing", tts: "Tổng hợp giọng nói (TTS)",
+                      dub: "Lồng tiếng (pipeline)" };
+const STAGE_NOTE = {
+  stt: "Cloud thay được (OpenAI/Groq…). Bỏ trống = faster-whisper local.",
+  translate: "Bỏ trống = dùng cấu hình translate.* hoặc opus-mt local.",
+  retranslate: "Dùng khi bản dịch quá dài so với thời lượng — cần model ngắn gọn.",
+  tts: "Chỉ thay được giọng PRESET. Clone giọng bắt buộc chạy local.",
+  dub: "Công đoạn tổng hợp — chạy pipeline local, không gọi model ngoài.",
+};
+let AI = { providers: [], stages: {}, summary: {}, prompts: [] };
+
+async function loadAi() {
+  const [pr, st, pm] = await Promise.all([
+    api("/v1/admin/providers").then(r => r.json()),
+    api("/v1/admin/stages").then(r => r.json()),
+    api("/v1/admin/prompts").then(r => r.json()),
+  ]);
+  AI = { providers: pr.providers, stages: st.stages, summary: st.summary, prompts: pm.prompts };
+  renderAi();
+}
+
+function renderAi() {
+  const provs = AI.providers;
+  const rows = provs.length ? provs.map(p => `
+    <div class="prov">
+      <div class="meta">
+        <b><span class="dot" id="dot-${esc(p.id)}"></span>${esc(p.name)}
+          <span class="badge">${esc(KIND_LABEL[p.kind] || p.kind)}</span>
+          ${p.enabled ? "" : '<span class="badge off">đang tắt</span>'}</b>
+        <code>${esc(p.base_url)}</code>
+        <div class="hint">${p.api_key_set ? "API key: " + esc(p.api_key_hint) : "không dùng API key"}</div>
+      </div>
+      <div class="row-actions">
+        <button class="ghost" onclick="testProv('${esc(p.id)}')">Kiểm tra kết nối</button>
+        ${p.kind === "ollama" ? `<button class="ghost" onclick="manageModels('${esc(p.id)}')">Quản lý model</button>` : ""}
+        <button class="ghost" onclick="editProv('${esc(p.id)}')">Sửa</button>
+        <button class="ghost" onclick="delProv('${esc(p.id)}', '${esc(p.name)}')">Xoá</button>
+      </div>
+    </div>`).join("") : '<p class="hint">Chưa có nhà cung cấp nào — thêm Cloud API hoặc Ollama để dùng model ngoài.</p>';
+
+  const stageRows = Object.keys(STAGE_LABEL).map(stage => {
+    const items = AI.stages[stage] || [];
+    const primary = items.find(i => i.order === 0) || {};
+    const options = ['<option value="">— không dùng —</option>'].concat(
+      provs.map(p => `<option value="${esc(p.id)}" ${primary.provider_id === p.id ? "selected" : ""}>${esc(p.name)} (${esc(KIND_LABEL[p.kind] || p.kind)})</option>`)
+    ).join("");
+    return `<div class="prov">
+      <div class="meta"><b>${esc(STAGE_LABEL[stage])}</b>
+        <div class="hint">${esc(STAGE_NOTE[stage] || "")}</div>
+        <div class="hint">Đang dùng: <b>${esc(AI.summary[stage] || "—")}</b></div></div>
+      <div class="row-actions">
+        <select id="st-prov-${stage}" style="min-width:200px">${options}</select>
+        <input id="st-model-${stage}" placeholder="tên model" value="${esc(primary.model || "")}" style="min-width:180px">
+        <button onclick="saveStage('${stage}')">Lưu</button>
+        ${primary.provider_id ? `<button class="ghost" onclick="clearStage('${stage}')">Bỏ gán</button>` : ""}
+      </div></div>`;
+  }).join("");
+
+  const prompts = AI.prompts.map(p => `
+    <div class="card" style="padding:14px 16px">
+      <b>${esc(p.description || p.task_key)} ${p.is_default ? "" : '<span class="badge">đã sửa</span>'}</b>
+      <div class="hint"><code>${esc(p.task_key)}</code></div>
+      <textarea id="pm-${esc(p.task_key)}">${esc(p.content)}</textarea>
+      <p class="vars">Biến dùng được: ${(p.variables || []).map(v => `<code>{${esc(v)}}</code>`).join("") || "—"}</p>
+      <div class="row-actions" style="margin-top:8px">
+        <button onclick="savePrompt('${esc(p.task_key)}')">Lưu prompt</button>
+        ${p.editable_default ? `<button class="ghost" onclick="resetPrompt('${esc(p.task_key)}')">Khôi phục mặc định</button>` : ""}
+      </div>
+    </div>`).join("");
+
+  $("ai").innerHTML = `
+    <div class="card"><h2>Nhà cung cấp AI</h2>
+      <div id="prov-list">${rows}</div>
+      <div class="row-actions" style="margin-top:14px">
+        <button onclick="editProv('')">＋ Thêm nhà cung cấp</button>
+      </div>
+      <p class="hint">Ollama local thường là <code>http://localhost:11434</code> (không cần API key).</p>
+    </div>
+    <div class="card"><h2>Công đoạn → model</h2>${stageRows}</div>
+    <div class="card"><h2>Prompt hệ thống</h2>
+      <p class="hint">Sửa prompt dùng cho dịch/dịch lại. Nút Khôi phục mặc định trả về bản trong code.</p>
+      <div class="grid2">${prompts}</div>
+    </div>`;
+}
+
+function closeModal() { $("modal-bg").classList.remove("on"); }
+function openModal(html) { $("modal").innerHTML = html; $("modal-bg").classList.add("on"); }
+
+function editProv(id) {
+  const p = AI.providers.find(x => x.id === id) || {};
+  openModal(`
+    <h2>${id ? "Sửa nhà cung cấp" : "Thêm nhà cung cấp"}</h2>
+    <label>Tên</label><input id="pv-name" value="${esc(p.name || "")}" placeholder="VD: DeepSeek, Ollama local">
+    <label>Loại</label>
+    <select id="pv-kind">
+      <option value="openai" ${p.kind === "openai" || !p.kind ? "selected" : ""}>OpenAI-compatible (OpenAI, DeepSeek, Groq, vLLM, OpenRouter…)</option>
+      <option value="ollama" ${p.kind === "ollama" ? "selected" : ""}>Ollama</option>
+    </select>
+    <label>Base URL</label>
+    <input id="pv-url" value="${esc(p.base_url || "")}" placeholder="https://api.deepseek.com/v1">
+    <p class="hint" id="pv-target"></p>
+    <label>API key ${id ? "(để trống = giữ nguyên)" : ""}</label>
+    <input id="pv-key" type="password" placeholder="${p.api_key_set ? esc(p.api_key_hint) : "sk-…"}">
+    ${p.api_key_set ? '<p class="hint">Đã có key. Bấm <b>Xoá key</b> để gỡ hẳn, hoặc nhập key mới để thay.</p>' : ""}
+    <label>Prefix ID (tuỳ chọn)</label><input id="pv-prefix" value="${esc(p.prefix_id || "")}">
+    <div class="row-actions" style="margin-top:18px">
+      <button onclick="saveProv('${esc(id)}')">Lưu</button>
+      ${p.api_key_set ? `<button class="ghost" onclick="clearKey('${esc(id)}')">Xoá key</button>` : ""}
+      <button class="ghost" onclick="closeModal()">Huỷ</button>
+    </div>`);
+  const sync = () => {
+    const kind = $("pv-kind").value, url = ($("pv-url").value || "").replace(/\/+$/, "");
+    $("pv-target").textContent = url
+      ? `Sẽ gọi: ${url}${kind === "ollama" ? "/api/chat" : "/chat/completions"}`
+      : "";
+  };
+  $("pv-kind").onchange = sync; $("pv-url").oninput = sync; sync();
+}
+
+async function saveProv(id) {
+  const body = { name: $("pv-name").value.trim(), kind: $("pv-kind").value,
+                 base_url: $("pv-url").value.trim(),
+                 prefix_id: $("pv-prefix").value.trim() || null };
+  const key = $("pv-key").value;
+  // Chỉ gửi api_key khi người dùng THỰC SỰ nhập → để trống = giữ nguyên (PATCH semantics).
+  if (key) body.api_key = key;
+  const r = id
+    ? await api(`/v1/admin/providers/${id}`, { method: "PATCH", body: JSON.stringify(body) })
+    : await api("/v1/admin/providers", { method: "POST", body: JSON.stringify(body) });
+  const d = await r.json();
+  if (!r.ok) { flash("✗ " + (d.detail || r.status), "err"); return; }
+  flash("✔ đã lưu " + d.name);
+  closeModal(); loadAi();
+}
+
+async function clearKey(id) {
+  if (!confirm("Xoá API key của nhà cung cấp này?")) return;
+  const r = await api(`/v1/admin/providers/${id}`, { method: "PATCH",
+                       body: JSON.stringify({ api_key: "" }) });
+  flash(r.ok ? "✔ đã xoá key" : "✗ lỗi", r.ok ? "ok" : "err");
+  closeModal(); loadAi();
+}
+
+async function delProv(id, name) {
+  if (!confirm(`Xoá nhà cung cấp "${name}"? Các công đoạn đang dùng nó cũng bị bỏ gán.`)) return;
+  const r = await api(`/v1/admin/providers/${id}`, { method: "DELETE" });
+  flash(r.ok ? "✔ đã xoá" : "✗ lỗi", r.ok ? "ok" : "err");
+  loadAi();
+}
+
+async function testProv(id) {
+  const dot = $("dot-" + id);
+  if (dot) dot.className = "dot";
+  flash("⏳ đang kiểm tra kết nối…");
+  const r = await api(`/v1/admin/providers/${id}/test`, { method: "POST" });
+  const d = await r.json();
+  if (dot) dot.className = "dot " + (d.ok ? "ok" : "bad");
+  flash((d.ok ? "✔ " : "✗ ") + (d.detail || ""), d.ok ? "ok" : "err");
+}
+
+async function manageModels(id) {
+  openModal(`<h2>Quản lý model Ollama</h2><div id="mm-body">⏳ đang tải…</div>
+             <div class="row-actions" style="margin-top:16px"><button class="ghost" onclick="closeModal()">Đóng</button></div>`);
+  const r = await api(`/v1/admin/providers/${id}/models`);
+  const d = await r.json();
+  if (!r.ok) { $("mm-body").innerHTML = `<p class="err">${esc(d.detail || "lỗi")}</p>`; return; }
+  const list = d.models.length ? d.models.map(m => `
+    <div class="prov"><div class="meta"><b>${esc(m.name)}</b>
+      <div class="hint">${m.parameter_size ? esc(m.parameter_size) + " · " : ""}${m.size ? (m.size / 1e9).toFixed(2) + " GB" : ""}${m.quantization ? " · " + esc(m.quantization) : ""}</div></div>
+      <div class="row-actions"><button class="ghost" onclick="delModel('${esc(id)}','${esc(m.name)}')">Xoá</button></div>
+    </div>`).join("") : '<p class="hint">Chưa có model nào được cài.</p>';
+  $("mm-body").innerHTML = `
+    <div>${list}</div>
+    <label style="margin-top:16px">Tải model mới (tên trên ollama.com/library)</label>
+    <div class="row-actions">
+      <input id="mm-pull" placeholder="vd: qwen2.5:7b-instruct" style="min-width:220px">
+      <button onclick="pullModel('${esc(id)}')">Tải về</button>
+    </div>
+    <div class="progress" id="mm-prog"><i id="mm-bar"></i></div>
+    <p class="hint" id="mm-status"></p>`;
+}
+
+async function pullModel(id) {
+  const name = $("mm-pull").value.trim();
+  if (!name) { flash("✗ nhập tên model", "err"); return; }
+  $("mm-prog").classList.add("on");
+  $("mm-status").textContent = "đang tải " + name + "…";
+  try {
+    // NDJSON stream từ backend -> tự vẽ tiến trình, không chờ tải xong mới hiện.
+    const resp = await fetch(`/v1/admin/providers/${id}/pull`, {
+      method: "POST", credentials: "same-origin",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: name }),
+    });
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        let j = {};
+        try { j = JSON.parse(line); } catch (e) { continue; }
+        if (j.total) {
+          $("mm-bar").style.width = Math.round(j.completed / j.total * 100) + "%";
+          $("mm-status").textContent = (j.status || "") + " — " +
+            (j.completed / 1e9).toFixed(2) + " / " + (j.total / 1e9).toFixed(2) + " GB";
+        } else {
+          $("mm-status").textContent = j.status || "";
+        }
+        if (j.status === "success") { $("mm-bar").style.width = "100%"; }
+        if (j.status === "error") { $("mm-status").textContent = "✗ " + (j.detail || "lỗi tải"); }
+      }
+    }
+    flash("✔ xong: " + name);
+    manageModels(id);
+  } catch (e) {
+    $("mm-status").textContent = "✗ " + e.message;
+  }
+}
+
+async function delModel(id, name) {
+  if (!confirm("Xoá model " + name + "?")) return;
+  const r = await api(`/v1/admin/providers/${id}/models/${encodeURIComponent(name)}`,
+                      { method: "DELETE" });
+  const d = await r.json();
+  flash(r.ok ? "✔ đã xoá " + name : "✗ " + (d.detail || r.status), r.ok ? "ok" : "err");
+  manageModels(id);
+}
+
+async function saveStage(stage) {
+  const body = { provider_id: $("st-prov-" + stage).value || null,
+                 model: $("st-model-" + stage).value.trim(), order: 0 };
+  const r = await api(`/v1/admin/stages/${stage}`, { method: "PUT", body: JSON.stringify(body) });
+  const d = await r.json();
+  flash(r.ok ? "✔ đã gán công đoạn " + stage : "✗ " + (d.detail || r.status), r.ok ? "ok" : "err");
+  loadAi();
+}
+async function clearStage(stage) {
+  const r = await api(`/v1/admin/stages/${stage}`, { method: "DELETE" });
+  flash(r.ok ? "✔ đã bỏ gán" : "✗ lỗi", r.ok ? "ok" : "err");
+  loadAi();
+}
+async function savePrompt(key) {
+  const content = $("pm-" + key).value;
+  const r = await api(`/v1/admin/prompts/${key}`, { method: "PUT",
+                       body: JSON.stringify({ content }) });
+  const d = await r.json();
+  flash(r.ok ? "✔ đã lưu prompt " + key : "✗ " + (d.detail || r.status), r.ok ? "ok" : "err");
+  loadAi();
+}
+async function resetPrompt(key) {
+  if (!confirm("Khôi phục prompt mặc định cho " + key + "?")) return;
+  const r = await api(`/v1/admin/prompts/${key}/reset`, { method: "POST" });
+  flash(r.ok ? "✔ đã khôi phục mặc định" : "✗ lỗi", r.ok ? "ok" : "err");
+  loadAi();
+}
+
+loadAi();             // tab mặc định là AI
 yvThemeChanged();     // đồng bộ nhãn nút sáng/tối với theme đã áp ở <head>
 </script>
 </body></html>"""

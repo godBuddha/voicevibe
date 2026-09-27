@@ -94,3 +94,29 @@ phân biệt — không xác nhận sự tồn tại của file cho người kh�
 - `create_job` kiểm tra quyền sở hữu `voice_id` **trước `_charge`** (trước đây chỉ worker
   kiểm tra, tức đã trừ credit rồi mới fail).
 - Rate limiter vẫn **in-memory, một tiến trình** — ghi rõ giới hạn; Redis là việc sau.
+
+## Phase 3 — quản trị AI (đều `Depends(current_admin)`)
+
+| Method | Path | Ghi chú |
+|---|---|---|
+| GET/POST | /v1/admin/providers | list (**không bao giờ trả key thật**) · tạo |
+| PATCH | /v1/admin/providers/{id} | `api_key`: vắng = giữ nguyên · `""` = xoá · có giá trị = thay |
+| DELETE | /v1/admin/providers/{id} | gỡ luôn gán công đoạn trỏ tới nó |
+| POST | /v1/admin/providers/{id}/test | OpenAI `GET {base}/models` · Ollama `GET {base}/api/version`; lỗi trả `ok:false` (không 500) |
+| GET | /v1/admin/providers/{id}/models | OpenAI `data[].id` · Ollama `models[]` (+`parameter_size`, `quantization`) |
+| POST | /v1/admin/providers/{id}/pull | proxy `POST /api/pull` → **StreamingResponse NDJSON** (tiến trình) |
+| DELETE | /v1/admin/providers/{id}/models/{name} | `DELETE /api/delete`; kind≠ollama → 422 |
+| GET/PUT/DELETE | /v1/admin/stages[/{stage}] | gán/bỏ gán công đoạn; trả `summary` đọc được |
+| GET/PUT | /v1/admin/prompts[/{task_key}] | prompt hệ thống |
+| POST | /v1/admin/prompts/{task_key}/reset | khôi phục mặc định trong code |
+
+**Mọi lời gọi ra nhà cung cấp phát xuất từ BACKEND** — key không đi qua trình duyệt.
+
+### Thứ tự ưu tiên khi pipeline chạy
+`stage_models` (công đoạn) → setting `translate.*` (đường cũ) → engine local mặc định.
+`build_translator()` dùng `stage_translator()` trước; hàm này bọc try/except nên DB chưa
+migrate KHÔNG làm chết pipeline — cứ rơi về đường cũ.
+
+### Ghi chú vận hành
+Worker là tiến trình riêng, không đi qua `app.main` → `app/tasks.py` cũng gọi
+`ensure_schema` để tự migrate trước khi nhận job.

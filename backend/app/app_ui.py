@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from .theme import THEME_BOOT, THEME_CSS, THEME_JS
 
-APP_HTML = """<!DOCTYPE html>
+APP_HTML = r"""<!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="utf-8">
@@ -310,8 +310,8 @@ __THEME_CSS__
         <div id="keymsg" class="status"></div>
         <table class="keys" style="margin-top:14px"><tbody id="keylist"></tbody></table>
         <h3 style="margin-top:20px">Ví dụ</h3>
-<pre>curl -X POST http://&lt;host&gt;/v1/jobs \\
-  -H "X-API-Key: yv_..." -H "Content-Type: application/json" \\
+<pre>curl -X POST http://&lt;host&gt;/v1/jobs \
+  -H "X-API-Key: yv_..." -H "Content-Type: application/json" \
   -d '{"type":"dub","media_url":"&lt;media_key&gt;","source_lang":"vi","target_lang":"en"}'</pre>
       </div>
     </section>

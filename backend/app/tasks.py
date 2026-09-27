@@ -14,6 +14,14 @@ from celery import Celery
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
+# Worker là tiến trình RIÊNG: nó không đi qua app.main nên không được hưởng
+# `ensure_schema` ở đó. Gọi tại đây để worker cũng tự migrate trước khi nhận job —
+# nếu không, worker sẽ chết ở query đầu tiên trên DB chưa nâng cấp.
+from .db import engine as _engine  # noqa: E402
+from .migrations import ensure_schema as _ensure_schema  # noqa: E402
+
+_ensure_schema(_engine)
+
 celery_app = Celery("yupvox", broker=REDIS_URL, backend=REDIS_URL)
 celery_app.conf.update(
     task_serializer="json",

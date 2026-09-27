@@ -41,6 +41,8 @@ from .models import (
     User,
     Voice,
 )
+from .prompts import seed_prompts
+from .providers_api import router as ai_admin_router
 from .ratelimit import check_rate as _check_rate
 from .ratelimit import _RATE  # noqa: F401 — giữ tên cũ cho test/ops
 from .security import MIN_PASSWORD_LEN, hash_password, password_problem
@@ -76,6 +78,12 @@ app = FastAPI(
 # Auto-migration: tạo bảng thiếu + THÊM CỘT thiếu vào bảng đã tồn tại (create_all một
 # mình không làm được việc sau). Idempotent — xem app/migrations.py.
 ensure_schema(_engine)
+
+# Prompt hệ thống: tạo row cho các task còn thiếu để nút "Khôi phục mặc định" luôn có đích.
+seed_prompts()
+
+# Nhóm endpoint quản trị AI (nhà cung cấp / công đoạn / prompt) — xem app/providers_api.py
+app.include_router(ai_admin_router)
 
 
 def _hash_key(raw: str) -> str:

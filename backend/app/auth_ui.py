@@ -55,7 +55,7 @@ async function post(path, payload) {
 """
 
 # ---------------------------------------------------------------- Đăng nhập
-LOGIN_HTML = """<!DOCTYPE html>
+LOGIN_HTML = r"""<!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="utf-8">
@@ -101,7 +101,7 @@ yvThemeChanged();
 </body></html>"""
 
 # ------------------------------------------------------- Thiết lập lần đầu
-SETUP_HTML = """<!DOCTYPE html>
+SETUP_HTML = r"""<!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="utf-8">

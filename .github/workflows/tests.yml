@@ -31,6 +31,8 @@ jobs:
           python tests/test_ui_js.py
           python tests/test_theme.py
           python tests/test_license_compliance.py
+          python tests/test_auth.py
+          python tests/test_migrations.py
           python -m app.pipelines.dub --selftest
           python -m app.pipelines.stt --selftest
           python -m app.pipelines.translate --selftest

@@ -28,3 +28,15 @@ không node_modules — self-host chỉ cần `python -m uvicorn`.
 ## Quy tắc lỗi
 Mọi fetch bọc try/catch → hiển thị message ngắn trên element trạng thái của tab,
 không alert; 401 → reset về gate.
+
+## Phase 2 — components mới
+
+| Component | File | Ghi chú |
+|---|---|---|
+| SetupForm | `auth_ui.py::SETUP_HTML` | email + mật khẩu ×2, validate ≥8 ký tự phía client, server vẫn kiểm lại |
+| LoginForm | `auth_ui.py::LOGIN_HTML` | hiển thị `?next=` sau khi đăng nhập |
+| ThemeToggle | `theme.py::THEME_JS` | nút `[data-theme-label]`, nhãn tự đổi theo trạng thái |
+| UserTable | `admin_ui.py` | tạo/đặt lại mật khẩu/cấp credits/khoá — gọi `/v1/admin/users/*` |
+| Toast | `app_ui.py` + `admin_ui.py` | `#toast` dùng chung thay cho `.status` cục bộ |
+
+Bỏ: **Gate (API key)** ở cả hai UI — thay bằng cổng server-side + phiên cookie.

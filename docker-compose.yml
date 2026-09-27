@@ -77,8 +77,12 @@ services:
       DATABASE_URL: postgresql+psycopg://yupvox:${POSTGRES_PASSWORD}@postgres:5432/yupvox
       REDIS_URL: redis://redis:6379/0
       SETTINGS_MASTER_KEY: ${SETTINGS_MASTER_KEY:?set in .env}
+      # Để TRỐNG mặc định: đường key admin tắt, dev key không tồn tại.
+      # Phase 2 dùng phiên đăng nhập cho /admin; chỉ đặt khi cần automation.
       YUPVOX_ADMIN_KEY: ${YUPVOX_ADMIN_KEY:-}
-      YUPVOX_API_KEYS: ${YUPVOX_API_KEYS:-dev-key-1}
+      YUPVOX_API_KEYS: ${YUPVOX_API_KEYS:-}
+      YUPVOX_SECURE_COOKIES: ${YUPVOX_SECURE_COOKIES:-}
+      YUPVOX_ENABLE_DOCS: ${YUPVOX_ENABLE_DOCS:-}
       MEDIA_ROOT: /media
       S3_ENDPOINT: http://minio:9000
       S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}

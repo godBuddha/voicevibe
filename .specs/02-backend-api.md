@@ -58,3 +58,39 @@ Job types: `tts` ✅ · `stt` ✅ · `dub` ✅ · `translate`/`subtitle` → stu
 - `_run_tts` kiểm tra ownership voice profile (chống IDOR).
 - Storage: `S3_ENDPOINT` set → S3/MinIO (S3Storage); không → LocalStorage `MEDIA_ROOT` (mặc định `./media`).
 - Celery: `task_default_queue="media"` khớp worker `-Q media`.
+
+## Phase 2 — xác thực & phân quyền
+
+**Hai đường, một chữ ký:** cookie phiên `yv_session` (trình duyệt) HOẶC `X-API-Key`
+(máy gọi). Cả hai trả về cùng `User` ⇒ 13 endpoint `Depends(auth)` cũ không phải sửa.
+Header phải khai `Header(None, …)` và coi chuỗi rỗng như không có.
+
+| Method | Path | Ghi chú |
+|---|---|---|
+| GET | /setup | Chưa có admin → form tạo Admin; đã có → 302 `/login` |
+| GET | /login | Chưa có admin → 302 `/setup`; đã đăng nhập → 302 `/` |
+| POST | /v1/auth/setup | 201 + cookie. Chốt `system_flags('setup.completed')`; đã setup → **409**; rate 5/phút/IP |
+| POST | /v1/auth/login | 401 thông báo chung; rate 10/phút/IP + 20/15 phút/tài khoản |
+| POST | /v1/auth/logout | Xoá phiên + cookie |
+| GET | /v1/auth/me | Danh tính hiện tại (401 nếu chưa đăng nhập) |
+| GET | /v1/admin/users | (admin) danh sách |
+| POST | /v1/admin/users | (admin) tạo user; 409 nếu trùng email |
+| POST | /v1/admin/users/{id}/reset-password | (admin) đổi mật khẩu + **thu hồi mọi phiên** của user |
+| POST | /v1/admin/users/{id}/credits | (admin) cấp/trừ credit, luôn ghi `credit_ledger` |
+| POST | /v1/admin/users/{id}/deactivate · /activate | (admin) khoá/mở; khoá ⇒ tắt phiên + API key. **Chặn khoá admin cuối** (409) |
+
+Cổng vào HTML ở **server**: `/`, `/admin`, `/setup`, `/login` đều redirect theo trạng thái
+(trước đây chỉ có gate ở client). `/docs` mặc định tắt.
+
+### Quyền sở hữu media (`/media/{key}`)
+Xác thực qua `user_from_api_key` (**có** kiểm `ApiKey.active`) hoặc cookie phiên, rồi
+`_owns_media`: admin → qua; `media/{user_id}/…` khớp user → qua; còn lại tra
+`media_objects` → `jobs.result_s3_key` → `voices.ref_s3_key`. **Thất bại trả 404**, không 404/403
+phân biệt — không xác nhận sự tồn tại của file cho người không có quyền.
+
+### Bảo vệ bổ sung
+- Mật khẩu: `hashlib.scrypt` (N=2^14, r=8, p=1, dklen=64) — **không thêm dependency nào**.
+- CSRF: `SameSite=Lax` + lớp hai — request xác thực bằng **cookie** mà `Origin` khác host → 403.
+- `create_job` kiểm tra quyền sở hữu `voice_id` **trước `_charge`** (trước đây chỉ worker
+  kiểm tra, tức đã trừ credit rồi mới fail).
+- Rate limiter vẫn **in-memory, một tiến trình** — ghi rõ giới hạn; Redis là việc sau.

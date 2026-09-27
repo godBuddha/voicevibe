@@ -213,8 +213,10 @@ openssl rand -hex 32   # dán vào SETTINGS_MASTER_KEY trong .env
 `pyannote/wespeaker-voxceleb-resnet34-LM` · `pyannote/speaker-diarization-community-1`.
 Token dán vào `.env` HOẶC set sau qua `/admin/settings` (khuyến nghị).
 
-> Giao diện: `/` là UI người dùng (inline, không build step) với chế độ sáng/tối.
-> `/admin` là trang Settings. Lấy API key đầu tiên: `POST /v1/auth/signup` hoặc key dev.
+> **Lần đầu truy cập:** mở `/` → tự chuyển tới **`/setup`** để tạo tài khoản **quản trị**
+> (chỉ hiện một lần duy nhất). Sau đó mọi người đăng nhập ở `/login`, và **chỉ Admin tạo
+> được tài khoản cho người khác** trong `/admin` → tab *Người dùng*.
+> Đăng ký công khai tắt mặc định; bật bằng `auth.allow_signup` trong Cấu hình hệ thống.
 
 ## Lựa chọn A — Máy cá nhân KHÔNG GPU (CPU-only)
 
@@ -228,7 +230,7 @@ pip install faster-whisper pyannote.audio vieneu srt soundfile sentencepiece num
 sudo apt install -y ffmpeg   # hoặc brew install ffmpeg (macOS)
 cd backend
 YUPVOX_INLINE=1 MEDIA_ROOT=./media uvicorn app.main:app --port 8000
-# Mở http://localhost:8000 → nhập API key dev-key-1
+# Mở http://localhost:8000 → tự chuyển tới /setup → tạo tài khoản quản trị đầu tiên
 ```
 
 ## Lựa chọn B — Máy có GPU (NVIDIA)
@@ -249,15 +251,29 @@ docker compose up -d --build   # postgres + redis + minio + api + worker
 
 ## Sau khi chạy
 
-1. Mở `http://<host>:8000/admin` → đăng nhập `admin-dev-key`
-   → **ĐỔI NGAY `admin.api_key`** (category security).
-2. Set `hf_token` trong UI (credentials) nếu chưa có trong .env.
-3. (Tùy chọn) Cấu hình cloud translation trong UI: `translate.base_url` +
-   `translate.api_key` + `translate.model` — hoạt động với **bất kỳ backend
-   chuẩn OpenAI**: vLLM · SGLang · LMDeploy · TGI · Ollama · llama.cpp-server ·
-   LiteLLM · DeepSeek · OpenAI · Groq. Không cấu hình = dùng opus-mt local
-   (Apache-2.0, ~300MB, đủ dùng cho subtitle).
-4. Mở `/` → upload video/audio → Dub.
+1. Mở `http://<host>:8000/` → tự chuyển tới **`/setup`** → tạo **tài khoản quản trị**
+   (email + mật khẩu ≥ 8 ký tự). Chỉ hiện một lần duy nhất.
+2. Vào `/admin` → tab **Người dùng** để tạo tài khoản cho người khác
+   (đăng ký công khai tắt mặc định; bật bằng `auth.allow_signup` nếu muốn mở).
+3. Set `hf_token` trong `/admin` → *Cấu hình hệ thống* (credentials) nếu chưa có trong .env.
+4. (Tùy chọn) Cấu hình cloud translation: `translate.base_url` + `translate.api_key`
+   + `translate.model` — hoạt động với **bất kỳ backend chuẩn OpenAI**: vLLM · SGLang ·
+   LMDeploy · TGI · Ollama · llama.cpp-server · LiteLLM · DeepSeek · OpenAI · Groq.
+   Không cấu hình = dùng opus-mt local (Apache-2.0, ~300MB, đủ dùng cho subtitle).
+5. Mở `/` → upload video/audio → Dub.
+
+### Thay đổi quan trọng so với bản trước (Phase 2)
+
+- **`admin-dev-key` và `dev-key-1` đã bị bỏ.** Trang `/admin` giờ dùng **phiên đăng nhập**;
+  đường `X-Admin-Key` chỉ hoạt động khi bạn đặt `admin.api_key` tường minh (dùng cho CI/script).
+  Dev key từ `YUPVOX_API_KEYS` cũng **tự vô hiệu ngay khi hệ thống đã có admin**.
+- **Tài khoản cũ (chưa có mật khẩu)** không đăng nhập được — Admin cần *Đặt lại mật khẩu*
+  cho họ trong tab Người dùng. API key cũ vẫn dùng bình thường.
+- **Media cũ trở nên không truy cập được**: `/media/{key}` giờ kiểm tra **quyền sở hữu**
+  (trước đây bất kỳ credential nào cũng đọc được media của người khác — lỗ hổng đã vá).
+  File upload mới có dạng `media/{user_id}/…`; kết quả job và clip giọng vẫn đọc được
+  bình thường vì tra được chủ qua `jobs` / `voices`.
+- `/docs` **tắt mặc định** (bật bằng `YUPVOX_ENABLE_DOCS=1`).
 
 ## ⚖️ Trách nhiệm khi dùng voice cloning
 

@@ -25,9 +25,16 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from app.admin_ui import ADMIN_HTML  # noqa: E402
 from app.app_ui import APP_HTML  # noqa: E402
+from app.auth_ui import LOGIN_HTML, SETUP_HTML  # noqa: E402
 
-PAGES = {"app_ui.py": APP_HTML, "admin_ui.py": ADMIN_HTML}
+PAGES = {"app_ui.py": APP_HTML, "admin_ui.py": ADMIN_HTML,
+         "auth_ui.py (login)": LOGIN_HTML, "auth_ui.py (setup)": SETUP_HTML}
 SCRIPT_RE = re.compile(r"<script>(.*?)</script>", re.S)
+
+# Mỗi trang có ít nhất một script "thật" (logic của trang). Ngoài ra có boot script
+# theme — cố tình RẤT NGẮN (chạy trước stylesheet để chống nhấp nháy màu), nên điều
+# kiện >200 ký tự áp cho TỪNG script như trước là sai.
+MIN_MAIN_SCRIPT = 200
 
 
 def inline_scripts(html: str) -> list[str]:
@@ -40,11 +47,14 @@ def main() -> None:
     for name, html in PAGES.items():
         scripts = inline_scripts(html)
         assert scripts, f"{name}: no inline <script> found — extraction broken?"
+        # Ít nhất MỘT script phải là logic thật của trang; nếu JS của trang biến mất
+        # thì chỉ còn boot script theme và test này phải bắt được.
+        assert any(len(s) > MIN_MAIN_SCRIPT for s in scripts), (
+            f"{name}: không có script nào > {MIN_MAIN_SCRIPT} ký tự — "
+            "JS của trang có thể đã biến mất (chỉ còn boot script theme?)"
+        )
         for i, js in enumerate(scripts):
             total += 1
-            # Cheap structural sanity even without node: unbalanced crude check
-            # is unreliable for JS, so only assert the extraction is non-trivial.
-            assert len(js) > 200, f"{name}: script #{i} suspiciously short"
             if not node:
                 continue
             with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as f:

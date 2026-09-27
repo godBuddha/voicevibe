@@ -58,8 +58,11 @@ SETTING_DEFS: list[dict] = [
      "label": "Dub credits/job", "default": 60},
     {"key": "pricing.subtitle", "category": "pricing", "secret": False,
      "label": "Subtitle credits/job", "default": 8},
+    {"key": "auth.allow_signup", "category": "security", "secret": False,
+     "label": "Cho phép đăng ký công khai", "default": False},
     {"key": "admin.api_key", "category": "security", "secret": True,
-     "label": "Admin API key", "env": "YUPVOX_ADMIN_KEY", "default": "admin-dev-key"},
+     "label": "Admin API key (để trống = tắt đường key, chỉ dùng phiên đăng nhập)",
+     "env": "YUPVOX_ADMIN_KEY", "default": ""},
     {"key": "webhook.secret", "category": "security", "secret": True,
      "label": "Webhook HMAC secret (X-YupVox-Signature)", "default": ""},
 ]

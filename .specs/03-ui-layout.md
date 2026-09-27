@@ -31,3 +31,14 @@ Cuối trang: form thêm custom key.
 - Viền mảnh phân tách khối, không shadow dày.
 - Emoji chỉ làm marker tab/tiêu đề (tradeoff cố ý: không build step).
 - Mọi fetch gắn header auth tương ứng; lỗi 401 → về gate.
+
+## Phase 2 — trang & đăng nhập
+
+- `/setup` — *Thiết lập lần đầu* → form **Tạo tài khoản quản trị** (email, mật khẩu, nhập lại).
+- `/login` — **Đăng nhập**; lỗi chung *Email hoặc mật khẩu không đúng*.
+- `/` — topbar hiện email + vai trò + *Đăng xuất*; **không còn gate API key ở client**
+  (localStorage `yv_api_key` đã bỏ), mọi fetch dùng `credentials:"same-origin"`.
+- `/admin` — hai tab: *Cấu hình hệ thống* (như cũ) và **Người dùng** (form tạo, bảng
+  user với badge vai trò/trạng thái, nút Đặt lại mật khẩu · Cấp credits · Vô hiệu hóa).
+- Thông báo dùng **toast dùng chung** (`#toast`) — trước đây `flash()` ghi vào phần tử
+  `.status` có thể không tồn tại ở panel hiện tại.

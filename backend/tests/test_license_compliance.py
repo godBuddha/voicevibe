@@ -55,6 +55,14 @@ Base.metadata.create_all(engine)
 from app.main import app  # noqa: E402
 
 c = TestClient(app)
+
+# Phase 2: `/` chỉ được trả khi đã có admin VÀ đã đăng nhập (cổng ở server).
+# Trên DB trắng thì phải là redirect về /setup, KHÔNG phải HTML ứng dụng.
+assert c.get("/", follow_redirects=False).status_code == 302
+assert c.get("/", follow_redirects=False).headers["location"] == "/setup"
+
+r = c.post("/v1/auth/setup", json={"email": "admin@local", "password": "matkhau123"})
+assert r.status_code == 201, r.text
 r = c.get("/")
 assert r.status_code == 200, r.text
 html = r.text

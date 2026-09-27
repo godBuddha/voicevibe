@@ -60,3 +60,36 @@ Engine: SQLAlchemy 2.0 (Postgres prod / SQLite dev — tự tạo bảng lúc st
 - users 1-n api_keys, 1-n voices, 1-n jobs, 1-n credit_ledger.
 - `users.credits` KHÔNG BAO GIỜ đổi mà không có dòng credit_ledger tương ứng.
 - Bảng `settings` thay thế .env cho cấu hình nghiệp vụ (quy tắc phân loại cứng).
+
+## Phase 2 — tài khoản, phiên, sở hữu media
+
+### users (cột thêm)
+| Cột | Kiểu | Ghi chú |
+|---|---|---|
+| password_hash | String(255) NULL | `scrypt$N$r$p$salt$hash`; NULL = user cũ chưa có mật khẩu |
+| role | String(16) | `user` \| `admin` — String chứ không SAEnum (tránh ALTER kiểu enum của Postgres) |
+| is_active | Boolean | khoá tài khoản: chặn đăng nhập, thu hồi phiên + API key |
+| last_login_at | BigInteger NULL | |
+| updated_at | BigInteger | |
+
+### sessions
+`token_hash` String(64) PK (**SHA-256 của token thô** — token thô chỉ nằm trong cookie),
+`user_id` FK, `created_at`/`expires_at`(index)/`last_seen_at`, `ip`, `user_agent`.
+
+### system_flags
+`key` PK, `value`, `updated_at`. Dùng `setup.completed` làm **chốt nguyên tử** cho `/setup`
+(khoá chính unique ⇒ hai request đồng thời không thể cùng thắng).
+
+### media_objects
+`key` String(512) PK, `user_id` FK index, `created_at`. Sổ chủ sở hữu media upload;
+`/media/{key}` tra bảng này, `jobs.result_s3_key`, `voices.ref_s3_key`.
+
+### api_keys (bổ sung)
+`prefix` String(16) — hiển thị masked; `key` lưu SHA-256 (đã có từ hardening trước).
+
+### Migration
+`app/migrations.py::ensure_schema(engine)` — `create_all` (bảng thiếu) + `ALTER TABLE ADD
+COLUMN` cho cột thiếu (**luôn nullable, không DEFAULT inline**: SQLite từ chối
+`ADD COLUMN … NOT NULL` không default trên bảng có dữ liệu) + backfill theo default của model
+(callable `_now` → mốc thời gian hiện tại) + tạo index thiếu. Idempotent. Postgres siết
+`SET NOT NULL` sau backfill. **Không dùng Alembic.**

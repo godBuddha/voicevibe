@@ -123,22 +123,25 @@ __THEME_CSS__
   table.keys td, table.keys th { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
   code { background:var(--code-bg); border-radius:6px; padding:2px 7px; font-size:12.5px; }
   pre { background:var(--pre-bg); color:var(--pre-fg); border-radius:12px; padding:14px; overflow-x:auto; font-size:12.5px; }
-  #gate { max-width:420px; margin:90px auto; text-align:center; }
   .soonbox { text-align:center; padding:40px 20px; }
+  .who .mut { line-height:1.2; }
+  .linkbtn { background:transparent; border:1px solid var(--line); color:var(--mut);
+             border-radius:9px; padding:6px 12px; cursor:pointer; font-size:13px; }
+  .linkbtn:hover { border-color:var(--acc); color:var(--fg); }
+  /* Toast dùng chung: mọi thông báo đều hiển thị được, kể cả ở panel không có
+     vùng .status riêng (trước đây flash() ghi vào phần tử có thể không tồn tại). */
+  #toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%);
+           background:var(--card); border:1px solid var(--line); border-radius:12px;
+           padding:12px 20px; font-size:13.5px; box-shadow:0 6px 24px rgba(0,0,0,.14);
+           z-index:100; max-width:90vw; display:none; }
+  #toast.on { display:block; }
+  #toast.ok { border-color:var(--ok); color:var(--ok); }
+  #toast.err { border-color:var(--err); color:var(--err); }
 </style>
 </head>
 <body>
 
-<div id="gate" class="card" style="max-width:420px;margin:90px auto;text-align:center">
-  <h1>🎙️ YupVox-Clone</h1>
-  <p class="mut">AI Voice cho một thế giới mới — nhập API key để bắt đầu</p>
-  <input id="gatekey" type="password" placeholder="X-API-Key (yv_... hoặc dev key)"
-         style="margin:14px 0" onkeydown="if(event.key==='Enter')enter()">
-  <button class="go" style="width:100%" onclick="enter()">Vào bảng điều khiển</button>
-  <p id="gmsg" class="err"></p>
-</div>
-
-<div id="shell" style="display:none">
+<div id="shell">
   <aside id="sidebar">
     <div class="logo"><div class="mark">🎙️</div>
       <div><b>YupVox-Clone</b><div class="mut">AI Voice cho một thế giới mới</div></div></div>
@@ -178,7 +181,9 @@ __THEME_CSS__
       <div class="search">🔍<input id="q" placeholder="Tìm kiếm dự án, giọng nói, công cụ…"></div>
       <div class="credits-pill">💰 <b id="top-credits">…</b> Credits</div>
       <button class="theme-btn" data-theme-label onclick="yvToggleTheme()" title="Chuyển chế độ sáng/tối">🌙 Chế độ tối</button>
-      <div class="who"><div class="avatar">C</div><div><b>Xin chào, Creator!</b><div class="mut" id="whokey"></div></div></div>
+      <div class="who"><div class="avatar" id="avatar">?</div>
+        <div><b id="whoemail">…</b><div class="mut" id="whorole"></div></div></div>
+      <button class="linkbtn" onclick="logout()">Đăng xuất</button>
     </div>
 
     <!-- DASHBOARD -->
@@ -312,23 +317,25 @@ __THEME_CSS__
     </section>
   </main>
 </div>
+<div id="toast"></div>
 
 <script>
 __THEME_JS__
-let KEY = localStorage.getItem("yv_api_key") || "";
 const $ = (id) => document.getElementById(id);
-const H = () => ({ "X-API-Key": KEY, "Content-Type": "application/json" });
+// Xác thực qua COOKIE PHIÊN do server đặt (HttpOnly) — JS không đọc/không lưu token.
+// `credentials:"same-origin"` để fetch gửi kèm cookie.
+const H = () => ({ "Content-Type": "application/json" });
 const PAGES = ["dashboard","dub","tts","voices","stt","jobs","api"];
-let POLL = null;
+let POLL = null, ME = {};
 
 function esc(s){ const d=document.createElement("div"); d.textContent=s==null?"":String(s); return d.innerHTML; }
-function mask(k){ return k ? "••••" + k.slice(-4) : ""; }
 function fmt(n){ return (n||0).toLocaleString("vi-VN"); }
 
 function soon(name){ flash('🚧 "' + name + '" sắp ra mắt — xem README roadmap.', "err"); }
-function flash(msg, cls){ const el = document.querySelector(".page.on .status") || $("gmsg");
-  el.className = "status " + (cls||"ok"); el.textContent = msg;
-  setTimeout(()=>{ el.textContent=""; }, 4000); }
+function flash(msg, cls){ const el = $("toast");
+  el.className = "on " + (cls||"ok"); el.textContent = msg;
+  clearTimeout(window._toastT);
+  window._toastT = setTimeout(()=>{ el.className = ""; el.textContent = ""; }, 4000); }
 
 function go(page) {
   PAGES.forEach(p => { $("page-"+p).classList.toggle("on", p===page); });
@@ -344,17 +351,15 @@ function go(page) {
 function toggleSide() { const s = $("sidebar");
   s.style.display = (s.style.display === "block") ? "none" : "block"; }
 
-async function enter() {
-  KEY = $("gatekey").value.trim();
-  const r = await fetch("/v1/me", { headers: H() });
-  if (!r.ok) { $("gmsg").textContent = "API key không hợp lệ"; return; }
-  localStorage.setItem("yv_api_key", KEY); boot();
+// Phiên hết hạn / chưa đăng nhập -> để server quyết định, không tự đoán.
+function needLogin() { location.href = "/login?next=" + encodeURIComponent(location.pathname + location.hash); }
+
+async function logout() {
+  try { await fetch("/v1/auth/logout", { method:"POST", credentials:"same-origin" }); } catch (e) {}
+  location.href = "/login";
 }
-function logout() { localStorage.removeItem("yv_api_key"); location.reload(); }
 
 async function boot() {
-  $("gate").style.display = "none"; $("shell").style.display = "flex";
-  $("whokey").textContent = "Key " + mask(KEY);
   const hash = (location.hash || "#/dashboard").replace("#/","");
   go(PAGES.includes(hash) ? hash : "dashboard");
   refreshMe();
@@ -365,23 +370,27 @@ window.onhashchange = () => { const h=(location.hash||"").replace("#/","");
   if (PAGES.includes(h)) go(h); };
 
 async function refreshMe() {
-  const r = await fetch("/v1/me", { headers: H() });
-  if (r.status === 401) { logout(); return; }
+  const r = await fetch("/v1/me", { headers: H(), credentials: "same-origin" });
+  if (r.status === 401) { needLogin(); return; }
   const d = await r.json();
+  ME = d;
   $("top-credits").textContent = fmt(d.credits);
   $("side-free").textContent = fmt(d.credits);
   $("st-free").textContent = fmt(d.credits);
+  $("whoemail").textContent = d.email || "";
+  $("avatar").textContent = (d.email || "?").charAt(0).toUpperCase();
+  $("whorole").textContent = d.role === "admin" ? "Quản trị viên" : "Người dùng";
   const sel = $("ttsvoice");
   sel.innerHTML = '<option value="">Mặc định (preset)</option>' +
-    d.voices.map(v => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join("");
-  $("voicelist").innerHTML = d.voices.length
+    (d.voices || []).map(v => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join("");
+  $("voicelist").innerHTML = (d.voices || []).length
     ? d.voices.map(v => `• <b>${esc(v.name)}</b> <span class="mut">(${esc(v.lang)}, ${esc(v.id)})</span>`).join("<br>")
     : "Chưa có giọng nào — upload clip ở trên.";
   loadUsage();
 }
 
 async function loadUsage() {
-  const r = await fetch("/v1/usage", { headers: H() });
+  const r = await fetch("/v1/usage", { headers: H(), credentials: "same-origin" });
   if (!r.ok) return;
   const d = await r.json();
   const used = d.used, total = Math.max(d.free_quota, used);
@@ -411,7 +420,7 @@ function chartColors() {
 yvOnThemeChange(loadUsage);
 
 async function loadDashJobs() {
-  const r = await fetch("/v1/jobs?limit=5", { headers: H() });
+  const r = await fetch("/v1/jobs?limit=5", { headers: H(), credentials: "same-origin" });
   if (!r.ok) return;
   const d = await r.json();
   $("dash-jobs").innerHTML = d.jobs.length
@@ -422,7 +431,7 @@ async function loadDashJobs() {
 }
 
 async function loadJobs() {
-  const r = await fetch("/v1/jobs?limit=20", { headers: H() });
+  const r = await fetch("/v1/jobs?limit=20", { headers: H(), credentials: "same-origin" });
   if (!r.ok) return;
   const d = await r.json();
   const q = ($("q").value || "").toLowerCase();
@@ -434,7 +443,7 @@ async function loadJobs() {
 function jobHtml(j) {
   let media = "";
   if (j.status === "done" && j.result_key) {
-    const u = "/media/" + j.result_key + "?api_key=" + encodeURIComponent(KEY);
+    const u = "/media/" + j.result_key;
     if (j.result_key.endsWith(".mp4")) media = `<video controls src="${esc(u)}"></video>`;
     else if (j.result_key.endsWith(".wav")) media = `<audio controls src="${esc(u)}"></audio>`;
     else media = `<a href="${esc(u)}" download>⬇️ Tải kết quả (${esc(j.result_key.split(".").pop())})</a>`;
@@ -451,7 +460,7 @@ async function uploadTo(url, inputId, extra) {
   if (!f) throw new Error("chưa chọn file");
   const fd = new FormData(); fd.append("file", f);
   for (const [k,v] of Object.entries(extra||{})) fd.append(k, v);
-  const r = await fetch(url, { method:"POST", headers:{ "X-API-Key": KEY }, body: fd });
+  const r = await fetch(url, { method:"POST", credentials:"same-origin", body: fd });
   const d = await r.json();
   if (!r.ok) throw new Error(d.detail || ("HTTP " + r.status));
   return d;
@@ -462,7 +471,7 @@ async function submitDub() {
   try {
     const up = await uploadTo("/v1/media/upload", "dubfile");
     flash("⏳ upload xong — tạo job dub…");
-    const r = await fetch("/v1/jobs", { method:"POST", headers:H(), body: JSON.stringify({
+    const r = await fetch("/v1/jobs", { method:"POST", headers:H(), credentials:"same-origin", body: JSON.stringify({
       type:"dub", media_url: up.media_key, source_lang: $("srclang").value,
       target_lang: $("tgtlang").value, background_mode: $("bgmode").value }) });
     const d = await r.json();
@@ -477,7 +486,7 @@ async function submitTTS() {
   try {
     const body = { type:"tts", text: $("ttstext").value };
     if ($("ttsvoice").value) body.voice_id = $("ttsvoice").value;
-    const r = await fetch("/v1/jobs", { method:"POST", headers:H(), body: JSON.stringify(body) });
+    const r = await fetch("/v1/jobs", { method:"POST", headers:H(), credentials:"same-origin", body: JSON.stringify(body) });
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || r.status);
     flash("✔ Job " + d.job_id + " đã tạo (−" + d.credits_charged + " credits).");
@@ -489,7 +498,7 @@ async function submitSTT() {
   flash("⏳ tạo job…");
   try {
     const up = await uploadTo("/v1/media/upload", "sttfile");
-    const r = await fetch("/v1/jobs", { method:"POST", headers:H(), body: JSON.stringify({
+    const r = await fetch("/v1/jobs", { method:"POST", headers:H(), credentials:"same-origin", body: JSON.stringify({
       type:"stt", media_url: up.media_key, source_lang: $("sttlang").value }) });
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || r.status);
@@ -508,7 +517,7 @@ async function uploadVoice() {
 }
 
 async function loadKeys() {
-  const r = await fetch("/v1/keys", { headers: H() });
+  const r = await fetch("/v1/keys", { headers: H(), credentials: "same-origin" });
   if (!r.ok) return;
   const d = await r.json();
   $("keylist").innerHTML = d.keys.map(k =>
@@ -517,17 +526,18 @@ async function loadKeys() {
     || '<tr><td class="mut">Chưa có key nào.</td></tr>';
 }
 async function createKey() {
-  const r = await fetch("/v1/keys", { method:"POST", headers:H() });
+  const r = await fetch("/v1/keys", { method:"POST", headers:H(), credentials:"same-origin" });
   const d = await r.json();
   if (!r.ok) { flash("✗ " + (d.detail||r.status), "err"); return; }
   $("keymsg").innerHTML = '<span class="ok">✔ Key mới (LƯU NGAY — chỉ hiện 1 lần):</span><br><code>' + esc(d.key) + '</code>';
   loadKeys();
 }
 
-if (KEY) {
-  fetch("/v1/me", { headers: H() }).then(r => { if (r.ok) boot(); else showGate(); });
-} else showGate();
-function showGate() { $("gate").style.display = ""; $("shell").style.display = "none"; }
+// Server chỉ trả trang này khi đã có phiên hợp lệ, nên không cần gate ở client nữa.
+// Vẫn kiểm tra một lần để nếu phiên vừa hết hạn thì chuyển về /login ngay.
+fetch("/v1/me", { headers: H(), credentials: "same-origin" })
+  .then(r => { if (r.ok) boot(); else needLogin(); })
+  .catch(() => needLogin());
 
 yvThemeChanged();  // đồng bộ nhãn nút sáng/tối với theme đã áp ở <head>
 </script>

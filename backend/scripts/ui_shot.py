@@ -33,8 +33,9 @@ import time
 import urllib.request
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-DEV_KEY = "dev-key-1"
-ADMIN_KEY = "admin-dev-key"
+# Tài khoản demo cho DB TẠM của script này (không phải thông tin thật).
+ADMIN_EMAIL = "admin@demo.local"
+DEMO_PASSWORD = "demo-password-123"
 
 PANELS = [  # (screenshot name, app router target, element that must be visible)
     ("02-dub", "dub", "#dubfile"),
@@ -52,21 +53,30 @@ def free_port() -> int:
 
 
 def seed_demo() -> None:
-    """Throwaway dev DB with demo rows so the UI isn't empty in screenshots."""
+    """Throwaway dev DB with demo rows so the UI isn't empty in screenshots.
+
+    Phase 2: UI xác thực bằng phiên, nên cần một Admin ĐĂNG NHẬP ĐƯỢC. Script tạo
+    admin + user demo với mật khẩu đã biết (DB này là tạm, xoá sau khi chụp).
+    """
     from sqlalchemy import select
 
-    from app.db import Base, SessionLocal, engine
-    from app.models import ApiKey, Job, JobStatus, User, Voice
+    from app.db import SessionLocal, engine
+    from app.migrations import ensure_schema
+    from app.models import Job, JobStatus, ROLE_ADMIN, User, Voice
+    from app.security import hash_password
 
-    Base.metadata.create_all(engine)
+    ensure_schema(engine)
     with SessionLocal() as db:
-        if db.scalar(select(User).where(User.email == "creator@demo")):
+        if db.scalar(select(User).where(User.email == ADMIN_EMAIL)):
             return
-        u = User(email="creator@demo", credits=49_858)
+        admin = User(email=ADMIN_EMAIL, role=ROLE_ADMIN,
+                     password_hash=hash_password(DEMO_PASSWORD), credits=49_858)
+        db.add(admin)
+        db.flush()
+        u = User(email="creator@demo", credits=49_858,
+                 password_hash=hash_password(DEMO_PASSWORD))
         db.add(u)
         db.flush()
-        db.add(ApiKey(key=hashlib.sha256(DEV_KEY.encode()).hexdigest(),
-                      prefix=DEV_KEY[:12], user_id=u.id))
         db.add(Voice(user_id=u.id, name="Giọng của Long", lang="vi",
                      engine="vieneu", ref_s3_key="voices/demo/ref.wav"))
         db.add(Voice(user_id=u.id, name="Mai Anh (preset)", lang="vi",
@@ -92,9 +102,7 @@ def main() -> int:
     sys.path.insert(0, str(REPO / "backend"))
     os.environ.setdefault("PYTHONPATH", str(REPO / "backend"))
     os.environ["YUPVOX_INLINE"] = "1"
-    os.environ["YUPVOX_ADMIN_KEY"] = ADMIN_KEY
     if not args.no_demo:
-        os.environ["YUPVOX_API_KEYS"] = DEV_KEY
         tmp = pathlib.Path(tempfile.mkdtemp(prefix="yv_ui_"))
         os.environ.setdefault("MEDIA_ROOT", str(tmp / "media"))
         os.environ.setdefault("DATABASE_URL", f"sqlite:///{tmp}/ui.db")
@@ -136,7 +144,6 @@ def main() -> int:
             browser = p.chromium.launch(**({"executable_path": chrome} if chrome else {}),
                                         args=launch_args)
             ctx = browser.new_context(viewport={"width": 1440, "height": 900})
-            ctx.add_init_script(f"localStorage.setItem('yv_api_key','{DEV_KEY}');")
             page = ctx.new_page()
             page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
 
@@ -148,6 +155,16 @@ def main() -> int:
                 page.screenshot(path=str(out_dir / f"{name}.png"), full_page=True)
                 shots += 1
 
+            # --- Đăng nhập bằng phiên (Phase 2): / chuyển về /login khi chưa có phiên.
+            page.goto(f"{base}/")
+            page.wait_for_selector("#email", timeout=20000)
+            shot("00-login")
+            page.fill("#email", ADMIN_EMAIL)
+            page.fill("#password", DEMO_PASSWORD)
+            page.click("#submit")
+            # Admin đăng nhập xong được đưa tới /admin (đúng hành vi sản phẩm), nên
+            # chờ RỜI khỏi /login rồi tự mở trang ứng dụng để chụp.
+            page.wait_for_url(lambda url: "/login" not in url, timeout=20000)
             page.goto(f"{base}/")
             page.wait_for_selector("#shell", state="visible", timeout=20000)
             page.wait_for_timeout(1200)
@@ -172,12 +189,15 @@ def main() -> int:
                 page.wait_for_timeout(700)
                 shot(name)
 
+            # --- Trang quản trị: phiên đang là admin nên vào thẳng, không cần key.
             page.goto(f"{base}/admin")
-            page.fill("#akey", ADMIN_KEY)
-            page.click("#login button")
             page.wait_for_selector("#content .card", timeout=20000)
             page.wait_for_timeout(500)
             shot("07-admin-settings")
+            page.click("#tab-users")
+            page.wait_for_selector("#users table.users", timeout=20000)
+            page.wait_for_timeout(500)
+            shot("10-admin-users")
 
             # Chế độ tối: bật qua đúng hàm của UI rồi kiểm tra theme đã đổi thật.
             page.goto(f"{base}/")

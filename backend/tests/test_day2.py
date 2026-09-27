@@ -122,16 +122,24 @@ assert "media not found" in r.json()["error"], r.text
 r = c.post("/v1/jobs", json={"type": "subtitle", "text": "hi"}, headers=h)
 assert r.status_code == 501, r.text
 
-# 3d) signup -> user + API key (hashed in DB), key works immediately.
-r = c.post("/v1/auth/signup", json={"email": "New@Example.io"})
+# 3d) signup: TẮT mặc định (chính sách Phase 2 — hệ thống self-host chỉ Admin tạo
+#     tài khoản). Bật công tắc thì mới tạo được, và KHÔNG bao giờ tạo admin.
+r = c.post("/v1/auth/signup", json={"email": "New@Example.io", "password": "matkhau123"})
+assert r.status_code == 403, r.text
+
+from app.settings_service import set_setting  # noqa: E402
+
+set_setting("auth.allow_signup", True, is_secret=False, category="security")
+r = c.post("/v1/auth/signup", json={"email": "New@Example.io", "password": "matkhau123"})
 assert r.status_code == 201, r.text
 su = r.json()
-assert su["key"].startswith("yv_")
+assert su["key"].startswith("yv_") and su["role"] == "user", su
 r = c.get("/v1/me", headers={"X-API-Key": su["key"]})
 assert r.status_code == 200 and r.json()["user_id"] == su["user_id"], r.text
 # duplicate email -> 409
-r = c.post("/v1/auth/signup", json={"email": "new@example.io"})
+r = c.post("/v1/auth/signup", json={"email": "new@example.io", "password": "matkhau123"})
 assert r.status_code == 409, r.text
+set_setting("auth.allow_signup", False, is_secret=False, category="security")
 
 # 4) credit metering + ledger: translate -2 stays; dub -60 refunded on failure
 r = c.get("/v1/me", headers=h)

@@ -36,3 +36,19 @@ lần đọc kế tiếp (TTL 5s) reload → pipeline đọc qua `get_setting` �
 `DATABASE_URL` · `SETTINGS_MASTER_KEY` — bootstrap secrets.
 Mọi biến khác (HF_TOKEN, TRANSLATE_*, YUPVOX_ADMIN_KEY, YUPVOX_API_KEYS,
 MEDIA_ROOT) chỉ là DEV FALLBACK khi DB chưa có entry.
+
+## Phase 2 — luồng xác thực
+
+```
+Lần đầu:  GET / ─(chưa có admin)─► /setup ─POST /v1/auth/setup─► tạo admin + cookie ─► /
+Sau đó:   GET / ─(chưa đăng nhập)─► /login ─POST /v1/auth/login─► cookie ─► /  (admin ─► /admin)
+Máy gọi:  X-API-Key: yv_…  ──► user_from_api_key (kiểm active + rate limit)
+Media:    <img|audio|video> tự gửi cookie  ──► _owns_media ──► 200 | 404
+```
+
+Env mới (đều là bootstrap/ops, không phải cấu hình nghiệp vụ):
+`YUPVOX_SECURE_COOKIES` (ép cookie Secure khi proxy thiếu `X-Forwarded-Proto`),
+`YUPVOX_ENABLE_DOCS` (mở `/docs`).
+
+**Đã bỏ mặc định:** `YUPVOX_ADMIN_KEY` (rỗng = tắt đường key) và `YUPVOX_API_KEYS`
+(rỗng = không dev key) — trước đây là `admin-dev-key` / `dev-key-1`, tức backdoor luôn mở.

@@ -106,6 +106,16 @@ Hybrid VRAM (gói 12GB): nếu dịch chạy cloud → trả lại ~4GB → all-
 bản open-source mới nhất. Tính năng Dubbing/Lecture/TikTok của VieNeu chỉ có trong app
 chính thức; repo chỉ cung cấp core SDK → pipeline dub (D5) là phần chúng ta tự viết.
 
+## Tài liệu
+
+- [`docs/oss-references.md`](docs/oss-references.md) — rà soát **mã nguồn OSS tham chiếu**
+  cho từng tính năng (dubbing, TTS/clone, diarization, lip-sync, video AI, UI đa track…),
+  **license đã xác minh bằng file LICENSE thật**, danh sách "không dùng" và lộ trình áp dụng.
+  Quy tắc: dự án này Apache-2.0 → chỉ copy code từ MIT/Apache/BSD/ISC; **AGPL/GPL chỉ tham
+  khảo kiến trúc**. Cảnh báo bẫy phổ biến: code permissive nhưng **weights non-commercial**.
+- **Ảnh mẫu giao diện** (`docs/design-mockup.jpeg`, sản phẩm proprietary) được giữ
+  **ngoài repo** — không phát hành lại; tài liệu trên đã đối chiếu đầy đủ tính năng của nó.
+
 ## Lộ trình 7 ngày
 
 - [x] **D1** Skeleton: docker-compose (postgres/redis/minio/api/worker), API shape,

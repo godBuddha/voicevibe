@@ -7,6 +7,7 @@ pyannote.audio>=4.0,<5       # diarization (MIT code; gated -> accept 4 repo HF,
 vieneu                       # Vietnamese TTS + instant cloning (Apache-2.0), v3 Turbo
                              #   GPU: RTF ~0.02 batched (48kHz) | CPU ONNX: RTF ~0.5, torch-free
                              #   GPU path pins transformers==4.57.6 per upstream README
+transformers==4.57.6         # vieneu GPU path dependency (pinned per upstream)
 # chatterbox-tts: CẦN VENV RIÊNG nếu dùng (pin torch==2.6.0, xung đột pyannote>=2.8)
 srt>=3.5
 soundfile>=0.12              # nạp audio in-memory cho pyannote (bypass torchcodec)

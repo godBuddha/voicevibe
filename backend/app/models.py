@@ -49,10 +49,13 @@ class User(Base):
 class ApiKey(Base):
     __tablename__ = "api_keys"
 
+    # Stores the SHA-256 hex of the raw key — a DB dump cannot recover usable
+    # keys. `prefix` keeps the first chars for masked display ("yv_abcd…").
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    prefix: Mapped[str] = mapped_column(String(16), default="")
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
-    rate_limit_per_min: Mapped[int] = mapped_column(Integer, default=60)  # TODO(D6) enforce
+    rate_limit_per_min: Mapped[int] = mapped_column(Integer, default=60)
     created_at: Mapped[int] = mapped_column(BigInteger, default=_now)
 
     user: Mapped[User] = relationship(back_populates="api_keys")

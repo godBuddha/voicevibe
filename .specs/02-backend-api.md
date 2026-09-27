@@ -44,3 +44,18 @@ Lỗi chuẩn HTTP: 401 (key sai) · 402 (thiếu credits) · 404 · 409 (job ch
 `YUPVOX_INLINE=1` (mặc định dev/máy cá nhân): chạy trong tiến trình API, không cần Redis.
 `YUPVOX_INLINE=0`: Celery qua Redis, worker GPU 1 job/lúc (prefetch=1, acks_late).
 Job types: `tts` ✅ · `stt` ✅ · `dub` ✅ · `translate`/`subtitle` → stub (D8+).
+
+## Bổ sung (hardening pass 27/09)
+| Method | Path | Mô tả |
+|---|---|---|
+| POST | /v1/auth/signup | `{email}` → 201 `{user_id, key}` — rate limit 5/phút/IP; trùng email → 409 |
+| GET | /v1/pricing | Bảng credits/job từ Settings (admin sửa được) |
+| GET | /v2/ | Frontend redesign (StaticFiles, song song với UI inline ở /) |
+
+- POST /v1/jobs `type=subtitle` → **501, KHÔNG trừ credits** (pipeline chưa có).
+- **API key lưu SHA-256 hash** (cột `key`), cột `prefix` để hiển thị masked; DELETE /v1/keys/{raw}.
+- **Refund**: job failed hoàn 100% credits (ledger `refund:job:<type>`); `_set_failed(job, exc, db)`.
+- Webhook kèm `X-YupVox-Signature` = HMAC-SHA256(`webhook.secret`, body) khi secret được set trong Settings.
+- `_run_tts` kiểm tra ownership voice profile (chống IDOR).
+- Storage: `S3_ENDPOINT` set → S3/MinIO (S3Storage); không → LocalStorage `MEDIA_ROOT` (mặc định `./media`).
+- Celery: `task_default_queue="media"` khớp worker `-Q media`.

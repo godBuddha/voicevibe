@@ -1,0 +1,40 @@
+name: selftests
+
+on: [push, pull_request]
+
+jobs:
+  offline-selftests:
+    # Tất cả test chạy offline — KHÔNG cần GPU, không tải model AI.
+    # Pipeline thật (STT/dub GPU) được verify bằng scripts/d*_smoke.py trên box GPU.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install ffmpeg (dub_pipeline selftest mixes audio via ffmpeg)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Install API test deps
+        run: pip install fastapi "uvicorn[standard]" "sqlalchemy>=2.0" httpx cryptography pydantic "celery[redis]" python-multipart
+      - name: Run offline selftests
+        env:
+          PYTHONPATH: .
+          YUPVOX_INLINE: "1"
+        run: |
+          python tests/test_day2.py
+          python tests/test_providers.py
+          python tests/test_settings.py
+          python -m app.pipelines.dub --selftest
+          python -m app.pipelines.stt --selftest
+          python -m app.pipelines.translate --selftest
+          python -m app.pipelines.tts --selftest
+          python -m app.pipelines.dub_pipeline --selftest
+      - name: Compose config sanity (bootstrap guards must be present)
+        run: |
+          cd ..
+          SETTINGS_MASTER_KEY=x POSTGRES_PASSWORD=x MINIO_ROOT_PASSWORD=x \
+            docker compose config -q && echo "compose config OK"

@@ -128,6 +128,8 @@ git clone <repo-url> && cd yupvox-clone
 cp .env.example .env
 # Sinh master key (BẮT BUỘC — mã hóa secret settings):
 openssl rand -hex 32   # dán vào SETTINGS_MASTER_KEY trong .env
+# Nếu chạy docker-compose (lựa chọn C), điền thêm trong .env:
+#   POSTGRES_PASSWORD=...  MINIO_ROOT_PASSWORD=...   (compose báo thiếu nếu quên)
 ```
 
 **HF token (cho pyannote diarization):** tạo token read tại
@@ -135,6 +137,10 @@ openssl rand -hex 32   # dán vào SETTINGS_MASTER_KEY trong .env
 `pyannote/speaker-diarization-3.1` · `pyannote/segmentation-3.0` ·
 `pyannote/wespeaker-voxceleb-resnet34-LM` · `pyannote/speaker-diarization-community-1`.
 Token dán vào `.env` HOẶC set sau qua `/admin/settings` (khuyến nghị).
+
+> Giao diện: `/` là UI inline (hoạt động ngay). `/v2` là bản frontend redesign
+> (StaticFiles) — song song cho đến khi hoàn thiện rồi thay thế. Admin:
+> `/admin` (Settings UI). Lấy API key đầu tiên: `POST /v1/auth/signup` hoặc key dev.
 
 ## Lựa chọn A — Máy cá nhân KHÔNG GPU (CPU-only)
 

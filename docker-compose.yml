@@ -7,6 +7,7 @@ volumes:
   pgdata:
   miniodata:
   media:
+  models:
 
 services:
   postgres:
@@ -51,14 +52,38 @@ services:
       retries: 10
     networks: [internal]
 
+  # One-shot: tạo bucket S3 nếu chưa có (idempotent — an toàn khi redeploy).
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET:-yupvox}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD;
+      mc mb --ignore-existing local/$$S3_BUCKET"
+    networks: [internal]
+
   api:
-    build: ./backend
+    build:
+      context: ./backend
+      target: api
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     environment:
       DATABASE_URL: postgresql+psycopg://yupvox:${POSTGRES_PASSWORD}@postgres:5432/yupvox
       REDIS_URL: redis://redis:6379/0
-      S3_ENDPOINT: http://minio:9000
+      SETTINGS_MASTER_KEY: ${SETTINGS_MASTER_KEY:?set in .env}
+      YUPVOX_ADMIN_KEY: ${YUPVOX_ADMIN_KEY:-}
       YUPVOX_API_KEYS: ${YUPVOX_API_KEYS:-dev-key-1}
+      MEDIA_ROOT: /media
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET:-yupvox}
     ports:
       - "8000:8000"
     volumes:
@@ -69,27 +94,39 @@ services:
       redis:
         condition: service_healthy
       minio:
-        condition: service_started
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     networks: [internal]
 
-  # Worker AI: cần GPU khi chạy thật (xem README phần phần cứng).
+  # Worker AI: target `worker` (torch + faster-whisper + pyannote + vieneu).
+  # Cần GPU: uncomment deploy.resources trên máy có nvidia-container-toolkit.
   worker:
-    build: ./backend
-    command: celery -A app.tasks.celery_app worker -l info -Q media -c 1
+    build:
+      context: ./backend
+      target: worker
     environment:
       DATABASE_URL: postgresql+psycopg://yupvox:${POSTGRES_PASSWORD}@postgres:5432/yupvox
       REDIS_URL: redis://redis:6379/0
+      SETTINGS_MASTER_KEY: ${SETTINGS_MASTER_KEY:?set in .env}
+      MEDIA_ROOT: /media
       S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET:-yupvox}
       HF_TOKEN: ${HF_TOKEN:-}
     volumes:
       - media:/media
-      - models:/root/.cache/huggingface
+      - models:/models/hf
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    # Bỏ comment khi chạy trên máy có GPU + nvidia-container-toolkit:
+      minio-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    networks: [internal]
     # deploy:
     #   resources:
     #     reservations:
@@ -97,7 +134,3 @@ services:
     #         - driver: nvidia
     #           count: 1
     #           capabilities: [gpu]
-    networks: [internal]
-
-volumes:
-  models:

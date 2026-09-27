@@ -39,7 +39,8 @@ SETTING_DEFS: list[dict] = [
     {"key": "translate.model", "category": "translation", "secret": False,
      "label": "Translation model name", "env": "TRANSLATE_MODEL"},
     {"key": "media_root", "category": "storage", "secret": False,
-     "label": "Media storage root", "env": "MEDIA_ROOT", "default": "/workspace/media"},
+     "label": "Media storage root (Local mode)", "env": "MEDIA_ROOT",
+     "default": "./media"},
     {"key": "max_speed", "category": "dubbing", "secret": False,
      "label": "Max speech tempo before re-translate", "default": 1.35},
     {"key": "pricing.tts", "category": "pricing", "secret": False,
@@ -54,6 +55,8 @@ SETTING_DEFS: list[dict] = [
      "label": "Subtitle credits/job", "default": 8},
     {"key": "admin.api_key", "category": "security", "secret": True,
      "label": "Admin API key", "env": "YUPVOX_ADMIN_KEY", "default": "admin-dev-key"},
+    {"key": "webhook.secret", "category": "security", "secret": True,
+     "label": "Webhook HMAC secret (X-YupVox-Signature)", "default": ""},
 ]
 
 

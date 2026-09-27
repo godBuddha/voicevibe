@@ -8,11 +8,12 @@ Feature surface mirrors YupVox:
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import secrets as _secrets
 import time
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
@@ -66,10 +67,15 @@ def _check_rate(ident: str, limit: int) -> bool:
     return True
 
 
+def _hash_key(raw: str) -> str:
+    """API keys are stored hashed — a DB dump exposes no usable keys."""
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
 def admin_auth(x_admin_key: str = Header(..., alias="X-Admin-Key")) -> None:
     expected = str(get_setting("admin.api_key", "admin-dev-key",
                                env_fallback="YUPVOX_ADMIN_KEY"))
-    if x_admin_key != expected:
+    if not _secrets.compare_digest(x_admin_key, expected):  # timing-safe
         raise HTTPException(status_code=401, detail="invalid admin key")
 
 
@@ -77,7 +83,8 @@ def auth(
     x_api_key: str = Header(..., alias="X-API-Key"),
     db: Session = Depends(get_db),
 ) -> User:
-    key = db.scalar(select(ApiKey).where(ApiKey.key == x_api_key, ApiKey.active.is_(True)))
+    key = db.scalar(select(ApiKey).where(ApiKey.key == _hash_key(x_api_key),
+                                         ApiKey.active.is_(True)))
     if key:
         user = db.get(User, key.user_id)
         if user:
@@ -135,6 +142,10 @@ def create_job(
 ) -> dict:
     if job.type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"type must be one of {sorted(VALID_TYPES)}")
+    if job.type == "subtitle":
+        # Chưa có pipeline thật — không nhận tiền của user (501, không trừ credits).
+        raise HTTPException(status_code=501,
+                            detail="subtitle pipeline chưa triển khai — job không bị trừ credits")
     j = Job(user_id=user.id, type=job.type, params=job.model_dump(exclude_none=True))
     db.add(j)
     db.flush()  # need j.id for the ledger row
@@ -231,6 +242,25 @@ def app_page() -> str:
     return APP_HTML
 
 
+# ---------------------------------------------------------------- frontend v2
+# Bản redesign (frontend/) được serve tại /v2 — song song với UI inline ở /
+# cho đến khi hoàn thiện rồi thay thế. Chỉ mount khi thư mục tồn tại (image
+# Docker api hiện chỉ copy backend/app — UI inline là fallback trong container).
+from pathlib import Path as _Path  # noqa: E402
+
+from fastapi.staticfiles import StaticFiles  # noqa: E402
+
+_FRONTEND = _Path(__file__).resolve().parents[2] / "frontend"
+if _FRONTEND.is_dir():
+    app.mount("/v2", StaticFiles(directory=str(_FRONTEND), html=True), name="frontend")
+
+
+@app.get("/v1/pricing")
+def pricing(user: User = Depends(auth)) -> dict:
+    """Bảng giá credits/job — nguồn sự thật là Settings (admin sửa được)."""
+    return {"pricing": {t: int(get_setting(f"pricing.{t}", COSTS[t])) for t in COSTS}}
+
+
 @app.post("/v1/media/upload", status_code=201)
 async def upload_media(file: UploadFile = File(...), user: User = Depends(auth),
                        db: Session = Depends(get_db)) -> dict:
@@ -248,7 +278,8 @@ async def upload_media(file: UploadFile = File(...), user: User = Depends(auth),
 @app.get("/media/{key:path}")
 def serve_media(key: str, api_key: str = "", db: Session = Depends(get_db)) -> FileResponse:
     """Serve kết quả — auth qua query param (media tag không gửi header được)."""
-    ok = api_key in DEV_KEYS or db.get(ApiKey, api_key) is not None
+    ok = api_key in DEV_KEYS or db.scalar(
+        select(ApiKey).where(ApiKey.key == _hash_key(api_key))) is not None
     if not ok:
         raise HTTPException(status_code=401, detail="invalid api key")
     storage = get_storage()
@@ -319,26 +350,55 @@ def admin_delete(key: str, _: None = Depends(admin_auth)) -> dict:
 @app.post("/v1/keys", status_code=201)
 def create_api_key(user: User = Depends(auth), db: Session = Depends(get_db)) -> dict:
     raw = "yv_" + _secrets.token_hex(16)
-    row = ApiKey(key=raw, user_id=user.id)
-    db.add(row)
+    db.add(ApiKey(key=_hash_key(raw), prefix=raw[:12], user_id=user.id))
     db.commit()
-    return {"key": raw, "rate_limit_per_min": row.rate_limit_per_min,
-            "note": "store it now — shown once"}
+    return {"key": raw, "rate_limit_per_min": 60,
+            "note": "store it now — shown once (only a SHA-256 hash is stored)"}
 
 
 @app.get("/v1/keys")
 def list_api_keys(user: User = Depends(auth), db: Session = Depends(get_db)) -> dict:
     keys = db.scalars(select(ApiKey).where(ApiKey.user_id == user.id)).all()
-    return {"keys": [{"key": mask(k.key), "active": k.active,
+    return {"keys": [{"key": mask(k.prefix), "active": k.active,
                       "rate_limit_per_min": k.rate_limit_per_min} for k in keys]}
 
 
 @app.delete("/v1/keys/{key}")
 def revoke_api_key(key: str, user: User = Depends(auth),
                    db: Session = Depends(get_db)) -> dict:
-    row = db.get(ApiKey, key)
+    # Accepts the RAW key (the only form a client still holds); lookup is hashed.
+    row = db.get(ApiKey, _hash_key(key))
     if row is None or row.user_id != user.id:
         raise HTTPException(status_code=404, detail="key not found")
     db.delete(row)
     db.commit()
-    return {"key": mask(key), "revoked": True}
+    return {"key": mask(row.prefix), "revoked": True}
+
+
+# --------------------------------------------------------- Day 6.1: signup
+
+
+class SignupIn(BaseModel):
+    email: str
+
+
+@app.post("/v1/auth/signup", status_code=201)
+def signup(body: SignupIn, request: Request,
+           db: Session = Depends(get_db)) -> dict:
+    """Tạo user + API key đầu tiên. Không cần auth — rate limit theo IP (5/phút)."""
+    ip = request.client.host if request.client else "unknown"
+    if not _check_rate(f"signup:{ip}", 5):
+        raise HTTPException(status_code=429, detail="too many signups, retry later")
+    email = body.email.strip().lower()
+    if "@" not in email or len(email) > 255:
+        raise HTTPException(status_code=422, detail="invalid email")
+    if db.scalar(select(User).where(User.email == email)):
+        raise HTTPException(status_code=409, detail="email already registered")
+    u = User(email=email)
+    db.add(u)
+    db.flush()
+    raw = "yv_" + _secrets.token_hex(16)
+    db.add(ApiKey(key=_hash_key(raw), prefix=raw[:12], user_id=u.id))
+    db.commit()
+    return {"user_id": u.id, "email": email, "credits": u.credits,
+            "key": raw, "note": "store it now — shown once"}

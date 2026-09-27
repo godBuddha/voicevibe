@@ -109,13 +109,16 @@ assert _pick_backend("vi", "en") == "local"
 print("translate via settings .... OK")
 
 # 8) keys management
+import hashlib
+
 with SessionLocal() as db:
     from app.models import ApiKey, User
 
     u = User(email="d6-admin@local")
     db.add(u)
     db.flush()
-    db.add(ApiKey(key="d6-test-key", user_id=u.id))
+    db.add(ApiKey(key=hashlib.sha256(b"d6-test-key").hexdigest(),
+                  prefix="d6-test-key"[:12], user_id=u.id))
     db.commit()
 
 KH = {"X-API-Key": "d6-test-key"}
@@ -124,7 +127,8 @@ assert r.status_code == 201
 new_key = r.json()["key"]
 assert new_key.startswith("yv_")
 r = c.get("/v1/keys", headers=KH)
-assert any(k["key"].endswith(new_key[-4:]) for k in r.json()["keys"])
+# list shows the masked PREFIX (only a SHA-256 hash of the raw key is stored)
+assert any(k["key"] == "••••" + new_key[:12][-4:] for k in r.json()["keys"])
 r = c.delete(f"/v1/keys/{new_key}", headers=KH)
 assert r.status_code == 200
 assert c.get("/v1/me", headers={"X-API-Key": new_key}).status_code == 401

@@ -22,38 +22,77 @@ celery_app.conf.update(
     task_acks_late=True,
     worker_prefetch_multiplier=1,  # one GPU job at a time
     task_track_started=True,
+    # compose worker runs `celery worker -Q media` — send_task without a queue
+    # would land on the default "celery" queue and NEVER be consumed.
+    task_default_queue="media",
 )
 
 # Real implementations land on:
 #   tts       -> D4  (VieNeu preset + zero-shot clone)  [DONE]
-#   stt       -> D3  (faster-whisper + pyannote)        [DONE as pipeline; job wiring D5]
-#   subtitle  -> D5  (SRT/VTT/ASS export with speaker labels)
-#   translate -> D5  (LLM with length constraint for dubbing)
-#   dub       -> D5  (stt + translate + tts + timing-fit engine)
+#   stt       -> D3  (faster-whisper + pyannote)        [DONE]
+#   translate -> D5  (cloud OpenAI-compatible / local Marian)  [DONE]
+#   dub       -> D5  (stt + translate + tts + timing-fit engine)  [DONE]
+#   subtitle  -> NOT WIRED (API returns 501, no credits charged)
 PIPELINES: dict[str, str] = {
-    "tts": "D4", "stt": "D3", "translate": "D5", "dub": "D5", "subtitle": "D5",
+    "tts": "done", "stt": "done", "translate": "done", "dub": "done",
+    "subtitle": "not implemented",
 }
 
 
-def _set_failed(job, exc: Exception) -> None:
-    from .models import JobStatus  # noqa: F401 — module-level name for this helper
+def _set_failed(job, exc: Exception, db) -> None:
+    """Mark failed + REFUND charged credits — failed jobs are free.
+
+    Job.credits_charged is zeroed (history stays in the ledger rows); the
+    refund is a positive ledger row with reason `refund:job:<type>`.
+    """
+    from .models import CreditLedger, JobStatus, User
 
     job.status = JobStatus.failed
     job.error = str(exc)[:500]
     job.progress = 100
-    from .db import SessionLocal  # noqa: F401  (caller commits)
+    charged = job.credits_charged or 0
+    if charged:
+        user = db.get(User, job.user_id)
+        if user is not None:
+            user.credits += charged
+            db.add(CreditLedger(user_id=user.id, delta=charged,
+                                reason=f"refund:job:{job.type}", job_id=job.id))
+            job.credits_charged = 0
 
 
 def _notify(url: str | None, payload: dict) -> None:
-    """Fire-and-forget webhook — failures must never fail the job."""
+    """Fire-and-forget webhook — failures must never fail the job.
+
+    When `webhook.secret` is set (Settings UI → security), the body is signed:
+    receiver verifies X-YupVox-Signature = HMAC-SHA256(secret, raw_body).
+    """
     if not url:
         return
     try:
+        import hashlib
+        import hmac
+        import json
+
         import httpx
 
-        httpx.post(url, json=payload, timeout=10.0)
+        headers: dict[str, str] = {}
+        secret = get_setting_safe("webhook.secret")
+        if secret:
+            body = json.dumps(payload, separators=(",", ":")).encode()
+            sig = hmac.new(str(secret).encode(), body, hashlib.sha256).hexdigest()
+            headers["X-YupVox-Signature"] = sig
+        httpx.post(url, json=payload, headers=headers, timeout=10.0)
     except Exception:  # noqa: BLE001
         pass
+
+
+def get_setting_safe(key: str):
+    try:
+        from .settings_service import get_setting
+
+        return get_setting(key)
+    except Exception:  # noqa: BLE001 — settings DB down must not break jobs
+        return None
 
 
 def _resolve_media(media_url: str, storage) -> str:
@@ -106,7 +145,7 @@ def _run_dub(job_id: str, params: dict) -> dict:
         with SessionLocal() as db:
             job = db.get(Job, job_id)
             if job is not None:
-                _set_failed(job, exc)
+                _set_failed(job, exc, db)
                 db.commit()
         return {"ok": False, "error": str(exc)[:200]}
 
@@ -148,7 +187,7 @@ def _run_stt(job_id: str, params: dict) -> dict:
         with SessionLocal() as db:
             job = db.get(Job, job_id)
             if job is not None:
-                _set_failed(job, exc)
+                _set_failed(job, exc, db)
                 db.commit()
         return {"ok": False, "error": str(exc)[:200]}
 
@@ -169,6 +208,10 @@ def _run_tts(job_id: str, params: dict) -> dict:
         db.commit()
         try:
             voice = db.get(Voice, params["voice_id"]) if params.get("voice_id") else None
+            if voice is not None and voice.user_id != job.user_id:
+                # Ownership check — a key must not synthesize with another
+                # user's cloned voice profile (IDOR).
+                raise PermissionError("voice profile does not belong to you")
             out_key = synthesize_with_voice(params["text"], voice, get_storage())
             job.status = JobStatus.done
             job.progress = 100
@@ -179,9 +222,52 @@ def _run_tts(job_id: str, params: dict) -> dict:
                     {"job_id": job_id, "status": "done", "result_key": out_key})
             return {"ok": True, "key": out_key}
         except Exception as exc:  # noqa: BLE001 — any failure -> job.failed
-            _set_failed(job, exc)
+            _set_failed(job, exc, db)
             db.commit()
             return {"ok": False, "error": str(exc)[:200]}
+
+
+def _run_translate(job_id: str, params: dict) -> dict:
+    """Real D5 translate pipeline: text -> translated text (storage .txt)."""
+    from .db import SessionLocal
+    from .models import Job, JobStatus
+    from .pipelines.translate import build_translator
+    from .storage import get_storage
+
+    with SessionLocal() as db:
+        job = db.get(Job, job_id)
+        if job is None:
+            return {"ok": False, "error": "job not found"}
+        job.status = JobStatus.running
+        job.progress = 10
+        db.commit()
+    try:
+        source = params.get("source_lang") or "vi"
+        target = params.get("target_lang") or "en"
+        text = params.get("text") or ""
+        if not text.strip():
+            raise ValueError("text is required for translate jobs")
+        tr = build_translator(source, target)
+        out = tr.translate(text)
+        key = f"jobs/{job_id}/translated.txt"
+        get_storage().put(key, out.encode("utf-8"))
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            job.status = JobStatus.done
+            job.progress = 100
+            job.result_s3_key = key
+            job.error = None
+            db.commit()
+        _notify(params.get("webhook_url"),
+                {"job_id": job_id, "status": "done", "result_key": key})
+        return {"ok": True, "key": key}
+    except Exception as exc:  # noqa: BLE001
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            if job is not None:
+                _set_failed(job, exc, db)
+                db.commit()
+        return {"ok": False, "error": str(exc)[:200]}
 
 
 def _run_stub(job_id: str, params: dict) -> dict:
@@ -218,6 +304,8 @@ def dispatch_inline(job_id: str, params: dict) -> dict:
         return _run_dub(job_id, params)
     if jtype == "stt":
         return _run_stt(job_id, params)
+    if jtype == "translate":
+        return _run_translate(job_id, params)
     return _run_stub(job_id, params)
 
 

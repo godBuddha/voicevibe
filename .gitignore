@@ -4,3 +4,6 @@ __pycache__/
 *.db
 .env
 models/
+
+# Design reference (proprietary product mockup) — local only, never publish
+docs/design-mockup.jpeg

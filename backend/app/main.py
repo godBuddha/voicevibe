@@ -238,8 +238,15 @@ def admin_page() -> str:
 
 @app.get("/", response_class=HTMLResponse)
 def app_page() -> str:
-    """Giao diện người dùng — Dub / TTS / Voices / Jobs."""
-    return APP_HTML
+    """Giao diện người dùng — Dub / TTS / Voices / Jobs.
+
+    AGPL-3.0 §13: liên kết "Mã nguồn" phải trỏ tới bản mã nguồn tương ứng đang chạy.
+    Đọc từ Settings (`app.source_url`) để self-host đổi được mà không sửa code.
+    """
+    from html import escape
+
+    url = escape(str(get_setting("app.source_url", "")), quote=True)
+    return APP_HTML.replace("__SOURCE_URL__", url)
 
 
 @app.get("/v1/pricing")

@@ -151,6 +151,19 @@ def main() -> int:
             page.goto(f"{base}/")
             page.wait_for_selector("#shell", state="visible", timeout=20000)
             page.wait_for_timeout(1200)
+
+            # AGPL §13: liên kết "Mã nguồn" phải THỰC SỰ tiếp cận được, không chỉ
+            # tồn tại trong DOM. Sidebar dài + fixed nên rất dễ bị đẩy xuống dưới
+            # màn hình mà không ai nhận ra khi chỉ nhìn code.
+            link = page.locator('.side-foot a')
+            assert link.count() == 1, "thiếu liên kết Mã nguồn (AGPL §13)"
+            box = link.bounding_box()
+            vh = page.viewport_size["height"]
+            assert box and box["y"] + box["height"] <= vh, (
+                f"liên kết Mã nguồn nằm ngoài màn hình (y={box and box['y']:.0f}, "
+                f"viewport={vh}) — thu gọn sidebar để nó hiển thị được"
+            )
+
             shot("01-dashboard")
 
             for name, target, sel in PANELS:

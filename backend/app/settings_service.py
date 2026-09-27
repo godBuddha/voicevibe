@@ -28,6 +28,11 @@ _TTL = 5.0  # seconds
 
 # The registry the admin UI renders. env = dev fallback key name.
 SETTING_DEFS: list[dict] = [
+    # AGPL-3.0 §13: app chạy qua mạng phải chỉ đường lấy mã nguồn. Self-host bản
+    # sửa thì ĐỔI giá trị này sang kho của bạn — đó là nghĩa vụ giấy phép.
+    {"key": "app.source_url", "category": "general", "secret": False,
+     "label": "Liên kết mã nguồn (AGPL-3.0 §13)",
+     "default": "https://github.com/godBuddha/yupvox-clone"},
     {"key": "hf_token", "category": "credentials", "secret": True,
      "label": "Hugging Face token (pyannote gated)", "env": "HF_TOKEN"},
     {"key": "translate.backend", "category": "translation", "secret": False,

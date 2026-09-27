@@ -8,15 +8,22 @@ mục đích: **học kiến trúc + tái sử dụng code** cho YupVox-Clone.
 (hay GitHub/HuggingFace API), ngày 27/09/2026 — không lấy từ trí nhớ.**
 Stars/chỉ số là ước lượng cùng ngày.
 
-## 0. Nguyên tắc bắt buộc (dự án này là Apache-2.0)
+## 0. Nguyên tắc (dự án PHI THƯƠNG MẠI, license Apache-2.0 — xem mục 1c)
+
+> Dự án phát hành miễn phí, không thương mại. Điều đó **mở khoá weights CC-BY-NC** nhưng
+> **không** mở khoá code copyleft — xem mục 1c để biết chính xác cái gì đổi, cái gì không.
 
 | Loại license | Được copy code? | Lý do |
 |---|---|---|
 | MIT / Apache-2.0 / BSD-2 / BSD-3 / ISC | ✅ **ĐƯỢC** | Permissive — phải **giữ nguyên copyright notice** + ghi công (NOTICE) |
+| **AGPL-3.0 / GPL-3.0** | ✅ **ĐƯỢC** (từ 27/09/2026) | Dự án **đã đổi sang AGPL-3.0** nên code copyleft nay tương thích. Vẫn phải **giữ copyright gốc + pin đúng commit lấy** |
 | MPL-2.0 / LGPL-3.0 | ⚠️ Hạn chế | Dùng như **thư viện riêng, không sửa** thì OK; sửa rồi nhúng vào là phải mở source phần đó |
-| **AGPL-3.0** | ❌ **KHÔNG** | Network copyleft: chạy như *dịch vụ qua mạng* → buộc mở source **toàn bộ** hệ thống |
-| **GPL-3.0 / SSPL** | ❌ **KHÔNG** | Copyleft lây nhiễm khi link/nhúng |
-| License riêng (research/community license) | ❌ Phải đọc điều khoản | Thường cấm thương mại, hoặc giới hạn doanh thu/khu vực |
+| **SSPL** | ❌ **KHÔNG** | Không tương thích AGPL — cấm chạy như dịch vụ trừ khi mở source toàn bộ stack |
+| License riêng (research/community/branding clause) | ❌ Phải đọc điều khoản | Thường cấm thương mại, giới hạn số người dùng, hoặc buộc hiển thị thương hiệu |
+| **Không có license** | ❌ **KHÔNG** | Mặc định *all rights reserved* — "non-commercial" trong README là **hạn chế**, không phải **cho phép** |
+
+> ⚠️ **Chiều tương thích quan trọng:** Apache/BSD/MIT → AGPL thì **được**; AGPL → Apache thì
+> **không**. Vì dự án đã là AGPL-3.0, ta copy được từ mọi hướng trừ SSPL và no-license.
 
 > ⚠️ **Bẫy phổ biến nhất — đã xác minh nhiều lần:** repo **code permissive** nhưng
 > **trọng số model (weights) lại non-commercial**. Copy code được, nhưng **không được
@@ -147,7 +154,62 @@ Chi tiết quan trọng:
   Frontend của họ (React, không phải Svelte) có cụm `settings/endpoints/*` và
   `PromptTemplate*` rất đáng **học bố cục**, nhưng không copy.
 
+## 1c. Bối cảnh: dự án PHI THƯƠNG MẠI, 100% mã nguồn mở miễn phí (27/09/2026)
+
+Chủ dự án xác nhận: **không dự kiến thương mại hoá, phát hành miễn phí, mở 100%**.
+Điều này thay đổi một số kết luận ở mục 0 và 2 — và thay đổi **theo một hướng cụ thể,
+không phải "mở hết"**:
+
+### Điều ĐƯỢC MỞ do phi thương mại
+- **Toàn bộ weights CC-BY-NC** trở nên dùng được: F5-TTS, Spark-TTS, XTTS-v2 (CPML cấm
+  thương mại nhưng cho phép phi thương mại), Sortformer, Canary-v1, MMS, Moonshine VI legacy.
+- **Quan trọng nhất — KHOẢNG TRỐNG ALIGNER TIẾNG VIỆT ĐÃ ĐÓNG.** Mục 3 trước đây ghi
+  "không có aligner tiếng Việt permissive"; giờ dùng được:
+  - `nguyenvulebinh/wav2vec2-base-vietnamese-250h` — **cc-by-nc-4.0** (đã verify HF API), không gated
+  - `facebook/mms-1b-fl102` (MMS_FA cho `torchaudio.forced_align`) — **cc-by-nc-4.0**
+  → Có thể ghép thẳng vào `whisperX`-style alignment (code BSD-2) hoặc
+  `torchaudio.functional.forced_align` (code BSD-2). **Không cần tự train CTC nữa.**
+
+### Điều KHÔNG đổi (quan trọng — dễ hiểu nhầm)
+- **AGPL/GPL không phải là "cấm thương mại"**. Phần mềm AGPL được phép dùng, sửa, **và bán**.
+  Ràng buộc duy nhất là **phải công bố mã nguồn** khi chạy như dịch vụ qua mạng (§13).
+  Vì dự án này vốn đã công bố 100% mã nguồn, ràng buộc đó *về nguyên tắc đã được thoả* —
+  nhưng vẫn còn một chốt kỹ thuật: **không thể đặt code AGPL vào một dự án Apache-2.0**.
+- **Apache-2.0 → AGPL-3.0 thì được, chiều ngược lại thì không.** FSF nói rõ: *"Apache License,
+  Version 2.0 … This is a free software license, **compatible with version 3 of the GNU GPL**"*
+  (nguồn: gnu.org/licenses/license-list.html#apache2). Nghĩa là code Apache-2.0 của ta có thể
+  đưa vào một work AGPL-3.0; nhưng code AGPL-3.0 **không** thể đưa vào work Apache-2.0 —
+  muốn dùng thì phải **đổi license toàn dự án sang AGPL-3.0** (hoặc giữ chúng như tiến trình
+  riêng, gọi qua CLI/HTTP — "mere aggregation", không link vào cùng work).
+- **"Không có license" KHÔNG PHẢI là "được dùng miễn phí".** Mặc định là *all rights reserved*.
+  → **Wav2Lip vẫn bị chặn** kể cả với mục đích phi thương mại: repo không có file LICENSE, và
+  ghi chú "non-commercial" trong README là một **hạn chế**, không phải một **sự cho phép**.
+  Dùng **MuseTalk (MIT)** thay thế — chất lượng tốt hơn và sạch pháp lý.
+- Giấy phép kiểu **"branding clause"** (open-webui ≥ v0.6.6, ArcReel NOTICE §7) **không** phụ
+  thuộc vào việc bạn có thương mại hay không — chúng ràng buộc về *số người dùng* hoặc về
+  *nghĩa vụ hiển thị*. Với dự án phi thương mại quy mô nhỏ thì trên thực tế thoả được, nhưng
+  vẫn **không phải license OSI** → không nên đưa vào dự án Apache-2.0.
+
+### Hệ quả cần ghi rõ cho người dùng cuối
+Khi ship weights CC-BY-NC, **hạn chế NC đi theo người nhận**: ai self-host bản này cũng không
+được dùng cho mục đích thương mại. Đây là đánh đổi có ý thức của dự án — phải ghi vào README
+để người dùng biết, không im lặng.
+
 ## 2. Danh sách "KHÔNG dùng" (đã xác minh lý do)
+
+> Sau khi đổi sang AGPL-3.0, các mục dưới đây **đã thay đổi trạng thái** so với bản rà soát
+> ngày 27/09 buổi sáng — đọc kỹ cột "còn chặn?":
+
+| Dự án | Vấn đề | Còn chặn? |
+|---|---|---|
+| **Wav2Lip** & fork | Không có file LICENSE → *all rights reserved*; README ghi non-commercial là **hạn chế** | 🔴 **CÒN** (kể cả phi thương mại) — dùng MuseTalk (MIT) |
+| **fish-speech** | License nghiên cứu, cấm thương mại | 🟢 **HẾT** (ta phi thương mại) — nhưng vẫn không phải OSI |
+| **XTTS-v2 (CPML)**, **F5-TTS**, **Spark-TTS**, **NLLB** | Weights cấm thương mại | 🟢 **HẾT** — dùng được, phải ghi cảnh báo NC trong README |
+| **whisper-timestamped, aeneas, Lago, Unkey, Documenso, Plane, Dub, VoiceStudio, ArcReel, MinIO, Garage** | AGPL-3.0 | 🟢 **HẾT** — copy được (giữ copyright + pin commit). *Lưu ý: Unkey/Documenso/Plane vẫn dở hơn nhu cầu của ta, không cần)* |
+| **pyvideotrans, voice-pro, seed-vc, ComfyUI, Auto-Synced-Translated-Dubs** | GPL-3.0 | 🟢 **HẾT** — copy được |
+| **Hook0** | SSPL-1.0 | 🔴 **CÒN** — SSPL không tương thích AGPL |
+| **open-webui ≥ v0.6.6**, **ArcReel §7** | License riêng có điều khoản branding/attribution | 🟡 **Tuỳ** — dùng được nếu thoả điều kiện (hiển thị ghi công / dưới 50 người dùng), nhưng không phải OSI → cân nhắc |
+| **VieNeu v4** | Proprietary | 🔴 **CÒN** — dùng v3 Turbo (Apache-2.0) |
 
 | Dự án | Vấn đề |
 |---|---|
@@ -167,12 +229,11 @@ Chi tiết quan trọng:
 
 ## 3. Khoảng trống chưa có giải pháp permissive
 
-1. **Aligner tiếng Việt** (buộc-thời-gian từng từ): **không có** model wav2vec2 tiếng Việt
-   nào permissive. Mọi bản sẵn có đều CC-BY-NC. Hướng đi hợp lệ:
-   - (a) train/fine-tune CTC tiếng Việt trên base **`facebook/wav2vec2-xls-r-300m` (Apache-2.0)**
-     rồi chạy code alignment của WhisperX (BSD-2), hoặc
-   - (b) dùng `torchaudio.functional.forced_align` (BSD-2) với model CTC tự có, hoặc
-   - (c) dùng **MFA** (code MIT) sau khi verify license model `vietnamese_mfa`.
+1. ~~Aligner tiếng Việt~~ — **ĐÃ GIẢI QUYẾT** trong bối cảnh phi thương mại (mục 1c):
+   `nguyenvulebinh/wav2vec2-base-vietnamese-250h` (cc-by-nc-4.0) chạy trên code alignment
+   của **WhisperX (BSD-2)**, hoặc `torchaudio.functional.forced_align` (BSD-2) với
+   **MMS_FA** (cc-by-nc-4.0). Phương án permissive (nếu sau này cần thương mại) vẫn giữ
+   nguyên trong mục 1c: tự train CTC trên `facebook/wav2vec2-xls-r-300m` (Apache-2.0).
 2. **Giữ nhạc nền tử tế** — giải quyết được bằng Demucs (MIT), chỉ chưa triển khai.
 3. **TTS đa ngôn ngữ có tiếng Việt trong cùng một model** — chưa tồn tại bản permissive;
    hiện phải ghép VieNeu (vi) + engine khác (non-vi) sau provider layer.

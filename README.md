@@ -94,17 +94,43 @@ tts_vi:
 Hybrid VRAM (gói 12GB): nếu dịch chạy cloud → trả lại ~4GB → all-resident
 (whisper int8 + pyannote + VieNeu) ≈ 7GB, thoải mái.
 
-## Stack & license (quyết định cuối — 26/09/2026)
+## Stack & license
+
+### License của dự án: AGPL-3.0
+
+Dự án này là **phần mềm tự do, phi thương mại, phát hành theo GNU AGPL-3.0** (xem `LICENSE`).
+Nói ngắn gọn: bạn được dùng, sửa, phát hành lại thoải mái — kể cả chạy như dịch vụ cho người
+khác dùng — miễn là **giữ nguyên giấy phép và công bố mã nguồn** (AGPL §13 áp dụng cả khi chỉ
+chạy trên server, không cần phân phối binary). Đúng tinh thần "mã nguồn mở 100% miễn phí".
+
+> **Điều khoản 13 — đường dẫn mã nguồn:** vì đây là ứng dụng web, giao diện có sẵn liên kết
+> **"Mã nguồn"** trỏ tới kho mã nguồn (góc dưới thanh bên). **Nếu bạn self-host và sửa code,
+> hãy đổi liên kết đó sang bản của bạn** — đó là nghĩa vụ AGPL, không phải tuỳ chọn.
+
+### ⚠️ Trọng số model non-commercial (CC-BY-NC) — không dùng thương mại
+
+Dự án phi thương mại nên có thể dùng một số model có **weights CC-BY-NC** (cấm thương mại).
+**Hạn chế này đi theo cả người self-host**: nếu bạn cài bản này, bạn cũng không được dùng nó
+cho mục đích thương mại.
+
+| Model | License weights | Ghi chú |
+|---|---|---|
+| `nguyenvulebinh/wav2vec2-base-vietnamese-250h` | **CC-BY-NC-4.0** | aligner tiếng Việt (buộc timing từng từ) |
+| `facebook/mms-1b-fl102` (MMS_FA) | **CC-BY-NC-4.0** | phương án thay thế cho aligner |
+| `SWivid/F5-TTS` | **CC-BY-NC-4.0** | TTS dự phòng (code MIT, weights NC) |
+| `coqui/XTTS-v2` | **CPML** (cấm thương mại) | không dùng cho voice cloning thương mại |
+
+Phần còn lại của stack đều permissive (Apache/MIT/BSD) — **dùng thương mại được**:
 
 | Layer | Model / tool | License | Ghi chú |
 |---|---|---|---|
 | TTS tiếng Việt + clone | **VieNeu-TTS v3 Turbo** | Apache-2.0 | 48kHz, clone từ clip 3–8s, 25 giọng preset 3 miền, streaming OpenAI-compatible |
 | TTS đa ngôn ngữ (non-vi) | Chatterbox | MIT | 23+ ngôn ngữ, không có tiếng Việt |
 | TTS đa ngôn ngữ (thay thế) | CosyVoice | Apache-2.0 | 9 ngôn ngữ |
-| STT | faster-whisper (large-v3) | MIT | Whisper gốc MIT |
+| STT | faster-whisper (large-v3) | MIT (weights Apache-2.0) | Whisper gốc MIT |
+| STT tiếng Việt chuyên biệt | PhoWhisper (`VinAI/PhoWhisper-large`) | BSD-3 | weights tiếng Việt permissive duy nhất |
 | Diarization | pyannote 3.1 | MIT code | HF gated — accept 4 repo: speaker-diarization-3.1, segmentation-3.0, wespeaker-voxceleb-resnet34-LM, speaker-diarization-community-1 |
 | Translation | Qwen LLM local | Apache-2.0 | **Không dùng NLLB** (CC-BY-NC) |
-| Loại trừ | F5-TTS (checkpoint CC-BY-NC), XTTS-v2 (CPML), NLLB (CC-BY-NC) | ❌ | không đạt chuẩn OSS thương mại |
 
 ⚠️ VieNeu **v4 là proprietary** (không open-source, chỉ qua API vieneu.io) — dùng v3 Turbo,
 bản open-source mới nhất. Tính năng Dubbing/Lecture/TikTok của VieNeu chỉ có trong app
@@ -115,8 +141,9 @@ chính thức; repo chỉ cung cấp core SDK → pipeline dub (D5) là phần c
 - [`docs/oss-references.md`](docs/oss-references.md) — rà soát **mã nguồn OSS tham chiếu**
   cho từng tính năng (dubbing, TTS/clone, diarization, lip-sync, video AI, UI đa track…),
   **license đã xác minh bằng file LICENSE thật**, danh sách "không dùng" và lộ trình áp dụng.
-  Quy tắc: dự án này Apache-2.0 → chỉ copy code từ MIT/Apache/BSD/ISC; **AGPL/GPL chỉ tham
-  khảo kiến trúc**. Cảnh báo bẫy phổ biến: code permissive nhưng **weights non-commercial**.
+  Vì dự án đã là **AGPL-3.0**, có thể copy code từ MIT/Apache/BSD/ISC **và cả AGPL/GPL**
+  (giữ nguyên copyright gốc + pin đúng commit); lưu ý Apache/BSD → AGPL thì được, chiều ngược
+  lại thì không. Cảnh báo: **"không có license" KHÔNG phải "được dùng"** — Wav2Lip vẫn bị chặn.
 - **Ảnh mẫu giao diện** (`docs/design-mockup.jpeg`, sản phẩm proprietary) được giữ
   **ngoài repo** — không phát hành lại; tài liệu trên đã đối chiếu đầy đủ tính năng của nó.
 
@@ -166,7 +193,8 @@ Chi phí GPU toàn bộ challenge: **~$2.5** (RTX 3060).
 
 # 🏠 Self-host trong 5 phút
 
-Mã nguồn mở 100% (Apache-2.0). Không bắt buộc GPU — chạy được trên máy cá nhân.
+Mã nguồn mở 100%, **phát hành miễn phí, phi thương mại** theo GNU AGPL-3.0 (xem `LICENSE`).
+Không bắt buộc GPU — chạy được trên máy cá nhân.
 
 ## Bước 0 — Yêu cầu chung
 

@@ -30,8 +30,8 @@ __THEME_CSS__
   /* ---- layout ---- */
   #shell { display:flex; min-height:100vh; }
   #sidebar { width:var(--side-w); background:var(--side); border-right:1px solid var(--line);
-             padding:18px 14px; display:flex; flex-direction:column; gap:4px;
-             position:fixed; top:0; bottom:0; left:0; overflow-y:auto; z-index:30; }
+             padding:18px 14px 14px; display:flex; flex-direction:column; gap:4px;
+             position:fixed; top:0; bottom:0; left:0; overflow:hidden; z-index:30; }
   main { margin-left:var(--side-w); flex:1; padding:0 26px 40px; }
   @media (max-width: 920px) {
     #sidebar { display:none; }
@@ -42,23 +42,29 @@ __THEME_CSS__
             border-radius:10px; padding:8px 12px; cursor:pointer; }
 
   /* ---- sidebar ---- */
-  .logo { display:flex; gap:10px; align-items:center; padding:6px 8px 16px; }
+  .logo { display:flex; gap:10px; align-items:center; padding:2px 8px 10px; }
   .logo .mark { width:38px; height:38px; border-radius:12px; background:linear-gradient(135deg,var(--acc),var(--acc2));
                 display:flex; align-items:center; justify-content:center; font-size:19px; }
   .logo b { font-size:16px; } .logo .mut { line-height:1.2; }
-  .nav { display:flex; flex-direction:column; gap:2px; }
+  /* nav là phần DUY NHẤT cuộn -> sidecard + liên kết Mã nguồn (AGPL §13) luôn
+     ghim ở đáy và nhìn thấy được, dù danh sách menu dài bao nhiêu. */
+  .nav { display:flex; flex-direction:column; gap:2px; flex:1; overflow-y:auto; min-height:0; }
   .nav .group { color:var(--mut); font-size:11px; text-transform:uppercase; letter-spacing:.08em;
-                padding:14px 10px 6px; }
-  .nav a { display:flex; gap:10px; align-items:center; padding:9px 12px; border-radius:10px;
+                padding:10px 10px 4px; }
+  .nav a { display:flex; gap:10px; align-items:center; padding:6px 12px; border-radius:10px;
            color:var(--fg); cursor:pointer; font-size:14px; }
   .nav a:hover { background:var(--hover); }
   .nav a.on { background:linear-gradient(90deg,var(--acc),var(--acc2)); color:var(--on-acc); font-weight:600; }
   .nav a.soon { color:var(--mut); opacity:.65; }
   .nav a.soon:hover { background:var(--hover); }
-  .sidecard { margin-top:auto; background:linear-gradient(160deg,var(--sidecard-from),var(--sidecard-to));
-              border:1px solid var(--line); border-radius:14px; padding:14px; font-size:13px; }
+  .sidecard { margin-top:10px; flex:none; background:linear-gradient(160deg,var(--sidecard-from),var(--sidecard-to));
+              border:1px solid var(--line); border-radius:14px; padding:12px 14px; font-size:13px; }
   .sidecard b { font-size:16px; }
   .sidecard button { width:100%; margin-top:8px; }
+  .side-foot { margin-top:10px; padding-top:10px; border-top:1px solid var(--line);
+               text-align:center; }
+  .side-foot a { font-size:12px; color:var(--mut); }
+  .side-foot a:hover { color:var(--acc); }
 
   /* ---- topbar ---- */
   .topbar { display:flex; gap:14px; align-items:center; padding:16px 0 18px; flex-wrap:wrap; }
@@ -157,8 +163,12 @@ __THEME_CSS__
     </nav>
     <div class="sidecard">
       🎁 Miễn phí <b id="side-free">50.000</b> Credits
-      <div class="mut">Khám phá các tính năng AI giọng nói</div>
       <button class="go" onclick="go('dub')">Bắt đầu ngay</button>
+      <!-- AGPL-3.0 §13: ứng dụng chạy qua mạng phải chỉ đường lấy mã nguồn.
+           Đổi liên kết qua /admin/settings → app.source_url nếu bạn self-host bản sửa. -->
+      <div class="side-foot">
+        <a href="__SOURCE_URL__" target="_blank" rel="noopener noreferrer">📖 Mã nguồn (AGPL-3.0)</a>
+      </div>
     </div>
   </aside>
 

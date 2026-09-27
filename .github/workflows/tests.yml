@@ -16,6 +16,14 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          # BẮT BUỘC: `cache: pip` mặc định đi tìm **/requirements.txt hoặc
+          # **/pyproject.toml — repo này KHÔNG có cả hai (deps nằm ở
+          # backend/requirements-*.txt). Thiếu dòng này thì setup-python fail
+          # ngay và job chết TRƯỚC KHI chạy test nào: CI "đỏ" suốt 11 lần push
+          # trong khi toàn bộ test thực ra xanh.
+          cache-dependency-path: |
+            backend/requirements-api.txt
+            backend/requirements-worker.txt
       - name: Install ffmpeg (dub_pipeline selftest mixes audio via ffmpeg)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - name: Install API test deps
@@ -34,6 +42,7 @@ jobs:
           python tests/test_auth.py
           python tests/test_migrations.py
           python tests/test_providers_admin.py
+          python tests/test_ci_config.py
           python -m app.pipelines.dub --selftest
           python -m app.pipelines.stt --selftest
           python -m app.pipelines.translate --selftest

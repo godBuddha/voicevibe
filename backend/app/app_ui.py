@@ -302,7 +302,7 @@ function esc(s){ const d=document.createElement("div"); d.textContent=s==null?""
 function mask(k){ return k ? "••••" + k.slice(-4) : ""; }
 function fmt(n){ return (n||0).toLocaleString("vi-VN"); }
 
-function soon(name){ flash("🚧 \"" + name + "\" sắp ra mắt — xem README roadmap.", "err"); }
+function soon(name){ flash('🚧 "' + name + '" sắp ra mắt — xem README roadmap.', "err"); }
 function flash(msg, cls){ const el = document.querySelector(".page.on .status") || $("gmsg");
   el.className = "status " + (cls||"ok"); el.textContent = msg;
   setTimeout(()=>{ el.textContent=""; }, 4000); }
@@ -314,7 +314,7 @@ function go(page) {
   location.hash = "#/" + page;
   if (page === "dashboard") { refreshMe(); loadDashJobs(); }
   if (page === "jobs") loadJobs();
-  if (page === "voices") loadVoices();
+  if (page === "voices") refreshMe();  // refreshMe() renders the voice list too
   if (page === "api") loadKeys();
   if (window.innerWidth < 920) $("sidebar").style.display = "none";
 }

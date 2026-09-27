@@ -23,15 +23,16 @@ python3 -m venv .venv
 # shellcheck disable=SC1091
 source .venv/bin/activate
 pip install -q -U pip
-# Driver host là 550 (CUDA 12.4): wheel cu128 chạy được nhờ CUDA minor-version
-# compatibility. Nếu smoke test cuối báo CUDA unavailable -> cài lại bằng cu126:
-#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu126
-pip install -q torch torchaudio --index-url https://download.pytorch.org/whl/cu128
+# Driver >= 550 chạy được wheel cu128 (CUDA minor-version compatibility).
+# PIN torch==2.8 — pyannote>=4 yêu cầu torch>=2.8; KHÔNG để pip kéo bản mới hơn
+# (từng bị kéo 2.14+cu130 -> kernel fail trên driver cũ).
+pip install -q torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu128
 pip install -q -r backend/requirements-api.txt
-# Core AI deps (bắt buộc cho D3-D5)
-pip install -q faster-whisper pyannote.audio vieneu srt numpy
-# Tùy chọn: engine clone đa ngôn ngữ (non-vi) — lỗi không chặn pipeline
-pip install -q chatterbox-tts || echo "WARN: chatterbox-tts lỗi (tùy chọn, chỉ non-vi TTS) — bỏ qua"
+# Core AI deps (bắt buộc cho D3-D5): soundfile = nạp in-memory cho pyannote
+# (bypass torchcodec); sentencepiece = tokenizer opus-mt (translate local).
+pip install -q faster-whisper pyannote.audio vieneu srt soundfile sentencepiece numpy
+# NOTE: chatterbox-tts KHÔNG cài vào venv này — nó pin torch==2.6 (xung đột
+# pyannote>=2.8). Cần TTS đa ngôn ngữ non-vi thì tạo venv riêng.
 
 echo "== [4/5] Offline selftests (không cần GPU) =="
 cd backend

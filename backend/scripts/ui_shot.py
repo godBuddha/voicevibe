@@ -1,0 +1,192 @@
+"""UI smoke + screenshot tool — drives the real app in headless Chrome.
+
+Two jobs, both valuable:
+  1. SMOKE: opens every panel and FAILS (exit 1) on any uncaught page error.
+     This is how two real bugs were caught — a broken `flash("\\"")` escape that
+     killed the whole inline UI, and `go('voices')` calling an undefined
+     `loadVoices()` (panel never opened). Neither shows up in Python tests.
+  2. SHOTS: writes the README screenshots to docs/screenshots/.
+
+Needs Playwright + a Chrome/Chromium binary:
+  uv run --with playwright python backend/scripts/ui_shot.py            # shots
+  uv run --with playwright python backend/scripts/ui_shot.py --check     # smoke only
+  uv run --with playwright python backend/scripts/ui_shot.py --no-demo   # use env DB/media
+
+Options: --out DIR (default <repo>/docs/screenshots), --port N (default: free),
+         --chrome PATH (default: google-chrome).
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import os
+import pathlib
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.request
+
+REPO = pathlib.Path(__file__).resolve().parents[2]
+DEV_KEY = "dev-key-1"
+ADMIN_KEY = "admin-dev-key"
+
+PANELS = [  # (screenshot name, app router target, element that must be visible)
+    ("02-dub", "dub", "#dubfile"),
+    ("03-tts", "tts", "#ttstext"),
+    ("04-voices", "voices", "#voicelist"),
+    ("05-jobs", "jobs", "#joblist"),
+    ("06-api-keys", "api", "#keylist"),
+]
+V2_PANELS = [("08-v2-dashboard", "dash"), ("09-v2-dub", "dub"),
+             ("10-v2-voices", "voices")]
+
+
+def free_port() -> int:
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def seed_demo() -> None:
+    """Throwaway dev DB with demo rows so the UI isn't empty in screenshots."""
+    from sqlalchemy import select
+
+    from app.db import Base, SessionLocal, engine
+    from app.models import ApiKey, Job, JobStatus, User, Voice
+
+    Base.metadata.create_all(engine)
+    with SessionLocal() as db:
+        if db.scalar(select(User).where(User.email == "creator@demo")):
+            return
+        u = User(email="creator@demo", credits=49_858)
+        db.add(u)
+        db.flush()
+        db.add(ApiKey(key=hashlib.sha256(DEV_KEY.encode()).hexdigest(),
+                      prefix=DEV_KEY[:12], user_id=u.id))
+        db.add(Voice(user_id=u.id, name="Giọng của Long", lang="vi",
+                     engine="vieneu", ref_s3_key="voices/demo/ref.wav"))
+        db.add(Voice(user_id=u.id, name="Mai Anh (preset)", lang="vi",
+                     engine="vieneu", ref_s3_key=""))
+        for t, st, pr, cost, key in [("dub", JobStatus.done, 100, 60, None),
+                                     ("stt", JobStatus.done, 100, 5, "jobs/demo/transcript.srt"),
+                                     ("tts", JobStatus.running, 45, 10, None),
+                                     ("translate", JobStatus.queued, 0, 2, None)]:
+            db.add(Job(user_id=u.id, type=t, status=st, progress=pr,
+                       credits_charged=cost, result_s3_key=key, params={"type": t}))
+        db.commit()
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", default=str(REPO / "docs" / "screenshots"))
+    ap.add_argument("--port", type=int, default=0)
+    ap.add_argument("--chrome", default="google-chrome")
+    ap.add_argument("--check", action="store_true", help="smoke only, no screenshots")
+    ap.add_argument("--no-demo", action="store_true", help="don't seed demo rows")
+    args = ap.parse_args()
+
+    sys.path.insert(0, str(REPO / "backend"))
+    os.environ.setdefault("PYTHONPATH", str(REPO / "backend"))
+    os.environ["YUPVOX_INLINE"] = "1"
+    os.environ["YUPVOX_ADMIN_KEY"] = ADMIN_KEY
+    if not args.no_demo:
+        os.environ["YUPVOX_API_KEYS"] = DEV_KEY
+        tmp = pathlib.Path(tempfile.mkdtemp(prefix="yv_ui_"))
+        os.environ.setdefault("MEDIA_ROOT", str(tmp / "media"))
+        os.environ.setdefault("DATABASE_URL", f"sqlite:///{tmp}/ui.db")
+        seed_demo()
+
+    port = args.port or free_port()
+    server = subprocess.Popen(
+        [sys.executable, "-m", "uvicorn", "app.main:app", "--port", str(port)],
+        cwd=str(REPO / "backend"), env={**os.environ},
+        stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+    base = f"http://127.0.0.1:{port}"
+    try:
+        for _ in range(30):
+            try:
+                urllib.request.urlopen(f"{base}/healthz", timeout=2).read()
+                break
+            except Exception:
+                time.sleep(1)
+        else:
+            print("FAIL: app server did not start")
+            return 1
+
+        from playwright.sync_api import sync_playwright
+
+        # Playwright needs an absolute executable path; fall back to its own
+        # bundled Chromium when no system Chrome is found.
+        chrome = shutil.which(args.chrome) or shutil.which("chromium") \
+            or shutil.which("chromium-browser") or args.chrome
+        launch_args = ["--no-sandbox", "--disable-gpu"]
+        if not pathlib.Path(chrome).is_file():
+            chrome = None  # let Playwright use its bundled browser
+            print("note: no system Chrome found — using Playwright's Chromium")
+
+        out_dir = pathlib.Path(args.out)
+        errors: list[str] = []
+        shots = 0
+
+        with sync_playwright() as p:
+            browser = p.chromium.launch(**({"executable_path": chrome} if chrome else {}),
+                                        args=launch_args)
+            ctx = browser.new_context(viewport={"width": 1440, "height": 900})
+            ctx.add_init_script(f"localStorage.setItem('yv_api_key','{DEV_KEY}');")
+            page = ctx.new_page()
+            page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
+
+            def shot(name: str) -> None:
+                nonlocal shots
+                if args.check:
+                    return
+                out_dir.mkdir(parents=True, exist_ok=True)
+                page.screenshot(path=str(out_dir / f"{name}.png"), full_page=True)
+                shots += 1
+
+            page.goto(f"{base}/")
+            page.wait_for_selector("#shell", state="visible", timeout=20000)
+            page.wait_for_timeout(1200)
+            shot("01-dashboard")
+
+            for name, target, sel in PANELS:
+                page.evaluate(f"go('{target}')")  # app's own router
+                page.wait_for_selector(sel, state="visible", timeout=15000)
+                page.wait_for_timeout(700)
+                shot(name)
+
+            page.goto(f"{base}/admin")
+            page.fill("#akey", ADMIN_KEY)
+            page.click("#login button")
+            page.wait_for_selector("#content .card", timeout=20000)
+            page.wait_for_timeout(500)
+            shot("07-admin-settings")
+
+            for name, target in V2_PANELS:
+                page.goto(f"{base}/v2/")
+                page.wait_for_selector(".sidebar", state="visible", timeout=20000)
+                page.wait_for_timeout(800)
+                if target != "dash":
+                    page.click(f'.nav a[data-panel="{target}"]')
+                    page.wait_for_timeout(800)
+                shot(name)
+
+            browser.close()
+
+        if errors:
+            print("UI SMOKE FAILED — uncaught page errors:")
+            for e in dict.fromkeys(errors):
+                print("  -", e)
+            return 1
+        print(f"UI SMOKE PASSED — all panels rendered, 0 page errors"
+              + (f", {shots} screenshots -> {out_dir}" if shots else ""))
+        return 0
+    finally:
+        server.terminate()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

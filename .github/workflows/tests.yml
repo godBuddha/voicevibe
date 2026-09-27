@@ -28,6 +28,7 @@ jobs:
           python tests/test_day2.py
           python tests/test_providers.py
           python tests/test_settings.py
+          python tests/test_ui_js.py
           python -m app.pipelines.dub --selftest
           python -m app.pipelines.stt --selftest
           python -m app.pipelines.translate --selftest

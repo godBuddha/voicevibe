@@ -3,6 +3,39 @@
 Clone của một SaaS AI voice/dubbing (TTS, STT, dubbing video/audio, dịch phụ đề,
 tách & clone nhiều người nói, API developer) — dựng bằng stack open-source.
 
+## Giao diện
+
+> Ảnh chụp từ app đang chạy thật (headless Chrome/Playwright), **dữ liệu trong ảnh là
+> demo seed cục bộ** (`creator@demo`, 49.858 credits) — không phải job thật.
+> Chụp lại bất cứ lúc nào bằng `backend/scripts/ui_shot.py`.
+
+### App UI — `/` (inline, chạy ngay không cần build step)
+
+| Bảng điều khiển | Dub video/audio |
+|---|---|
+| ![dashboard](docs/screenshots/01-dashboard.png) | ![dub](docs/screenshots/02-dub.png) |
+
+| Text → Speech | Giọng của tôi (voice clone) |
+|---|---|
+| ![tts](docs/screenshots/03-tts.png) | ![voices](docs/screenshots/04-voices.png) |
+
+| Jobs (player inline) | API keys |
+|---|---|
+| ![jobs](docs/screenshots/05-jobs.png) | ![api](docs/screenshots/06-api-keys.png) |
+
+### Admin Settings — `/admin`
+
+Mọi cấu hình lưu DB, secret mã hóa Fernet at rest, mỗi dòng có tag nguồn
+(`db` / `env` / `default` / `unset`) — **không hardcode .env**.
+
+![admin settings](docs/screenshots/07-admin-settings.png)
+
+### Frontend redesign — `/v2` (đang phát triển song song)
+
+| Bảng điều khiển | Dub | Giọng của tôi |
+|---|---|---|
+| ![v2 dashboard](docs/screenshots/08-v2-dashboard.png) | ![v2 dub](docs/screenshots/09-v2-dub.png) | ![v2 voices](docs/screenshots/10-v2-voices.png) |
+
 ## Kiến trúc
 
 ```

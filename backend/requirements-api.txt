@@ -1,0 +1,11 @@
+# API service (light) — runs in `api` container
+fastapi>=0.115
+uvicorn[standard]>=0.30
+celery[redis]>=5.4
+sqlalchemy>=2.0
+psycopg[binary]>=3.2
+pydantic-settings>=2.4
+httpx>=0.27
+minio>=7.2
+python-multipart>=0.0.9
+cryptography>=43          # mã hóa secret settings at rest (Fernet)

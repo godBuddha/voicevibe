@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YupVox-Clone — AI Voice cho một thế giới mới</title>
+<link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="logo">🎙️ YupVox<span>-Clone</span></div>
+  <nav class="nav">
+    <div class="grp">Tổng quan</div>
+    <a data-panel="dash" class="on">🏠 Bảng điều khiển</a>
+    <div class="grp">Tạo nội dung với AI</div>
+    <a data-panel="tts">🗣️ TTS Studio</a>
+    <a data-panel="dub">🎬 Dub video/audio</a>
+    <div class="grp">Giọng nói</div>
+    <a data-panel="voices">🎭 Giọng của tôi</a>
+    <div class="grp">Công việc</div>
+    <a data-panel="jobs">📋 Jobs</a>
+    <div class="grp">Khác</div>
+    <a data-panel="pricing">💳 Gói dịch vụ &amp; Giá</a>
+    <a href="/docs" target="_blank">🔌 API cho nhà phát triển</a>
+  </nav>
+  <div class="side-foot nav">
+    <a href="/admin" target="_blank">⚙️ Admin Settings</a>
+  </div>
+</aside>
+
+<div class="main">
+  <header class="topbar">
+    <h1 id="ptitle">Bảng điều khiển</h1>
+    <div class="top-actions">
+      <span class="pill credits" id="credits">…</span>
+      <span class="pill" id="keymask"></span>
+      <button onclick="logout()">Đổi key</button>
+    </div>
+  </header>
+
+  <main class="content">
+
+    <!-- BẢNG ĐIỀU KHIỂN -->
+    <section id="p-dash" class="panel">
+      <div class="bento">
+        <div class="card"><div class="mut">Credits khả dụng</div>
+          <div class="big" id="d-credits">…</div>
+          <div class="mut">/ 50.000 miễn phí</div></div>
+        <div class="card"><div class="mut">Jobs hoàn tất</div>
+          <div class="big" id="d-jdone">…</div>
+          <div class="mut" id="d-jrun"></div></div>
+        <div class="card"><div class="mut">Giọng đã clone</div>
+          <div class="big" id="d-voices">…</div>
+          <div class="mut">sẵn sàng cho TTS</div></div>
+        <div class="card"><div class="mut">Thao tác nhanh</div>
+          <button class="go" onclick="nav('dub')">🎬 Dub ngay</button>
+          <button class="go" onclick="nav('tts')">🗣️ TTS ngay</button></div>
+      </div>
+      <div class="card" style="margin-top:14px"><h3>Jobs gần đây</h3>
+        <div id="d-recent" class="mut">…</div></div>
+    </section>
+
+    <!-- TTS -->
+    <section id="p-tts" class="panel" hidden>
+      <div class="card">
+        <h3>🗣️ Chuyển văn bản thành giọng nói</h3>
+        <label>Văn bản</label>
+        <textarea id="ttstext" placeholder="Nhập văn bản cần đọc thành giọng nói…"></textarea>
+        <label>Giọng</label>
+        <select id="ttsvoice"><option value="">Mặc định (preset)</option></select>
+        <button class="go" onclick="submitTTS()">🗣️ Chuyển thành giọng nói</button>
+        <div id="ttsmsg" class="status"></div>
+      </div>
+    </section>
+
+    <!-- DUB -->
+    <section id="p-dub" class="panel" hidden>
+      <div class="card">
+        <h3>🎬 Dịch &amp; lồng tiếng video/audio</h3>
+        <label>File audio/video (mp3, wav, mp4, mkv… — tối đa 200MB)</label>
+        <input type="file" id="dubfile" accept="audio/*,video/*">
+        <div class="row">
+          <div><label>Ngôn ngữ nguồn</label>
+            <select id="srclang"><option value="vi">Tiếng Việt</option><option value="en">English</option></select></div>
+          <div><label>Ngôn ngữ đích</label>
+            <select id="tgtlang"><option value="en">English</option><option value="vi">Tiếng Việt</option></select></div>
+          <div><label>Nền</label>
+            <select id="bgmode">
+              <option value="silence">Chỉ giọng dub (im lặng)</option>
+              <option value="source_low">Giữ nền gốc nhỏ (karaoke)</option>
+            </select></div>
+        </div>
+        <div class="mut" style="margin-top:8px">Giọng từng nhân vật được tự gán theo speaker
+          (Hải Đăng, Mai Anh, …). Upload clip ở tab "Giọng của tôi" để clone giọng riêng.</div>
+        <button class="go" onclick="submitDub()">🚀 Bắt đầu dub</button>
+        <div id="dubmsg" class="status"></div>
+      </div>
+    </section>
+
+    <!-- VOICES -->
+    <section id="p-voices" class="panel" hidden>
+      <div class="card">
+        <h3>🎭 Tạo giọng clone</h3>
+        <div class="mut">Ghi một clip 3–8 giây giọng rõ ràng (wav/mp3). Chỉ clone giọng của bạn
+          hoặc khi có sự đồng ý của chủ giọng.</div>
+        <input type="file" id="voicefile" accept="audio/*" style="margin-top:10px">
+        <label>Tên giọng</label>
+        <input id="voicename" placeholder="VD: Giọng của Long">
+        <button class="go" onclick="uploadVoice()">⬆️ Tạo voice profile</button>
+        <div id="voicemsg" class="status"></div>
+      </div>
+      <div class="card"><h3>Danh sách giọng</h3>
+        <div id="voicelist" class="mut">…</div></div>
+    </section>
+
+    <!-- JOBS -->
+    <section id="p-jobs" class="panel" hidden>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <h3 style="margin:0">📋 Jobs</h3>
+          <button class="ghost" onclick="loadJobs()">Làm mới</button>
+        </div>
+        <div id="joblist" style="margin-top:12px"></div>
+      </div>
+    </section>
+
+    <!-- PRICING -->
+    <section id="p-pricing" class="panel" hidden>
+      <div class="card">
+        <h3>💳 Gói dịch vụ &amp; Giá</h3>
+        <div class="mut">Credits tiêu theo từng loại job (admin đổi được qua Settings):</div>
+        <div id="pricingtable" style="margin-top:10px"></div>
+        <div class="mut" style="margin-top:10px">Mỗi user nhận 50.000 credits miễn phí khi tạo.</div>
+      </div>
+    </section>
+
+    <!-- API -->
+    <section id="p-api" class="panel" hidden>
+      <div class="card">
+        <h3>🔌 API cho nhà phát triển</h3>
+        <div class="mut">REST API chuẩn — tài liệu tương tác (Swagger):</div>
+        <p><a href="/docs" target="_blank">Mở /docs (Swagger UI) →</a></p>
+        <div class="mut">Ví dụ tạo job dub:</div>
+        <pre style="background:#0d1020;border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto">curl -X POST $BASE/v1/jobs \
+  -H "X-API-Key: $KEY" -H "Content-Type: application/json" \
+  -d '{"type":"dub","media_url":"media/.../file.mp4",
+       "source_lang":"vi","target_lang":"en"}'</pre>
+        <div class="mut">Webhook: set <code>webhook_url</code> khi tạo job để nhận kết quả.</div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- gate -->
+<div id="gate" class="card" style="max-width:420px;margin:90px auto;text-align:center;display:none">
+  <h3>🎙️ YupVox-Clone</h3>
+  <p class="mut">Nhập API key để bắt đầu (yv_… hoặc dev key)</p>
+  <input id="gatekey" type="password" onkeydown="if(event.key==='Enter')enter()">
+  <button class="go" onclick="enter()">Vào</button>
+  <p id="gmsg" class="err"></p>
+</div>
+
+<script src="/assets/app.js"></script>
+</body>
+</html>

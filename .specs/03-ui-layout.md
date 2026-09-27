@@ -24,6 +24,10 @@ Render: card theo category, mỗi setting một row
 Cuối trang: form thêm custom key.
 
 ## Quy ước
-- Dark theme, viền mảnh phân tách khối, không shadow dày.
+- **Hai chế độ màu: sáng (mặc định) và tối**, cùng một bộ token trong `backend/app/theme.py`
+  (`:root` = sáng, `html[data-theme="dark"]` = tối). Không được hardcode màu hex ngoài hai
+  khối đó — `tests/test_theme.py` cưỡng chế. Nút lật nằm ở topbar, ghi nhớ ở
+  `localStorage['yv_theme']`; `THEME_BOOT` phải chèn TRƯỚC stylesheet để không nhấp nháy màu.
+- Viền mảnh phân tách khối, không shadow dày.
 - Emoji chỉ làm marker tab/tiêu đề (tradeoff cố ý: không build step).
 - Mọi fetch gắn header auth tương ứng; lỗi 401 → về gate.

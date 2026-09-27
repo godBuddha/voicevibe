@@ -5,7 +5,10 @@ Two jobs, both valuable:
      This is how two real bugs were caught — a broken `flash("\\"")` escape that
      killed the whole inline UI, and `go('voices')` calling an undefined
      `loadVoices()` (panel never opened). Neither shows up in Python tests.
-  2. SHOTS: writes the README screenshots to docs/screenshots/.
+  2. SHOTS: writes the README screenshots to docs/screenshots/ — including the
+     dark-mode shots, taken by flipping the real theme function and asserting
+     `data-theme` actually changed (a theme that silently fails to apply would
+     otherwise ship unnoticed).
 
 Needs Playwright + a Chrome/Chromium binary:
   uv run --with playwright python backend/scripts/ui_shot.py            # shots
@@ -40,8 +43,6 @@ PANELS = [  # (screenshot name, app router target, element that must be visible)
     ("05-jobs", "jobs", "#joblist"),
     ("06-api-keys", "api", "#keylist"),
 ]
-V2_PANELS = [("08-v2-dashboard", "dash"), ("09-v2-dub", "dub"),
-             ("10-v2-voices", "voices")]
 
 
 def free_port() -> int:
@@ -165,14 +166,22 @@ def main() -> int:
             page.wait_for_timeout(500)
             shot("07-admin-settings")
 
-            for name, target in V2_PANELS:
-                page.goto(f"{base}/v2/")
-                page.wait_for_selector(".sidebar", state="visible", timeout=20000)
-                page.wait_for_timeout(800)
-                if target != "dash":
-                    page.click(f'.nav a[data-panel="{target}"]')
-                    page.wait_for_timeout(800)
-                shot(name)
+            # Chế độ tối: bật qua đúng hàm của UI rồi kiểm tra theme đã đổi thật.
+            page.goto(f"{base}/")
+            page.wait_for_selector("#shell", state="visible", timeout=20000)
+            page.wait_for_timeout(1000)
+            page.evaluate("yvSetTheme('dark')")
+            page.wait_for_timeout(600)
+            applied = page.evaluate(
+                "document.documentElement.getAttribute('data-theme')")
+            assert applied == "dark", f"theme không đổi sang dark (nhận {applied!r})"
+            shot("08-dashboard-dark")
+            page.evaluate("go('dub')")
+            page.wait_for_selector("#dubfile", state="visible", timeout=15000)
+            page.wait_for_timeout(500)
+            shot("09-dub-dark")
+            # trả về sáng để ảnh admin/những lần chạy sau không bị lệch
+            page.evaluate("yvSetTheme('light')")
 
             browser.close()
 

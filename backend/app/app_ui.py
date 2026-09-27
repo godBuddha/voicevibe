@@ -3,7 +3,14 @@
 Single page, vanilla JS, hash routing (#/dashboard, #/dub, #/tts, #/voices,
 #/stt, #/jobs, #/api). Không build step — self-host chỉ cần Python.
 Usage donut đọc số liệu THẬT từ GET /v1/usage (aggregate credit_ledger).
+
+Màu sắc KHÔNG hardcode trong file này: mọi token đến từ app/theme.py (sáng + tối),
+nên giao diện có chế độ tối mà không cần build step. Xem tests/test_theme.py —
+test đó cưỡng chế "không hex ngoài khối token".
 """
+from __future__ import annotations
+
+from .theme import THEME_BOOT, THEME_CSS, THEME_JS
 
 APP_HTML = """<!DOCTYPE html>
 <html lang="vi">
@@ -11,10 +18,9 @@ APP_HTML = """<!DOCTYPE html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>YupVox-Clone — AI Voice cho một thế giới mới</title>
+__THEME_BOOT__
 <style>
-  :root { --bg:#f6f5fb; --card:#ffffff; --line:#e8e6f5; --fg:#23213a; --mut:#8b88a8;
-          --acc:#7c5cff; --acc2:#a78bfa; --ok:#22c58b; --warn:#ffb020; --err:#ff5d73;
-          --side:#ffffff; }
+__THEME_CSS__
   * { box-sizing:border-box; }
   body { background:var(--bg); color:var(--fg); font:14.5px/1.55 system-ui,-apple-system,sans-serif; margin:0; }
   a { color:var(--acc); text-decoration:none; }
@@ -23,16 +29,16 @@ APP_HTML = """<!DOCTYPE html>
 
   /* ---- layout ---- */
   #shell { display:flex; min-height:100vh; }
-  #sidebar { width:248px; background:var(--side); border-right:1px solid var(--line);
+  #sidebar { width:var(--side-w); background:var(--side); border-right:1px solid var(--line);
              padding:18px 14px; display:flex; flex-direction:column; gap:4px;
              position:fixed; top:0; bottom:0; left:0; overflow-y:auto; z-index:30; }
-  main { margin-left:248px; flex:1; padding:0 26px 40px; }
+  main { margin-left:var(--side-w); flex:1; padding:0 26px 40px; }
   @media (max-width: 920px) {
     #sidebar { display:none; }
     main { margin-left:0; }
     #burger { display:inline-flex !important; }
   }
-  #burger { display:none; background:var(--card); border:1px solid var(--line);
+  #burger { display:none; background:var(--card); border:1px solid var(--line); color:var(--fg);
             border-radius:10px; padding:8px 12px; cursor:pointer; }
 
   /* ---- sidebar ---- */
@@ -45,11 +51,11 @@ APP_HTML = """<!DOCTYPE html>
                 padding:14px 10px 6px; }
   .nav a { display:flex; gap:10px; align-items:center; padding:9px 12px; border-radius:10px;
            color:var(--fg); cursor:pointer; font-size:14px; }
-  .nav a:hover { background:#f3f1fc; }
-  .nav a.on { background:linear-gradient(90deg,var(--acc),var(--acc2)); color:#fff; font-weight:600; }
+  .nav a:hover { background:var(--hover); }
+  .nav a.on { background:linear-gradient(90deg,var(--acc),var(--acc2)); color:var(--on-acc); font-weight:600; }
   .nav a.soon { color:var(--mut); opacity:.65; }
-  .nav a.soon:hover { background:#f3f1fc; }
-  .sidecard { margin-top:auto; background:linear-gradient(160deg,#f4f0ff,#eef9f4);
+  .nav a.soon:hover { background:var(--hover); }
+  .sidecard { margin-top:auto; background:linear-gradient(160deg,var(--sidecard-from),var(--sidecard-to));
               border:1px solid var(--line); border-radius:14px; padding:14px; font-size:13px; }
   .sidecard b { font-size:16px; }
   .sidecard button { width:100%; margin-top:8px; }
@@ -63,49 +69,54 @@ APP_HTML = """<!DOCTYPE html>
                   padding:9px 16px; font-size:13.5px; }
   .who { display:flex; gap:9px; align-items:center; }
   .avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,var(--acc),var(--acc2));
-            color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; }
+            color:var(--on-acc); display:flex; align-items:center; justify-content:center; font-weight:700; }
+  .theme-btn { background:var(--card); border:1px solid var(--line); color:var(--fg);
+               border-radius:99px; padding:9px 15px; cursor:pointer; font-size:13px; white-space:nowrap; }
+  .theme-btn:hover { border-color:var(--acc); }
 
   /* ---- cards / pages ---- */
   .page { display:none; } .page.on { display:block; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; }
   .grid2 { display:grid; grid-template-columns: 1.6fr 1fr; gap:16px; margin-top:16px; }
   @media (max-width: 980px) { .grid2 { grid-template-columns:1fr; } }
-  .hero { background:linear-gradient(120deg,#7c5cff 0%,#a78bfa 55%,#22c58b 130%);
-          color:#fff; border-radius:20px; padding:30px; }
+  .hero { background:var(--hero-grad);
+          color:var(--on-acc); border-radius:20px; padding:30px; }
   .hero h1 { font-size:26px; } .hero p { opacity:.92; max-width:520px; }
-  .hero button { background:#fff; color:var(--acc); border:none; border-radius:12px;
+  .hero button { background:var(--card); color:var(--acc); border:none; border-radius:12px;
                  padding:11px 22px; font-weight:700; cursor:pointer; margin-top:14px; font-size:15px; }
   .statrow { display:flex; gap:22px; flex-wrap:wrap; margin-top:18px; }
   .stat b { font-size:17px; display:block; } .stat span { opacity:.85; font-size:12.5px; }
   .chips { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
-  .chip { background:#f6f4ff; border:1px solid var(--line); border-radius:10px; padding:9px 14px;
+  .chip { background:var(--chip); border:1px solid var(--line); border-radius:10px; padding:9px 14px;
           cursor:pointer; font-size:13.5px; }
   .chip:hover { border-color:var(--acc); }
   label { display:block; color:var(--mut); font-size:12.5px; margin:12px 0 5px; }
-  input, select, textarea { background:#fbfaff; border:1px solid var(--line); color:var(--fg);
+  input, select, textarea { background:var(--input); border:1px solid var(--line); color:var(--fg);
           border-radius:10px; padding:10px 12px; width:100%; font:inherit; }
   textarea { min-height:96px; resize:vertical; }
-  button.go { background:linear-gradient(90deg,var(--acc),var(--acc2)); border:none; color:#fff;
+  button.go { background:linear-gradient(90deg,var(--acc),var(--acc2)); border:none; color:var(--on-acc);
               border-radius:11px; padding:11px 22px; font-weight:700; cursor:pointer; margin-top:16px; font-size:15px; }
   button.ghost { background:transparent; border:1px solid var(--line); color:var(--mut);
                  border-radius:9px; padding:7px 13px; cursor:pointer; font-size:13px; }
   .row { display:flex; gap:12px; flex-wrap:wrap; } .row > div { flex:1; min-width:170px; }
   .status { margin-top:10px; font-size:13.5px; } .ok { color:var(--ok); } .err { color:var(--err); }
-  .job { border:1px solid var(--line); border-radius:12px; padding:13px 15px; margin-bottom:10px; background:#fff; }
+  .job { border:1px solid var(--line); border-radius:12px; padding:13px 15px; margin-bottom:10px; background:var(--card); }
   .job .h { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:center; }
   .pill { font-size:12px; padding:3px 11px; border-radius:99px; }
-  .pill.done { background:#e6f9f1; color:var(--ok); } .pill.running { background:#fff5e0; color:#c77c00; }
-  .pill.failed { background:#ffe9ec; color:var(--err); } .pill.queued { background:#f0eefb; color:var(--mut); }
+  .pill.done { background:var(--pill-done-bg); color:var(--ok); }
+  .pill.running { background:var(--pill-run-bg); color:var(--pill-run-fg); }
+  .pill.failed { background:var(--pill-fail-bg); color:var(--err); }
+  .pill.queued { background:var(--pill-queue-bg); color:var(--mut); }
   audio, video { width:100%; margin-top:10px; border-radius:10px; }
   .donut-wrap { display:flex; gap:18px; align-items:center; }
   .legend { font-size:13px; } .legend i { display:inline-block; width:10px; height:10px;
            border-radius:3px; margin-right:7px; }
-  .usagebar { height:8px; border-radius:99px; background:#f0eefb; margin:7px 0; overflow:hidden; }
+  .usagebar { height:8px; border-radius:99px; background:var(--track); margin:7px 0; overflow:hidden; }
   .usagebar i { display:block; height:100%; border-radius:99px; }
   table.keys { width:100%; border-collapse:collapse; font-size:13.5px; }
   table.keys td, table.keys th { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
-  code { background:#f3f1fc; border-radius:6px; padding:2px 7px; font-size:12.5px; }
-  pre { background:#23213a; color:#d7d5f5; border-radius:12px; padding:14px; overflow-x:auto; font-size:12.5px; }
+  code { background:var(--code-bg); border-radius:6px; padding:2px 7px; font-size:12.5px; }
+  pre { background:var(--pre-bg); color:var(--pre-fg); border-radius:12px; padding:14px; overflow-x:auto; font-size:12.5px; }
   #gate { max-width:420px; margin:90px auto; text-align:center; }
   .soonbox { text-align:center; padding:40px 20px; }
 </style>
@@ -156,6 +167,7 @@ APP_HTML = """<!DOCTYPE html>
       <button id="burger" onclick="toggleSide()">☰</button>
       <div class="search">🔍<input id="q" placeholder="Tìm kiếm dự án, giọng nói, công cụ…"></div>
       <div class="credits-pill">💰 <b id="top-credits">…</b> Credits</div>
+      <button class="theme-btn" data-theme-label onclick="yvToggleTheme()" title="Chuyển chế độ sáng/tối">🌙 Chế độ tối</button>
       <div class="who"><div class="avatar">C</div><div><b>Xin chào, Creator!</b><div class="mut" id="whokey"></div></div></div>
     </div>
 
@@ -191,13 +203,13 @@ APP_HTML = """<!DOCTYPE html>
           <h3>Mức sử dụng của bạn</h3>
           <div class="donut-wrap">
             <svg width="120" height="120" viewBox="0 0 120 120">
-              <circle cx="60" cy="60" r="48" fill="none" stroke="#f0eefb" stroke-width="14"/>
+              <circle cx="60" cy="60" r="48" fill="none" stroke="var(--track)" stroke-width="14"/>
               <circle id="donut" cx="60" cy="60" r="48" fill="none" stroke="var(--acc)"
                       stroke-width="14" stroke-linecap="round"
                       stroke-dasharray="0 302" transform="rotate(-90 60 60)"/>
               <text x="60" y="56" text-anchor="middle" font-size="17" font-weight="700"
-                    fill="#23213a" id="donut-used">0</text>
-              <text x="60" y="74" text-anchor="middle" font-size="10" fill="#8b88a8" id="donut-total">/ 50.000</text>
+                    fill="var(--fg)" id="donut-used">0</text>
+              <text x="60" y="74" text-anchor="middle" font-size="10" fill="var(--mut)" id="donut-total">/ 50.000</text>
             </svg>
             <div class="legend" id="legend">…</div>
           </div>
@@ -292,6 +304,7 @@ APP_HTML = """<!DOCTYPE html>
 </div>
 
 <script>
+__THEME_JS__
 let KEY = localStorage.getItem("yv_api_key") || "";
 const $ = (id) => document.getElementById(id);
 const H = () => ({ "X-API-Key": KEY, "Content-Type": "application/json" });
@@ -366,16 +379,26 @@ async function loadUsage() {
   $("donut").setAttribute("stroke-dasharray", (pct/100*302).toFixed(1) + " 302");
   $("donut-used").textContent = fmt(used);
   $("donut-total").textContent = "/ " + fmt(d.free_quota);
-  const colors = { tts:"#22c58b", stt:"#38bdf8", translate:"#7c5cff", dub:"#a78bfa", subtitle:"#ffb020" };
+  // Màu đọc từ CSS var -> tự đổi theo theme (không hardcode hex ở đây).
+  const colors = chartColors();
   const names = { tts:"TTS", stt:"STT", translate:"Dịch thuật", dub:"Dub video", subtitle:"Phụ đề", other:"Khác" };
   let html = "";
   for (const [t, n] of Object.entries(d.by_type)) {
-    const c = colors[t.split("_")[0]] || "#ff8a4c";
+    const c = colors[t.split("_")[0]] || yvCssVar("--chart-other");
     html += `<div><i style="background:${c}"></i>${esc(names[t.split("_")[0]]||t)} — <b>${fmt(n)}</b>
       <div class="usagebar"><i style="width:${total?n/total*100:0}%;background:${c}"></i></div></div>`;
   }
   $("legend").innerHTML = html || '<span class="mut">Chưa sử dụng — tạo job đầu tiên!</span>';
 }
+
+function chartColors() {
+  return { tts:yvCssVar("--chart-tts"), stt:yvCssVar("--chart-stt"),
+           translate:yvCssVar("--chart-translate"), dub:yvCssVar("--chart-dub"),
+           subtitle:yvCssVar("--chart-subtitle") };
+}
+
+// Đổi theme -> vẽ lại donut/legend để lấy màu mới.
+yvOnThemeChange(loadUsage);
 
 async function loadDashJobs() {
   const r = await fetch("/v1/jobs?limit=5", { headers: H() });
@@ -495,5 +518,13 @@ if (KEY) {
   fetch("/v1/me", { headers: H() }).then(r => { if (r.ok) boot(); else showGate(); });
 } else showGate();
 function showGate() { $("gate").style.display = ""; $("shell").style.display = "none"; }
+
+yvThemeChanged();  // đồng bộ nhãn nút sáng/tối với theme đã áp ở <head>
 </script>
 </body></html>"""
+
+# Nội suy token theme (không dùng f-string: CSS/JS đầy dấu ngoặc nhọn).
+APP_HTML = (APP_HTML
+            .replace("__THEME_BOOT__", THEME_BOOT)
+            .replace("__THEME_CSS__", THEME_CSS)
+            .replace("__THEME_JS__", THEME_JS))

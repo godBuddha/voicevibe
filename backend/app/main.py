@@ -242,19 +242,6 @@ def app_page() -> str:
     return APP_HTML
 
 
-# ---------------------------------------------------------------- frontend v2
-# Bản redesign (frontend/) được serve tại /v2 — song song với UI inline ở /
-# cho đến khi hoàn thiện rồi thay thế. Chỉ mount khi thư mục tồn tại (image
-# Docker api hiện chỉ copy backend/app — UI inline là fallback trong container).
-from pathlib import Path as _Path  # noqa: E402
-
-from fastapi.staticfiles import StaticFiles  # noqa: E402
-
-_FRONTEND = _Path(__file__).resolve().parents[2] / "frontend"
-if _FRONTEND.is_dir():
-    app.mount("/v2", StaticFiles(directory=str(_FRONTEND), html=True), name="frontend")
-
-
 @app.get("/v1/pricing")
 def pricing(user: User = Depends(auth)) -> dict:
     """Bảng giá credits/job — nguồn sự thật là Settings (admin sửa được)."""

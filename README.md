@@ -30,11 +30,15 @@ Mọi cấu hình lưu DB, secret mã hóa Fernet at rest, mỗi dòng có tag n
 
 ![admin settings](docs/screenshots/07-admin-settings.png)
 
-### Frontend redesign — `/v2` (đang phát triển song song)
+### Chế độ tối (dark mode)
 
-| Bảng điều khiển | Dub | Giọng của tôi |
-|---|---|---|
-| ![v2 dashboard](docs/screenshots/08-v2-dashboard.png) | ![v2 dub](docs/screenshots/09-v2-dub.png) | ![v2 voices](docs/screenshots/10-v2-voices.png) |
+Toàn bộ giao diện dùng chung một bộ token màu (`backend/app/theme.py`): chế độ sáng là
+mặc định, chế độ tối lật ngay trên thanh trên cùng và được ghi nhớ trong `localStorage`
+(`yv_theme`). Không có hex nào nằm ngoài khối token — `tests/test_theme.py` cưỡng chế điều này.
+
+| Bảng điều khiển (tối) | Dub (tối) |
+|---|---|
+| ![dashboard dark](docs/screenshots/08-dashboard-dark.png) | ![dub dark](docs/screenshots/09-dub-dark.png) |
 
 ## Kiến trúc
 
@@ -181,9 +185,8 @@ openssl rand -hex 32   # dán vào SETTINGS_MASTER_KEY trong .env
 `pyannote/wespeaker-voxceleb-resnet34-LM` · `pyannote/speaker-diarization-community-1`.
 Token dán vào `.env` HOẶC set sau qua `/admin/settings` (khuyến nghị).
 
-> Giao diện: `/` là UI inline (hoạt động ngay). `/v2` là bản frontend redesign
-> (StaticFiles) — song song cho đến khi hoàn thiện rồi thay thế. Admin:
-> `/admin` (Settings UI). Lấy API key đầu tiên: `POST /v1/auth/signup` hoặc key dev.
+> Giao diện: `/` là UI người dùng (inline, không build step) với chế độ sáng/tối.
+> `/admin` là trang Settings. Lấy API key đầu tiên: `POST /v1/auth/signup` hoặc key dev.
 
 ## Lựa chọn A — Máy cá nhân KHÔNG GPU (CPU-only)
 

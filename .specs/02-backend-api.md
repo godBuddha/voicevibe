@@ -50,7 +50,6 @@ Job types: `tts` ✅ · `stt` ✅ · `dub` ✅ · `translate`/`subtitle` → stu
 |---|---|---|
 | POST | /v1/auth/signup | `{email}` → 201 `{user_id, key}` — rate limit 5/phút/IP; trùng email → 409 |
 | GET | /v1/pricing | Bảng credits/job từ Settings (admin sửa được) |
-| GET | /v2/ | Frontend redesign (StaticFiles, song song với UI inline ở /) |
 
 - POST /v1/jobs `type=subtitle` → **501, KHÔNG trừ credits** (pipeline chưa có).
 - **API key lưu SHA-256 hash** (cột `key`), cột `prefix` để hiển thị masked; DELETE /v1/keys/{raw}.

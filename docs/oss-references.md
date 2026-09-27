@@ -86,7 +86,7 @@ Stars/chỉ số là ước lượng cùng ngày.
 
 | Thành phần (mockup) | Dự án | License | Hành động |
 |---|---|---|---|
-| **Waveform đa track** (Nhân vật 1/2 + Nhạc nền) | **wavesurfer.js** `katspaugh/wavesurfer.js` (+ plugin multitrack), hoặc **waveform-playlist** `naomiaro/waveform-playlist` | **BSD-3** / **MIT** | 🟢 ADOPT cho `/v2` |
+| **Waveform đa track** (Nhân vật 1/2 + Nhạc nền) | **wavesurfer.js** `katspaugh/wavesurfer.js` (+ plugin multitrack), hoặc **waveform-playlist** `naomiaro/waveform-playlist` | **BSD-3** / **MIT** | 🟢 ADOPT cho UI chính |
 | Editor audio zero-build (vanilla JS) | **AudioMass** `pkalogiros/AudioMass` | **MIT** | 🟢 Học UX (khớp ràng buộc "không build step" của ta) |
 | Điều khiển media không cần build | **media-chrome** `muxinc/media-chrome` | **MIT** | 🟢 ADOPT (Web Components) |
 | Lên lịch phát đa track chính xác | **Tone.js** `Tonejs/Tone.js` | **MIT** | 🟡 ADOPT khi cần |
@@ -110,6 +110,42 @@ Stars/chỉ số là ước lượng cùng ngày.
 
 > Ta đã tách lớp storage (`S3Storage` ↔ `LocalStorage` qua `S3_ENDPOINT`) nên **đổi
 > backend chỉ là đổi service trong compose**, không sửa code pipeline.
+
+## 1b. Bốn repo được chủ dự án chỉ định — kết quả xác minh (27/09/2026)
+
+Đã fetch file `LICENSE` thật của từng repo. **Chỉ 2 trong 4 được copy code.**
+
+| Repo | License (verify từ file thật) | OSI? | Copy code vào Apache-2.0? |
+|---|---|---|---|
+| **open-webui** ≥ v0.6.6 (nhánh `main` hiện tại) | "Open WebUI License" = BSD-3 **+ điều khoản 4 bắt giữ branding** | ❌ Không | 🔴 **KHÔNG** |
+| **open-webui** ≤ **v0.6.5** | **BSD-3-Clause** (thuần) | ✅ | 🟢 **ĐƯỢC** — pin đúng tag |
+| **omlx** `jundot/omlx` | **Apache-2.0** | ✅ | 🟢 **ĐƯỢC** |
+| **VoiceStudio** `debpalash/VoiceStudio` | **AGPL-3.0-only** + weights **CC-BY-NC** | ✅ (code) | 🔴 **KHÔNG** |
+| **ArcReel** `ArcReel/ArcReel` | **AGPL-3.0** + điều khoản §7 buộc ghi công | ✅ (code) | 🔴 **KHÔNG** |
+
+Chi tiết quan trọng:
+
+- **open-webui — mốc đổi license đã xác định chính xác:** commit `60d84a3` ("chore: license
+  'branding' clause", 18/04/2025). Kiểm tra bằng cách grep `LICENSE` tại từng tag:
+  **v0.6.5 = BSD-3** (bản cuối cùng còn permissive), **v0.6.6 trở đi = license riêng**.
+  Điều khoản 4 nói lệnh cấm chỉ áp dụng **khi vượt 50 người dùng trong 30 ngày** — nhưng vì
+  đây là "material condition of the rights granted", **không thể** mang code đó vào sản phẩm
+  Apache-2.0 (Apache-2.0 không cho phép áp thêm hạn chế xuống người nhận sau).
+  → Muốn copy: `git checkout v0.6.5` rồi lấy từ đó, giữ nguyên copyright.
+- **omlx — nguồn copy tốt nhất trong 4 repo:** `omlx/api/adapters/{openai,anthropic,base}.py`
+  + `sse_formatter.py` + `parser_tool_calls.py` + các schema model (`openai_models.py`,
+  `embedding_models.py`, `audio_models.py`) là code độc lập, không phụ thuộc SwiftUI. Phần
+  app macOS (SwiftUI/Metal) chỉ để tham khảo.
+- **VoiceStudio:** code AGPL (lây nhiễm toàn bộ dịch vụ) **và** weights mặc định
+  (`k2-fsa/OmniVoice`) là **CC-BY-NC** — không dùng thương mại được. Đọc `LICENSE-NOTICE.md`
+  của họ có ghi rõ. Chỉ nên đọc `backend/services/llm_providers.py` +
+  `backend/config/models.yaml` để **học cách mô tả catalog provider**, và
+  `docs/electron-llm-providers.md` để học quy tắc "test trước khi kích hoạt, giữ nguyên key
+  khi ô để trống" — đúng những quy tắc ta áp dụng ở mục 3.2 của kế hoạch.
+- **ArcReel:** AGPL + NOTICE §7(b) buộc mọi bản sửa phải giữ dòng "Powered by ArcReel" và
+  **link tới repo gốc ở vị trí hiển thị** — không phù hợp white-label/self-host thương mại.
+  Frontend của họ (React, không phải Svelte) có cụm `settings/endpoints/*` và
+  `PromptTemplate*` rất đáng **học bố cục**, nhưng không copy.
 
 ## 2. Danh sách "KHÔNG dùng" (đã xác minh lý do)
 
@@ -151,7 +187,7 @@ Stars/chỉ số là ước lượng cùng ngày.
 | 4 | **Track nhạc nền thật** (tách stem) | Demucs (MIT) | `app/pipelines/dub_pipeline.py::_make_bed` | vừa (thêm dep) |
 | 5 | Vòng lặp re-translate cho `needs_shorter_text` | VideoLingo (Apache-2.0) | `dub.py` + `dub_pipeline.py` | vừa |
 | 6 | Retime phụ đề lên audio đã dub | ffsubsync (MIT) | stage mới sau mix | nhỏ |
-| 7 | Waveform đa track cho `/v2` | wavesurfer.js (BSD-3) | `frontend/` | vừa |
+| 7 | Waveform đa track cho UI chính | wavesurfer.js (BSD-3) | `backend/app/app_ui.py` | vừa |
 | 8 | Nâng pyannote `3.1` → `community-1` | pyannote (CC-BY-4.0 weights) | `stt.py::DIA_MODEL` | nhỏ (cần accept repo) |
 
 **Khi copy code permissive:** giữ nguyên header copyright của tác giả gốc, ghi nguồn

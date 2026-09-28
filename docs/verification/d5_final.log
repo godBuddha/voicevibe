@@ -10,15 +10,26 @@ libnvrtc.so.13: cannot open shared object file: No such file or directory
   std = sequences.std(dim=-1, correction=1)
 /workspace/yupvox-clone/.venv/lib/python3.12/site-packages/transformers/models/marian/tokenization_marian.py:175: UserWarning: Recommended: pip install sacremoses.
   warnings.warn("Recommended: pip install sacremoses.")
-[dub] saved jobs/dub/b37acdf9a22f.wav (14.3s vs src 13.8s)
+[dub] saved jobs/dub/b06e0a8f3a46.wav (14.3s vs src 13.8s)
 [plan] per-segment timing:
   #0 SPEAKER_00 slot= 1.54s gen= 1.44s speed=1.00 delay=     0ms
-  #1 SPEAKER_00 slot= 1.60s gen= 2.96s speed=1.35 delay=  2100ms  <-- RE-TRANSLATE
-  #2 SPEAKER_00 slot= 3.22s gen= 3.84s speed=1.06 delay=  3700ms
-  #3 SPEAKER_01 slot= 1.56s gen= 1.76s speed=0.90 delay=  7440ms
+  #1 SPEAKER_00 slot= 1.60s gen= 3.12s speed=1.35 delay=  2100ms  <-- RE-TRANSLATE
+  #2 SPEAKER_00 slot= 3.22s gen= 3.44s speed=0.95 delay=  3700ms
+  #3 SPEAKER_01 slot= 1.56s gen= 1.52s speed=1.00 delay=  7440ms
   #4 SPEAKER_01 slot= 3.68s gen= 3.68s speed=0.90 delay=  9580ms
 [verify] faster-whisper round-trip on DUBBED audio (en)...
-[verify] heard: Hi guys, I'm Long Today we're going to test the translation system and the automated sound of his own writing for 7 days Hi Long, I'm Mai Dinh You heard AI voice technology is changing fast, right?
+[verify] heard: Hi guys, I'm Long Today we're going to test the translation system and the automated sound of his own reading for 7 days Hi Long, I'm Mai Dinh You heard AI voice technology is changing fast, right?
 [verify] 37 words | lang=en p=1.00
 
 D5 SMOKE: PASS (dub 14.3s, heard 37 en words)
+1. stage_translator trên DB chưa migrate: None -> OK
+/workspace/yupvox-clone/.venv/lib/python3.12/site-packages/transformers/models/marian/tokenization_marian.py:175: UserWarning: Recommended: pip install sacremoses.
+  warnings.warn("Recommended: pip install sacremoses.")
+2. build_translator rơi về đường cũ: LocalMarianTranslator
+3. cột mới của users: ['is_active', 'last_login_at', 'password_hash', 'role', 'updated_at']
+4. bảng mới: ['ai_providers', 'media_objects', 'prompts', 'sessions', 'stage_models', 'system_flags']
+5. row cũ còn nguyên: 1 -> 1 | api_keys = 1 | role backfill = 'user'
+6. chạy ensure_schema thêm 2 lần: OK (idempotent)
+7. sau migrate + gán công đoạn: CloudChatTranslator | model = m1 | base_url = https://api.example.com/v1
+
+MIGRATION + FALLBACK SMOKE: PASS

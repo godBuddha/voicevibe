@@ -74,6 +74,26 @@ python -m app.pipelines.dub_pipeline --selftest            # cần ffmpeg
 
 Smoke UI thật (bắt lỗi JS mà test Python không thấy): `python backend/scripts/ui_shot.py --check`
 
+## Kiểm chứng trên GPU (pipeline thật)
+
+CI chạy offline nên **không** chạm tới model. Pipeline thật được kiểm bằng các smoke script
+trên box GPU, chạy đúng mã của commit đã push:
+
+| Script | Nội dung | Kết quả |
+|---|---|---|
+| `scripts/d5_smoke.py` | lồng tiếng vi→en audio 2 người nói: STT + tách người nói → dịch → TTS → timing-fit → ffmpeg; kiểm lại bằng ASR vòng | ✅ 14.3s / nguồn 13.8s, 37 từ en, `p=1.00` |
+| `scripts/d7_smoke.py` | lồng tiếng **video**: MP4 vào → MP4 ra, giữ luồng hình, `background=source_low` | ✅ MP4 320×180 h264 + aac 48k, 13.7s, 37 từ en |
+| `scripts/migration_smoke.py` | DB **hình dạng cũ** → migrate, và `stage_translator()` phải trả `None` chứ không ném lỗi | ✅ 7/7 |
+
+Nhật ký thô: `docs/verification/*.log`. Bằng chứng hình ảnh lấy **trực tiếp từ MP4 đã tạo**
+(`ffmpeg` trích khung hình, không phải ảnh minh hoạ) — khung ở giây thứ 11 hiện đúng đồng hồ
+đếm của `testsrc`, tức luồng video sống sót qua bước lồng tiếng. Ảnh dạng sóng nguồn và bản
+đã lồng tiếng xếp đoạn khớp nhau, cho thấy timing-fit đặt đúng vị trí.
+
+`migration_smoke.py` canh đúng rủi ro mà Giai đoạn 3 mang lại: deployment **đang chạy** có DB
+chưa có bảng `stage_models`/`ai_providers`. Nếu `stage_translator()` ném lỗi ở đó thì cả
+pipeline dubbing chết — nên nó được bọc để rơi về đường cũ, và script này khoá hành vi đó lại.
+
 ## Kiến trúc
 
 ```

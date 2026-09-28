@@ -10,10 +10,10 @@ libnvrtc.so.13: cannot open shared object file: No such file or directory
   std = sequences.std(dim=-1, correction=1)
 /workspace/yupvox-clone/.venv/lib/python3.12/site-packages/transformers/models/marian/tokenization_marian.py:175: UserWarning: Recommended: pip install sacremoses.
   warnings.warn("Recommended: pip install sacremoses.")
-[dub] saved jobs/dub/1932aa63d8be.mp4
+[dub] saved jobs/dub/383f606c0028.mp4
 [dub] duration 13.7s (src ~13.4s)
 [verify] round-trip ASR on the dubbed MP4 audio track...
-[verify] heard: Hi, guys, I'm Long. Today we're going to test the translation system and the automated sound of his own writing for 7 days. Hi, Long, I'm Mai Dinh. You heard AI voice technology is changing fast, right?
+[verify] heard: Hi guys, I'm Long. Today we're going to test the translation system and the automated sound of his own writing for 7 days. Hi, Long, I'm Mai Dinh. You heard AI voice technology is changing fast, right?
 [verify] lang=en p=1.00
 
 D7 SMOKE: PASS (video dub MP4 13.7s, 37 en words, background=source_low)

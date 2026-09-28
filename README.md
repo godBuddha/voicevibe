@@ -45,6 +45,35 @@ mặc định, chế độ tối lật ngay trên thanh trên cùng và được
 |---|---|
 | ![dashboard dark](docs/screenshots/08-dashboard-dark.png) | ![dub dark](docs/screenshots/09-dub-dark.png) |
 
+## Kiểm thử & CI
+
+Mọi push chạy **15 suite offline** trên GitHub Actions — không cần GPU, không tải model:
+10 guard (`tests/test_*.py`) + 5 pipeline selftest. Bước chạy **không dừng ở suite đỏ đầu
+tiên**: một lần chạy cho biết toàn cảnh, và mỗi lần chạy tự công bố bảng kết quả vào
+`$GITHUB_STEP_SUMMARY`.
+
+![lịch sử CI](docs/screenshots/ci-01-runs.png)
+
+> **CI từng đỏ 11 lần liên tiếp mà không phải vì code.** Mọi lần chạy đều chết sau ~7 giây
+> tại `actions/setup-python` vì khai `cache: pip` nhưng repo không có `requirements.txt`
+> lẫn `pyproject.toml` (deps nằm ở `backend/requirements-api.txt` và
+> `requirements-worker.txt`) — job dừng **trước khi chạy test nào**, nên "đỏ" không nói gì
+> về chất lượng mã. Ảnh trên cho thấy đúng bước ngoặt: 11 lần 5–9s, rồi 45s / 1m4s / 40s
+> sau khi sửa. Xem `backend/tests/test_ci_config.py` — guard canh chính file workflow
+> (cache path phải trỏ tới file có thật, mọi suite được workflow gọi phải tồn tại, và
+> không test nào bị bỏ quên ngoài CI). Guard đã được kiểm chứng **ngược**: gỡ dòng sửa ra
+> thì nó fail, thêm lại thì pass.
+
+Chạy tại chỗ, đúng những gì CI chạy:
+
+```bash
+cd backend
+PYTHONPATH=. YUPVOX_INLINE=1 python tests/test_day2.py     # ... và 9 suite còn lại
+python -m app.pipelines.dub_pipeline --selftest            # cần ffmpeg
+```
+
+Smoke UI thật (bắt lỗi JS mà test Python không thấy): `python backend/scripts/ui_shot.py --check`
+
 ## Kiến trúc
 
 ```

@@ -116,16 +116,37 @@ trên box GPU, chạy đúng mã của commit đã push:
 |---|---|---|
 | `scripts/d5_smoke.py` | lồng tiếng vi→en audio 2 người nói: STT + tách người nói → dịch → TTS → timing-fit → ffmpeg; kiểm lại bằng ASR vòng | ✅ 14.3s / nguồn 13.8s, 37 từ en, `p=1.00` |
 | `scripts/d7_smoke.py` | lồng tiếng **video**: MP4 vào → MP4 ra, giữ luồng hình, `background=source_low` | ✅ MP4 320×180 h264 + aac 48k, 13.7s, 37 từ en |
+| `scripts/subtitle_smoke.py` | phụ đề SRT/VTT/ASS + song ngữ từ audio 2 người nói | ✅ 5 cue, 2 người nói, 3 định dạng |
 | `scripts/migration_smoke.py` | DB **hình dạng cũ** → migrate, và `stage_translator()` phải trả `None` chứ không ném lỗi | ✅ 7/7 |
+| `scripts/retranslate_llm_check.py` | vòng lặp re-translate với **LLM thật** (OpenRouter) | ✅ 5.3s @ tốc độ ép 1.35 → **2.4s @ 1.18** |
 
 Nhật ký thô: `docs/verification/*.log`. Bằng chứng hình ảnh lấy **trực tiếp từ MP4 đã tạo**
 (`ffmpeg` trích khung hình, không phải ảnh minh hoạ) — khung ở giây thứ 11 hiện đúng đồng hồ
 đếm của `testsrc`, tức luồng video sống sót qua bước lồng tiếng. Ảnh dạng sóng nguồn và bản
 đã lồng tiếng xếp đoạn khớp nhau, cho thấy timing-fit đặt đúng vị trí.
 
-`migration_smoke.py` canh đúng rủi ro mà Giai đoạn 3 mang lại: deployment **đang chạy** có DB
-chưa có bảng `stage_models`/`ai_providers`. Nếu `stage_translator()` ném lỗi ở đó thì cả
-pipeline dubbing chết — nên nó được bọc để rơi về đường cũ, và script này khoá hành vi đó lại.
+### Đoạn dịch dài quá thời lượng — không còn đọc méo
+
+Khi bản dịch dài hơn slot, cách cũ là ép `atempo` tới `max_speed` (1.35) — nghe rõ méo.
+Giờ pipeline **xin bản dịch ngắn hơn** (prompt `retranslate_timing`, sửa được trong `/admin`)
+rồi tổng hợp lại. Ba điều đã kiểm chứng bằng LLM thật:
+
+- **Ngân sách ký tự tính từ tốc độ nói thật** của chính bản dịch hiện tại, không phải hằng số.
+- **Model KHÔNG tôn trọng `max_chars`**: xin ≤21 ký tự, `gpt-4o-mini` trả 45 rồi 33. Nên
+  pipeline **đo trên audio tổng hợp**, chỉ nhận khi audio thật sự ngắn hơn — tin vào độ dài
+  chuỗi là nhận một bản vẫn không vừa slot.
+- **Model không tất định**: cùng prompt, hai lời gọi cho hai kết quả khác nhau.
+
+### Chống Whisper "bịa" chữ
+
+Whisper luôn phải sinh ký tự kể cả trên đoạn im lặng/nhạc, nên nó bịa — và trong pipeline
+lồng tiếng, câu bịa bị **dịch rồi đọc lên**, tức là thêm nội dung không có trong bản gốc.
+Lọc theo ba tín hiệu xác suất của chính model (`no_speech_prob`, `avg_logprob`,
+`compression_ratio`) chứ **không dùng danh sách câu** — danh sách sẽ hụt mọi ngôn ngữ khác.
+Hai điểm quan trọng: `no_speech` cao một mình **không đủ** (câu nói ngắn làm model phân vân
+nhưng vẫn giải mã đúng — lọc theo nó sẽ ăn mất câu thật), và bộ lọc **không bao giờ trả về
+rỗng** (mất hết nội dung tệ hơn giữ nhiễu). Số đoạn bị bỏ được ghi vào job và trả ra API để
+người dùng kiểm tra được.
 
 ## Kiến trúc
 

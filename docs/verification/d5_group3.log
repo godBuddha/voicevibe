@@ -1,0 +1,24 @@
+[src] /workspace/samples/d3_2spk.wav (13.8s, vi, 2 speakers)
+/workspace/yupvox-clone/.venv/lib/python3.12/site-packages/pyannote/audio/core/io.py:48: UserWarning: 
+torchcodec is not installed correctly so built-in audio decoding will fail. Solutions are:
+* use audio preloaded in-memory as a {'waveform': (channel, time) torch.Tensor, 'sample_rate': int} dictionary;
+* fix torchcodec installation. Error message was:
+
+libnvrtc.so.13: cannot open shared object file: No such file or directory
+  warnings.warn(
+/workspace/yupvox-clone/.venv/lib/python3.12/site-packages/pyannote/audio/models/blocks/pooling.py:103: UserWarning: std(): degrees of freedom is <= 0. Correction should be strictly less than the reduction factor (input numel divided by output numel). (Triggered internally at /pytorch/aten/src/ATen/native/ReduceOps.cpp:1839.)
+  std = sequences.std(dim=-1, correction=1)
+/workspace/yupvox-clone/.venv/lib/python3.12/site-packages/transformers/models/marian/tokenization_marian.py:175: UserWarning: Recommended: pip install sacremoses.
+  warnings.warn("Recommended: pip install sacremoses.")
+[dub] saved jobs/dub/7b77033e3b4e.wav (14.3s vs src 13.8s)
+[plan] per-segment timing:
+  #0 SPEAKER_00 slot= 1.54s gen= 1.60s speed=0.82 delay=     0ms
+  #1 SPEAKER_00 slot= 1.60s gen= 2.64s speed=1.35 delay=  2100ms  <-- RE-TRANSLATE
+  #2 SPEAKER_00 slot= 3.22s gen= 3.60s speed=0.99 delay=  3700ms
+  #3 SPEAKER_01 slot= 1.56s gen= 1.76s speed=0.90 delay=  7440ms
+  #4 SPEAKER_01 slot= 3.68s gen= 3.76s speed=0.92 delay=  9580ms
+[verify] faster-whisper round-trip on DUBBED audio (en)...
+[verify] heard: Hi guys, I'm Long. Today we're going to test the translation system and the automated sound of his own writing for 7 days. Hi Long, I'm Mai Dinh. You heard AI voice technology is changing fast right?
+[verify] 37 words | lang=en p=1.00
+
+D5 SMOKE: PASS (dub 14.3s, heard 37 en words)

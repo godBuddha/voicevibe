@@ -240,16 +240,23 @@ Khi ship weights CC-BY-NC, **hạn chế NC đi theo người nhận**: ai self-
 
 ## 4. Lộ trình áp dụng vào repo này (theo thứ tự ưu tiên)
 
-| # | Việc | Nguồn tham chiếu | Điểm chạm trong code | Chi phí |
+| # | Việc | Nguồn tham chiếu | Điểm chạm trong code | Trạng thái |
 |---|---|---|---|---|
-| 1 | Bộ chống hallucination cho Whisper | faster-whisper (MIT) | `app/pipelines/stt.py::transcribe` | ~5 dòng |
-| 2 | SRT/VTT/ASS + phụ đề song ngữ | pysubs2 (MIT) | thay `app/pipelines/stt.py::to_srt` | nhỏ |
-| 3 | Chuẩn hoá cue (gộp theo dấu câu/khoảng lặng) | stable-ts (MIT) | `stt.py::merge` + segment hậu kỳ | vừa |
-| 4 | **Track nhạc nền thật** (tách stem) | Demucs (MIT) | `app/pipelines/dub_pipeline.py::_make_bed` | vừa (thêm dep) |
-| 5 | Vòng lặp re-translate cho `needs_shorter_text` | VideoLingo (Apache-2.0) | `dub.py` + `dub_pipeline.py` | vừa |
-| 6 | Retime phụ đề lên audio đã dub | ffsubsync (MIT) | stage mới sau mix | nhỏ |
-| 7 | Waveform đa track cho UI chính | wavesurfer.js (BSD-3) | `backend/app/app_ui.py` | vừa |
-| 8 | Nâng pyannote `3.1` → `community-1` | pyannote (CC-BY-4.0 weights) | `stt.py::DIA_MODEL` | nhỏ (cần accept repo) |
+| 1 | Bộ chống hallucination cho Whisper | faster-whisper (MIT) | `app/pipelines/stt.py::segment_is_hallucination` | ✅ **xong** — 3 tín hiệu xác suất của model + nhãn `[Music]`; 14 ca test |
+| 2 | SRT/VTT/ASS + phụ đề song ngữ | pysubs2 (MIT) | `app/pipelines/subtitle.py` | ✅ **xong** — 3 định dạng, song ngữ, xác minh trên GPU |
+| 3 | Chuẩn hoá cue (gộp theo dấu câu/khoảng lặng) | stable-ts (MIT) | `stt.py::merge` + segment hậu kỳ | ⬜ chưa |
+| 4 | **Track nhạc nền thật** (tách stem) | Demucs (MIT) | `app/pipelines/dub_pipeline.py::_make_bed` | ⬜ chưa (cần thêm dep ~2GB) |
+| 5 | Vòng lặp re-translate cho `needs_shorter_text` | VideoLingo (Apache-2.0) | `dub_pipeline.py::_retranslate_pass` | ✅ **xong** — đo trên audio thật; 9 ca test + LLM thật |
+| 6 | Retime phụ đề lên audio đã dub | ffsubsync (MIT) | stage mới sau mix | ⬜ chưa |
+| 7 | Waveform đa track cho UI chính | wavesurfer.js (BSD-3) | `backend/app/app_ui.py` | ⬜ chưa |
+| 8 | Nâng pyannote `3.1` → `community-1` | pyannote (CC-BY-4.0 weights) | `stt.py::DIA_MODEL` | ⬜ chưa (cần accept repo) |
+
+**Bài học khi làm #5 (re-translate) — đã kiểm chứng bằng LLM thật:** model **KHÔNG
+tôn trọng** `max_chars`. Xin ≤21 ký tự, `gpt-4o-mini` trả về 45 rồi 33. Vì vậy
+vòng lặp đo trên **audio tổng hợp** chứ không tin độ dài chuỗi — nếu tin, bản "ngắn
+hơn" vẫn có thể nói ra dài hơn slot. Và LLM không tất định (cùng prompt, hai lời
+gọi cho hai kết quả khác nhau), nên mọi assertion trên đầu ra LLM phải là **bất
+biến** (ngắn hơn, khác bản cũ, audio ngắn hơn), không bao giờ là so bằng nhau.
 
 **Khi copy code permissive:** giữ nguyên header copyright của tác giả gốc, ghi nguồn
 trong file (hoặc `NOTICE`), và nêu rõ license — MIT/Apache/BSD đều yêu cầu điều này.

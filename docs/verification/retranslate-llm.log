@@ -1,0 +1,15 @@
+model: openai/gpt-4o-mini
+
+1. dịch đầy đủ : 'Today we will test the entire automatic translation and voice-over system.' (74 ký tự)
+   tổng hợp giả: 5.3s > slot 1.6s -> cần bản ngắn hơn
+
+2. gọi retranslate_shorter(max_chars=21) …
+   -> 'Today we’ll test the whole system.' (34 ký tự)
+   (!) model VƯỢT ngân sách: 34 > 21 — đúng như dự phòng, nên phải đo trên audio
+
+3. _retranslate_pass nhận: 1 đoạn
+   -> "We'll test the whole system." (28 ký tự) [khác lời gọi ở bước 2 — model không tất định]
+   sau khi thay: 2.0s, cờ needs_shorter_text = False, speed = 1.00
+   (trước: 5.3s, speed bị ép = 1.35)
+
+LLM RE-TRANSLATE CHECK PASSED

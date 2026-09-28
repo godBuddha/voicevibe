@@ -45,6 +45,7 @@ from .prompts import seed_prompts
 from .providers_api import router as ai_admin_router
 from .ratelimit import check_rate as _check_rate
 from .ratelimit import _RATE  # noqa: F401 — giữ tên cũ cho test/ops
+from .ratelimit import backend as rate_limit_backend
 from .security import MIN_PASSWORD_LEN, hash_password, password_problem
 from .settings_service import (
     SETTING_DEFS,
@@ -127,7 +128,11 @@ class VoiceIn(BaseModel):
 
 @app.get("/healthz")
 def healthz() -> dict:
-    return {"ok": True, "time": int(time.time())}
+    # `ratelimit` có mặt để người vận hành THẤY ĐƯỢC hạn mức có đang chia sẻ hay
+    # không. Chạy nhiều worker mà backend là "memory" thì hạn mức thực tế bị nhân
+    # theo số worker — không có gì khác trong hệ thống nói ra điều đó.
+    return {"ok": True, "time": int(time.time()),
+            "ratelimit": rate_limit_backend()}
 
 
 @app.post("/v1/jobs", status_code=202)

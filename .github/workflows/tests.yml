@@ -48,6 +48,7 @@ jobs:
             "tests/test_migrations.py"
             "tests/test_providers_admin.py"
             "tests/test_ci_config.py"
+            "tests/test_ratelimit.py"
             "app.pipelines.dub --selftest"
             "app.pipelines.stt --selftest"
             "app.pipelines.translate --selftest"

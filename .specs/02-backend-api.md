@@ -93,7 +93,11 @@ phân biệt — không xác nhận sự tồn tại của file cho người kh�
 - CSRF: `SameSite=Lax` + lớp hai — request xác thực bằng **cookie** mà `Origin` khác host → 403.
 - `create_job` kiểm tra quyền sở hữu `voice_id` **trước `_charge`** (trước đây chỉ worker
   kiểm tra, tức đã trừ credit rồi mới fail).
-- Rate limiter vẫn **in-memory, một tiến trình** — ghi rõ giới hạn; Redis là việc sau.
+- Rate limiter: **Redis** khi có `REDIS_URL` (cửa sổ trượt bằng ZSET + script Lua
+  nguyên tử → hạn mức chia sẻ giữa mọi worker/replica); không có Redis thì rơi về
+  in-memory **một tiến trình** (hạn mức bị nhân theo số worker). Redis chết giữa
+  chừng cũng rơi về in-memory chứ không làm request gãy — đánh đổi có ý thức.
+  Dùng `ratelimit.backend()` để biết đang ở backend nào.
 
 ## Phase 3 — quản trị AI (đều `Depends(current_admin)`)
 

@@ -1,0 +1,21 @@
+# Override: cấp GPU cho worker (cần nvidia-container-toolkit trên máy chủ).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+#
+# Vì sao là file riêng chứ không nằm sẵn trong docker-compose.yml: máy không có
+# GPU sẽ hỏng ngay ở bước tạo container ("could not select device driver nvidia"),
+# tức là bản self-host trên laptop/CPU không chạy được nữa. Tách ra thì mặc định
+# luôn chạy được, còn ai có GPU thì thêm đúng một cờ.
+#
+# Kiểm tra trước khi dùng:
+#   docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi
+
+services:
+  worker:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

@@ -298,10 +298,51 @@ pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.
 ## Lựa chọn C — VPS / Docker Compose
 
 ```bash
-docker compose up -d --build   # postgres + redis + minio + api + worker
-# Worker GPU: bỏ comment phần deploy.resources trong docker-compose.yml
-# + cài nvidia-container-toolkit trên host
+cp .env.example .env
+# Bắt buộc điền: SETTINGS_MASTER_KEY (openssl rand -hex 32), POSTGRES_PASSWORD
+docker compose up -d --build          # postgres + redis + api + worker
 ```
+
+Mặc định **không cần cấu hình gì thêm**: media nằm trong volume `media` dùng chung,
+và `api` chỉ bind `127.0.0.1:8000` (không phơi ra Internet khi chưa có TLS).
+
+**Có GPU** — thêm file override (cần `nvidia-container-toolkit` trên host):
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
+docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi  # kiểm tra trước
+```
+
+**Có tên miền, muốn TLS tự động** (Let's Encrypt qua Caddy):
+
+```bash
+echo "APP_DOMAIN=yupvox.example.com" >> .env
+docker compose --profile proxy up -d
+```
+
+Không đặt `APP_DOMAIN` thì Caddy dùng chứng chỉ **tự ký cho localhost** — chỉ hợp
+để thử, không dùng thật. Chạy sau Cloudflare Tunnel / LB sẵn có thì bỏ qua profile
+`proxy` và trỏ tunnel vào `127.0.0.1:8000`.
+
+> **Vì sao không còn MinIO.** Bản trước có `minio` + `minio-init`; ảnh `minio/minio`
+> đã bị **xoá khỏi Docker Hub** nên stack không pull nổi image nào — `docker compose
+> config -q` vẫn xanh trong khi `up` chết ngay. Vì media luôn được phục vụ qua API để
+> **kiểm quyền sở hữu**, presigned URL không được dùng, nên một S3 nội bộ không mang
+> lại lợi ích gì. Muốn lưu ở S3 ngoài (R2 / S3 / B2) thì đặt `S3_ENDPOINT`,
+> `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET` — storage tự chuyển, không cần đổi code.
+> `scripts/check_deploy.py` (chạy trong CI) chặn việc dán lại image đã chết và bắt
+> đúng loại lỗi này.
+
+### Biến môi trường của compose
+
+| Biến | Mặc định | Ý nghĩa |
+|---|---|---|
+| `SETTINGS_MASTER_KEY` | — (**bắt buộc**) | khoá Fernet mã hoá secret trong DB |
+| `POSTGRES_PASSWORD` | — (**bắt buộc**) | mật khẩu Postgres nội bộ |
+| `API_BIND` | `127.0.0.1` | đổi `0.0.0.0` nếu tự lo TLS phía trước |
+| `APP_DOMAIN` | `localhost` | chỉ dùng khi bật profile `proxy` |
+| `S3_*` | trống | chỉ đặt khi lưu media ở S3 ngoài |
+| `HF_TOKEN` | trống | pyannote gated (cần accept 4 repo) |
 
 ## Sau khi chạy
 

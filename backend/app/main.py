@@ -115,7 +115,7 @@ class JobIn(BaseModel):
     target_lang: str | None = None
     voice_id: str | None = None
     max_speed: float = 1.35
-    webhook_url: str | None = None  # TODO(D6): POST result on completion
+    webhook_url: str | None = None
 
 
 class VoiceIn(BaseModel):
@@ -181,7 +181,9 @@ def get_result(
         raise HTTPException(status_code=404, detail="job not found")
     if j.status != JobStatus.done:
         raise HTTPException(status_code=409, detail=f"job is {j.status.value}")
-    # TODO(D3): presigned S3/MinIO URL with expiry
+    # Cố ý KHÔNG dùng presigned URL của S3. Media phải đi qua API để kiểm **quyền sở
+    # hữu** (`_owns_media`); một presigned URL sẽ bỏ qua toàn bộ kiểm tra đó và biến
+    # mọi key thành công khai trong thời gian URL còn hiệu lực.
     return {"job_id": j.id, "download_url": f"/media/{j.result_s3_key}"}
 
 

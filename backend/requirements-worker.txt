@@ -1,4 +1,14 @@
 # AI worker (heavy) — runs in `worker` container, needs GPU for production speed
+
+# Celery + Redis: worker là tiến trình CHẠY celery (`celery -A app.tasks.celery_app
+# worker`), và api cần redis-py để đẩy job vào queue. Thiếu dòng này thì container
+# worker không start nổi: "exec: celery: executable file not found in $PATH".
+celery[redis]>=5.4
+
+# Postgres driver: worker CŨNG đọc/ghi DB (job status, credits, ref sự kiện).
+# Thiếu dòng này: "ModuleNotFoundError: No module named 'psycopg'" lúc khởi động.
+psycopg[binary]>=3.2
+
 # torch/torchaudio: cu128 wheels chạy trên driver >= CUDA 12.0 (verified RTX 3060, driver 550):
 #   pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu128
 faster-whisper>=1.1          # STT (MIT) — large-v3 ~4-5GB VRAM fp16 (estimate)

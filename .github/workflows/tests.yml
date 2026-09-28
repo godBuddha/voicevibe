@@ -99,8 +99,20 @@ jobs:
             exit 1
           fi
           echo "Tất cả suite xanh."
-      - name: Compose config sanity (bootstrap guards must be present)
+      - name: Compose + Caddy config sanity
+        # `config -q` chỉ xác nhận YAML hợp lệ — nó KHÔNG biết image có tồn tại,
+        # container có healthcheck, hay có đang chạy bằng root. Bản cũ trỏ vào
+        # `minio/minio:latest` (đã bị xoá khỏi Docker Hub): `config` vẫn xanh
+        # trong khi stack không pull nổi image nào. Vì vậy có check_deploy.py.
         run: |
           cd ..
-          SETTINGS_MASTER_KEY=x POSTGRES_PASSWORD=x MINIO_ROOT_PASSWORD=x \
-            docker compose config -q && echo "compose config OK"
+          python scripts/check_deploy.py
+          export SETTINGS_MASTER_KEY=x POSTGRES_PASSWORD=x APP_DOMAIN=example.com
+          docker compose config -q && echo "compose config OK"
+          docker compose -f docker-compose.yml -f docker-compose.gpu.yml config -q \
+            && echo "compose + GPU override config OK"
+          docker compose --profile proxy config -q && echo "compose + proxy profile OK"
+          docker run --rm -e APP_DOMAIN=example.com \
+            -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile \
+            && echo "Caddyfile OK"

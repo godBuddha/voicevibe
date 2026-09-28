@@ -1,13 +1,23 @@
 name: yupvox-clone
 
+# Self-host stack: postgres + redis + api + worker.
+#
+#   docker compose up -d                                  # app on 127.0.0.1:8000
+#   docker compose --profile proxy up -d                  # + Caddy, automatic TLS
+#   docker compose -f docker-compose.yml \
+#                  -f docker-compose.gpu.yml up -d        # + GPU for the worker
+#
+# Đọc `.env.example` trước: ba biến bắt buộc, thiếu là compose dừng ngay.
+
 networks:
   internal:
 
 volumes:
   pgdata:
-  miniodata:
-  media:
-  models:
+  media:      # media in/out — api và worker CÙNG mount volume này
+  models:     # cache model HuggingFace (nặng, giữ qua các lần deploy)
+  caddydata:
+  caddyconfig:
 
 services:
   postgres:
@@ -23,6 +33,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+    restart: unless-stopped
     networks: [internal]
 
   redis:
@@ -32,40 +43,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
-    networks: [internal]
-
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set in .env}
-    volumes:
-      - miniodata:/data
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-    networks: [internal]
-
-  # One-shot: tạo bucket S3 nếu chưa có (idempotent — an toàn khi redeploy).
-  minio-init:
-    image: minio/mc:latest
-    depends_on:
-      minio:
-        condition: service_healthy
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-      S3_BUCKET: ${S3_BUCKET:-yupvox}
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD;
-      mc mb --ignore-existing local/$$S3_BUCKET"
+    restart: unless-stopped
     networks: [internal]
 
   api:
@@ -83,28 +61,47 @@ services:
       YUPVOX_API_KEYS: ${YUPVOX_API_KEYS:-}
       YUPVOX_SECURE_COOKIES: ${YUPVOX_SECURE_COOKIES:-}
       YUPVOX_ENABLE_DOCS: ${YUPVOX_ENABLE_DOCS:-}
+      # Lưu trữ mặc định = volume dùng chung (`media`). Không cần dịch vụ S3 nào:
+      # media luôn được phục vụ qua API để KIỂM QUYỀN SỞ HỮU (`/media/{key}`), nên
+      # presigned URL không được dùng — xem ghi chú trong README.
       MEDIA_ROOT: /media
-      S3_ENDPOINT: http://minio:9000
-      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      S3_BUCKET: ${S3_BUCKET:-yupvox}
+      # Muốn dùng S3 ngoài (Cloudflare R2 / S3 / B2…) thì đặt 4 biến này, storage
+      # tự chuyển sang S3Storage (xem app/storage.py::get_storage).
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      HOME: /tmp
+    # Bind vào loopback: mặc định KHÔNG phơi app ra Internet khi chưa có TLS.
+    # Đặt API_BIND=0.0.0.0 trong .env nếu bạn tự lo TLS phía trước (tunnel, LB…).
+    # API_PORT đổi được vì 8000 là cổng rất hay bị chiếm (đã gặp thật).
     ports:
-      - "8000:8000"
+      - "${API_BIND:-127.0.0.1}:${API_PORT:-8000}:8000"
     volumes:
       - media:/media
+    tmpfs:
+      - /tmp
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request as u; u.urlopen('http://127.0.0.1:8000/healthz', timeout=3)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
-        condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
+    restart: unless-stopped
     networks: [internal]
 
   # Worker AI: target `worker` (torch + faster-whisper + pyannote + vieneu).
-  # Cần GPU: uncomment deploy.resources trên máy có nvidia-container-toolkit.
+  # GPU nằm ở file override `docker-compose.gpu.yml` — máy không GPU vẫn chạy được
+  # (chậm hơn nhiều, nhưng compose không chết vì đòi thiết bị không tồn tại).
   worker:
     build:
       context: ./backend
@@ -114,27 +111,66 @@ services:
       REDIS_URL: redis://redis:6379/0
       SETTINGS_MASTER_KEY: ${SETTINGS_MASTER_KEY:?set in .env}
       MEDIA_ROOT: /media
-      S3_ENDPOINT: http://minio:9000
-      S3_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      S3_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      S3_BUCKET: ${S3_BUCKET:-yupvox}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+      S3_BUCKET: ${S3_BUCKET:-}
       HF_TOKEN: ${HF_TOKEN:-}
+      HOME: /tmp
     volumes:
       - media:/media
       - models:/models/hf
+    tmpfs:
+      - /tmp
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    # Trước đây worker KHÔNG có healthcheck: nó chết âm thầm, job nằm mãi ở
+    # `queued` và không có gì báo. `grep pong` chỉ thành công khi có worker thật
+    # trả lời — `celery inspect` một mình vẫn exit 0 khi không ai phản hồi.
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.tasks.celery_app inspect ping 2>/dev/null | grep -q pong"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 180s   # lần nạp torch đầu tiên rất chậm
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
     restart: unless-stopped
     networks: [internal]
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+
+  # TLS tự động (Let's Encrypt) khi có tên miền thật. Bật bằng:
+  #   docker compose --profile proxy up -d
+  # Không đặt trong profile mặc định vì phần lớn bản self-host chạy sau tunnel
+  # hoặc reverse proxy sẵn có — dựng thêm Caddy ở đó chỉ tổ vướng.
+  caddy:
+    image: caddy:2-alpine
+    profiles: [proxy]
+    environment:
+      # KHÔNG dùng `${APP_DOMAIN:?...}` ở đây. Compose nội suy biến của MỌI service
+      # TRƯỚC khi lọc theo profile, nên `:?` sẽ làm `docker compose build api`
+      # (và mọi lệnh khác) hỏng ngay cả khi profile `proxy` đang tắt. Đã gặp thật.
+      #
+      # Cũng KHÔNG để rỗng: `{$APP_DOMAIN:localhost}` trong Caddyfile chỉ áp dụng
+      # giá trị dự phòng khi biến KHÔNG được set — set-nhưng-rỗng thì địa chỉ site
+      # thành chuỗi rỗng, Caddy hiểu nhầm khối sau là global option và báo
+      # "unrecognized global option: encode". Cũng đã gặp thật.
+      # Vì vậy chốt sẵn `localhost` ở đây để Caddy LUÔN nhận giá trị khác rỗng.
+      APP_DOMAIN: ${APP_DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [internal]

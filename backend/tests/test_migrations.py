@@ -56,9 +56,10 @@ os.environ["MEDIA_ROOT"] = str(WORK / "media")
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
+from sqlalchemy import create_engine as _create_engine  # noqa: E402
 from sqlalchemy import inspect, text  # noqa: E402
 
-from app.db import engine  # noqa: E402
+from app.db import Base, engine  # noqa: E402
 from app.migrations import ensure_schema  # noqa: E402
 
 insp = inspect(engine)
@@ -117,5 +118,51 @@ with engine.begin() as conn:
         "SELECT user_id FROM sessions WHERE token_hash = 'h1'")).scalar()
 assert got == "olduser1", got
 print("session dùng được row user cũ ............ OK")
+
+# 7) HỒI QUY: cột trùng TỪ KHOÁ SQL.
+# `stage_models.order` là từ khoá dành riêng của SQL. Bản đầu tiên nội suy định danh
+# trần, nên `ALTER TABLE stage_models ALTER COLUMN order SET NOT NULL` là lỗi cú pháp
+# — Postgres báo `syntax error at or near "order"` và app CHẾT lúc khởi động, vì
+# ensure_schema chạy trước khi phục vụ request.
+#
+# Vì sao lọt qua test cũ: bảng `stage_models` trên DB mới do `create_all` tạo sẵn
+# nên KHÔNG đi qua đường ADD COLUMN, còn nhánh SET NOT NULL thì chỉ chạy trên
+# Postgres. Nay dựng một bảng `stage_models` **hình dạng cũ** (thiếu cột `order`) để
+# buộc đường đó phải chạy — và nó hỏng trên cả SQLite lẫn Postgres nếu thiếu trích dẫn.
+tbl = Base.metadata.tables["stage_models"]
+colexpr = tbl.c["order"].type.compile(dialect=engine.dialect)
+
+
+def _old_shape_conn():
+    """DB riêng (file khác) để không đụng DB của các ca trên."""
+    e = _create_engine(f"sqlite:///{tempfile.mkdtemp(prefix='yvmig_order_')}/old.db")
+    with e.begin() as c:
+        # thiếu hẳn cột `order` -> ensure_schema phải ADD COLUMN nó
+        c.execute(text(
+            "CREATE TABLE stage_models ("
+            "  id INTEGER PRIMARY KEY, stage VARCHAR(16) NOT NULL,"
+            "  provider_id INTEGER, model VARCHAR(128) NOT NULL,"
+            "  params JSON)"))
+        c.execute(text(
+            "INSERT INTO stage_models (id, stage, model) "
+            "VALUES (1, 'translate', 'm1')"))
+    return e
+
+
+old = _old_shape_conn()
+acts = ensure_schema(old)
+assert any("stage_models.order" in a for a in acts), acts
+print("thêm cột trùng từ khoá (order) ........... OK")
+# Dữ liệu cũ giữ nguyên; cột mới được BACKFILL theo default của model (`order` mặc
+# định 0 = lựa chọn chính), đúng như thiết kế `_backfill_literal`.
+with old.begin() as conn:
+    row = conn.execute(text(
+        'SELECT stage, model, "order" FROM stage_models WHERE id = 1')).fetchone()
+assert row is not None and row[0] == "translate" and row[1] == "m1", row
+assert row[2] == 0, f"cột mới phải backfill theo default (0), nhận {row[2]!r}"
+print("row cũ sống sót sau ADD COLUMN ........... OK")
+# idempotent trên DB đó
+assert ensure_schema(old) == [], "ensure_schema không idempotent với bảng cũ"
+print("idempotent trên bảng hình dạng cũ ........ OK")
 
 print("MIGRATION GUARD PASSED")

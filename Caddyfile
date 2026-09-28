@@ -1,0 +1,32 @@
+# Caddy reverse proxy — TLS tự động (Let's Encrypt) khi APP_DOMAIN là tên miền thật.
+# Bật bằng:  docker compose --profile proxy up -d
+#
+# `api:8000` là tên service trong mạng nội bộ của compose; Caddy là chỗ DUY NHẤT
+# phơi ra ngoài, còn api đã bind vào loopback.
+
+# Compose luôn truyền giá trị KHÁC RỖNG (mặc định `localhost`) — xem ghi chú trong
+# docker-compose.yml: chuỗi rỗng làm Caddy hiểu nhầm khối này là global option.
+# Đặt APP_DOMAIN=tên.miền.thật để có Let's Encrypt; để trống -> CA nội bộ (tự ký).
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	# Caddy tự đặt X-Forwarded-Proto / X-Forwarded-For. `auth.py` đọc
+	# X-Forwarded-Proto để quyết định cờ `Secure` cho cookie phiên, nên header này
+	# là bắt buộc chứ không phải tuỳ chọn — thiếu nó thì cookie đi qua HTTP thường.
+	reverse_proxy api:8000
+
+	# TLS mặc định của Caddy (HSTS chỉ bật khi đã có chứng chỉ thật).
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	# File media có thể lớn (video): Caddy stream request body nên không cần khai
+	# giới hạn — mặc định đã là không chặn.
+	log {
+		output stderr
+		format console
+	}
+}

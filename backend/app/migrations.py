@@ -42,6 +42,24 @@ def _literal(value) -> str | None:
     return None
 
 
+def _q(engine: Engine, ident: str) -> str:
+    """Trích dẫn định danh theo dialect.
+
+    BẮT BUỘC, không phải cho đẹp: `stage_models.order` là **từ khoá dành riêng** của
+    SQL, nên `ALTER TABLE stage_models ALTER COLUMN order SET NOT NULL` là lỗi cú
+    pháp. Đã gặp thật trên Postgres (`syntax error at or near "order"`) — app chết
+    ngay lúc khởi động vì `ensure_schema` chạy trước khi phục vụ request.
+
+    Vì sao test SQLite không bắt được: nhánh `SET NOT NULL` chỉ chạy trên Postgres,
+    và bảng `stage_models` trên DB mới được `create_all` tạo sẵn (không đi qua
+    `ADD COLUMN`). Tức là đường sinh ra lỗi chưa từng được chạy.
+
+    Dùng `identifier_preparer` của dialect: nó biết luật trích dẫn của từng loại DB
+    (`"order"` với Postgres/SQLite) thay vì tự đoán.
+    """
+    return engine.dialect.identifier_preparer.quote(ident)
+
+
 def _backfill_literal(col) -> str | None:
     """Literal để backfill cột vừa thêm, hoặc None nếu để NULL là đúng.
 
@@ -81,16 +99,17 @@ def ensure_schema(engine: Engine, verbose: bool = False) -> list[str]:
                 if col.name in have:
                     continue
                 ddl_type = col.type.compile(dialect=engine.dialect)
+                tbl, cn = _q(engine, table.name), _q(engine, col.name)
                 conn.execute(text(
-                    f'ALTER TABLE {table.name} ADD COLUMN {col.name} {ddl_type}'))
+                    f'ALTER TABLE {tbl} ADD COLUMN {cn} {ddl_type}'))
                 actions.append(f"add column {table.name}.{col.name}")
 
                 # 4) backfill (password_hash/last_login_at -> giữ NULL)
                 lit = _backfill_literal(col)
                 if lit is not None:
                     conn.execute(text(
-                        f"UPDATE {table.name} SET {col.name} = {lit} "
-                        f"WHERE {col.name} IS NULL"))
+                        f"UPDATE {tbl} SET {cn} = {lit} "
+                        f"WHERE {cn} IS NULL"))
                     actions.append(f"backfill {table.name}.{col.name} = {lit}")
 
     # 5) index thiếu (unique index của users.email đã có sẵn từ trước)
@@ -113,7 +132,8 @@ def ensure_schema(engine: Engine, verbose: bool = False) -> list[str]:
                     if col.primary_key or col.nullable:
                         continue
                     conn.execute(text(
-                        f"ALTER TABLE {table.name} ALTER COLUMN {col.name} SET NOT NULL"))
+                        f"ALTER TABLE {_q(engine, table.name)} "
+                        f"ALTER COLUMN {_q(engine, col.name)} SET NOT NULL"))
                     actions.append(f"set not null {table.name}.{col.name}")
 
     if verbose and actions:

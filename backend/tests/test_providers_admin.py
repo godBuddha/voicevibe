@@ -53,6 +53,7 @@ assert c.post("/v1/auth/setup",
 
 # ------------------------------------------------ mạng giả: không gọi ra ngoài thật
 CALLS: list[tuple[str, str]] = []
+CHAT_BODIES: list[dict] = []
 OLLAMA_TAGS = {"models": [
     {"name": "qwen2.5:7b-instruct", "size": 4_700_000_000,
      "details": {"parameter_size": "7.6B", "quantization_level": "Q4_K_M"}},
@@ -65,6 +66,11 @@ OPENAI_MODELS = {"data": [{"id": "deepseek-chat"}, {"id": "deepseek-reasoner"}]}
 def handler(req: httpx.Request) -> httpx.Response:
     path = req.url.path
     CALLS.append((req.method, path))
+    # giữ nguyên thân request của các lời gọi chat để kiểm prompt có đi ra thật không
+    if path.endswith("/chat/completions"):
+        CHAT_BODIES.append(json.loads(req.content))
+        return httpx.Response(200, json={"choices": [
+            {"message": {"content": "mock translation"}}]})
     # host "bad" mô phỏng nhà cung cấp hỏng: mọi đường đều 500
     if req.url.host == "bad":
         return httpx.Response(500, text="boom")
@@ -97,9 +103,14 @@ _REAL = httpx  # giữ module thật để lấy Client/HTTPError/Timeout
 
 
 class _FakeHttpx:
-    """Chỉ chặn get/request/stream; mọi thuộc tính khác (HTTPError, Timeout, Client…)
+    """Chỉ chặn get/request/stream/Client; mọi thuộc tính khác (HTTPError, Timeout…)
     vẫn trỏ về module httpx thật — nếu thay cả module thì `except httpx.HTTPError`
-    trong providers_api sẽ nổ AttributeError (đã gặp thật khi viết test này)."""
+    trong providers_api sẽ nổ AttributeError (đã gặp thật khi viết test này).
+
+    `Client` phải chặn riêng: provider layer (`openai_compat`) tự dựng
+    `httpx.Client(...)` chứ không gọi hàm module-level, nên nếu để nguyên thì các
+    lời gọi chat trong pipeline sẽ đi ra MẠNG THẬT (đã gặp thật).
+    """
 
     @staticmethod
     def get(url, **kw):
@@ -115,11 +126,20 @@ class _FakeHttpx:
     def stream(method, url, **kw):
         return _REAL.Client(transport=TRANSPORT, timeout=None).stream(method, url, **kw)
 
+    @staticmethod
+    def Client(*a, **kw):
+        kw["transport"] = TRANSPORT          # buộc mọi client đi qua mạng giả
+        return _REAL.Client(*a, **kw)
+
     def __getattr__(self, name):
         return getattr(_REAL, name)
 
 
 PA.httpx = _FakeHttpx()
+# pipeline dùng httpx của chính module này — không vá thì lời gọi chat đi ra mạng thật
+from app.providers import openai_compat as _OA  # noqa: E402
+
+_OA.httpx = _FakeHttpx()
 
 # ------------------------------------------------------------------ 1. CRUD
 r = c.post("/v1/admin/providers", json={
@@ -279,6 +299,79 @@ assert r.status_code == 200 and r.json()["is_default"] is True
 assert get_prompt("translate") == DEFAULT_PROMPTS["translate"]["content"]
 assert c.post("/v1/admin/prompts/khong-co/reset").status_code == 404
 print("khôi phục mặc định ................... OK")
+
+# ------------------------------------- 9b. prompt DB -> thực sự đi ra request
+# Đây là đường nối mà Giai đoạn 3 tạo ra và là loại lỗi im lặng điển hình: sửa
+# prompt trong /admin, lưu thành công, API trả 200 — mà nội dung gửi cho nhà
+# cung cấp vẫn là bản mặc định. Không có gì trong UI phát hiện được điều đó.
+# Vì vậy phải khẳng định trên THÂN REQUEST thật, không chỉ trên giá trị trong DB.
+r = c.post("/v1/admin/providers", json={
+    "name": "P", "kind": "openai", "base_url": "https://api.p.example/v1",
+    "api_key": "sk-test-secret"})
+p_id = r.json()["id"]
+c.put("/v1/admin/stages/translate",
+      json={"provider_id": p_id, "model": "deepseek-chat", "order": 0})
+
+from app.pipelines.translate import build_translator  # noqa: E402
+
+CHAT_BODIES.clear()
+t = build_translator("vi", "en")
+assert type(t).__name__ == "CloudChatTranslator", type(t).__name__
+# (a) system prompt lấy từ DB, đã render biến
+c.put("/v1/admin/prompts/translate",
+      json={"content": "RENDER [{source}->{target}]: {text}"})
+t = build_translator("vi", "en")
+assert t.system == "RENDER [vi->en]: {text}", t.system
+t.translate("xin chào")
+assert CHAT_BODIES, "không có request chat nào được gửi!"
+sent = CHAT_BODIES[-1]
+assert sent["model"] == "deepseek-chat", sent["model"]
+assert sent["messages"][0]["content"] == "RENDER [vi->en]: {text}", sent["messages"]
+assert sent["messages"][1]["content"] == "xin chào", sent["messages"]
+print("prompt trong DB đi ra request ......... OK")
+
+# (b) prompt 'retranslate_timing' cũng phải đi ra — đây là đường timing-fit dùng.
+# Lưu ý: đường này gửi prompt ở message USER (system để rỗng) vì prompt đã bao
+# trọn câu cần dịch ở cuối template.
+CHAT_BODIES.clear()
+c.put("/v1/admin/prompts/retranslate_timing",
+      json={"content": "NGẮN HƠN {max_chars} ký tự cho {text}"})
+t.retranslate_shorter("một câu dài", 42)
+_sent = CHAT_BODIES[-1]["messages"]
+assert _sent[0]["content"] == "", _sent
+assert _sent[1]["content"] == "NGẮN HƠN 42 ký tự cho một câu dài", _sent
+print("prompt dịch-lại-timing đi ra request .. OK")
+
+# (c) khôi phục mặc định -> request quay về đúng bản trong code, ĐÃ điền biến
+CHAT_BODIES.clear()
+c.put("/v1/admin/prompts/translate", json={"content": "TẠM: {text}"})
+c.post("/v1/admin/prompts/translate/reset")
+t2 = build_translator("vi", "en")
+assert "TẠM" not in t2.system, t2.system
+assert "from vi to en" in t2.system, t2.system
+assert "{source}" not in t2.system, t2.system
+print("reset prompt -> quay về bản trong code OK")
+
+# (d) HỒI QUY cho lỗi thật đã gặp: `str.format` ném KeyError khi thiếu MỘT biến,
+# và bản cũ bắt lỗi rồi trả về nguyên template -> MẤT HẾT biến, không chỉ biến
+# thiếu. Nghĩa là system prompt mặc định gửi cho model đúng chuỗi
+# "from {source} to {target}" — model không hề biết cặp ngôn ngữ.
+from app.prompts import render as _render  # noqa: E402
+
+_sys = _render("translate", source="vi", target="en")   # thiếu `text` (đúng thực tế)
+assert "{source}" not in _sys and "{target}" not in _sys, \
+    f"thiếu một biến làm mất luôn các biến khác: {_sys!r}"
+assert "from vi to en" in _sys, _sys
+# biến thiếu vẫn phải giữ nguyên chỗ trống (không crash, không nuốt)
+c.post("/v1/admin/prompts/retranslate_timing/reset")
+_part = _render("retranslate_timing", source="vi", target="en")
+assert "{source}" not in _part and "{target}" not in _part, _part
+assert "{max_chars}" in _part and "{text}" in _part, _part
+# giá trị vừa thay KHÔNG được bị thay tiếp (bản dịch chứa `{source}`)
+assert _render("retranslate_timing", source="vi", target="en",
+               text="giữ {source} nguyên", max_chars=5).endswith("giữ {source} nguyên")
+print("hồi quy: thiếu biến không mất biến .. OK")
+c.delete(f"/v1/admin/providers/{p_id}")
 
 # ------------------------------------------------------------ 10. phân quyền
 RL.reset()

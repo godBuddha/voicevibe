@@ -10,16 +10,25 @@ Quy ước biến: prompt dùng `{source}`, `{target}`, `{text}`, `{max_chars}` 
 """
 from __future__ import annotations
 
+import re
+
 from sqlalchemy import select
 
 from .db import SessionLocal
 from .models import Prompt
 
+# `{tên_biến}` — chữ, số, gạch dưới. Không hỗ trợ format spec (`{x:>5}`) một cách
+# có chủ đích: prompt là văn bản cho LLM, không phải template trình bày.
+_PLACEHOLDER = re.compile(r"\{(\w+)\}")
+
 # task_key -> (prompt mặc định, mô tả, danh sách biến)
 DEFAULT_PROMPTS: dict[str, dict] = {
     "translate": {
         "description": "Dịch từng câu phụ đề sang ngôn ngữ đích",
-        "variables": ["source", "target", "text"],
+        # `text` KHÔNG có ở đây: prompt này là system prompt, còn nội dung cần dịch
+        # đi ở message của user (xem CloudChatTranslator). Khai `text` sẽ khiến
+        # người sửa prompt tưởng dùng được `{text}` rồi thấy nó nằm trần trong prompt.
+        "variables": ["source", "target"],
         "content": (
             "You are a professional subtitle translator. Translate each line "
             "from {source} to {target}. Keep it short and natural — it will be "
@@ -130,9 +139,18 @@ def reset_prompt(task_key: str) -> dict:
 
 
 def render(task_key: str, **kwargs) -> str:
-    """Prompt đã điền biến. Biến thiếu thì để nguyên chỗ trống thay vì crash job."""
+    """Prompt đã điền biến: chỉ thay biến ĐÃ truyền, giữ nguyên `{tên}` của biến thiếu.
+
+    KHÔNG dùng `str.format`. Nó ném `KeyError` khi thiếu *bất kỳ* biến nào, và bản
+    trước bắt lỗi đó rồi trả về NGUYÊN template — nên `CloudChatTranslator` (chỉ
+    truyền `source`/`target` vì phần text nằm ở message của user) đã gửi cho model
+    đúng chuỗi "Translate each line from {source} to {target}": mất hẳn thông tin
+    cặp ngôn ngữ, mà không có gì trong UI hay log báo sai.
+
+    Thay bằng một lượt regex (không lặp lại) để giá trị vừa thay không bị thay
+    tiếp — ví dụ bản dịch có chứa `{source}`.
+    """
     template = get_prompt(task_key)
-    try:
-        return template.format(**kwargs)
-    except (KeyError, IndexError, ValueError):
-        return template
+    return _PLACEHOLDER.sub(
+        lambda m: str(kwargs[m.group(1)]) if m.group(1) in kwargs else m.group(0),
+        template)

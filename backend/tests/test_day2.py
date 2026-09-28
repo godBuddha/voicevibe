@@ -118,9 +118,35 @@ r = c.get(f"/v1/jobs/{djid}", headers=h)
 assert r.status_code == 200 and r.json()["status"] == "failed", r.text
 assert "media not found" in r.json()["error"], r.text
 
-# 3c) subtitle job -> 501, NO credits charged (pipeline not implemented yet).
+# 3c) subtitle: ĐÃ có pipeline thật (trước đây 501). Cấu hình sai phải bị chặn
+#     bằng 422 TRƯỚC khi trừ credit — cùng nguyên tắc với quyền sở hữu voice.
 r = c.post("/v1/jobs", json={"type": "subtitle", "text": "hi"}, headers=h)
-assert r.status_code == 501, r.text
+assert r.status_code == 422, r.text
+assert "media_url" in r.json()["detail"], r.text
+
+r = c.post("/v1/jobs", json={"type": "subtitle", "media_url": "media/x.wav",
+                             "format": "txt"}, headers=h)
+assert r.status_code == 422, r.text
+assert "format" in r.json()["detail"], r.text
+
+r = c.post("/v1/jobs", json={"type": "subtitle", "media_url": "media/x.wav",
+                             "bilingual": True}, headers=h)
+assert r.status_code == 422, r.text
+assert "target_lang" in r.json()["detail"], r.text
+
+# cấu hình hợp lệ -> nhận job (202) và TRỪ credit như mọi job thật
+_before = c.get("/v1/me", headers=h).json()["credits"]
+r = c.post("/v1/jobs", json={"type": "subtitle", "media_url": "media/khong-co.wav",
+                             "source_lang": "vi"}, headers=h)
+assert r.status_code == 202, r.text
+assert r.json()["credits_charged"] > 0, r.text
+# pipeline hỏng (thiếu media) -> hoàn đủ credit
+import time as _t  # noqa: E402
+
+_t.sleep(1)
+r = c.get(f"/v1/jobs/{r.json()['job_id']}", headers=h)
+assert r.json()["status"] == "failed", r.text
+assert c.get("/v1/me", headers=h).json()["credits"] == _before, "phải hoàn đủ credit"
 
 # 3d) signup: TẮT mặc định (chính sách Phase 2 — hệ thống self-host chỉ Admin tạo
 #     tài khoản). Bật công tắc thì mới tạo được, và KHÔNG bao giờ tạo admin.
@@ -141,7 +167,8 @@ r = c.post("/v1/auth/signup", json={"email": "new@example.io", "password": "matk
 assert r.status_code == 409, r.text
 set_setting("auth.allow_signup", False, is_secret=False, category="security")
 
-# 4) credit metering + ledger: translate -2 stays; dub -60 refunded on failure
+# 4) credit metering + ledger: translate -2 stays; dub -60 và subtitle -8 hoàn lại
+#    vì cả hai đều fail (thiếu media thật) — mỗi lần trừ đều phải có dòng ledger.
 r = c.get("/v1/me", headers=h)
 assert r.json()["credits"] == 50_000 - 2, r.json()
 
@@ -149,8 +176,15 @@ with SessionLocal() as db:
     from sqlalchemy import select
     rows = db.scalars(select(CreditLedger).where(CreditLedger.user_id == uid)).all()
     got = sorted((r.reason, r.delta) for r in rows)
-    assert got == [("job:dub", -60), ("job:translate", -2), ("refund:job:dub", 60)], got
-    assert {r.job_id for r in rows} == {jid, djid}
+    assert got == [
+        ("job:dub", -60), ("job:subtitle", -8), ("job:translate", -2),
+        ("refund:job:dub", 60), ("refund:job:subtitle", 8),
+    ], got
+    # mọi lần trừ/hoàn đều phải gắn job_id — không có dòng ledger mồ côi.
+    # (Trước đây là so khớp cứng `== {jid, djid}`; cách đó vỡ ngay khi thêm một
+    # loại job mới, mà không nói lên điều gì về tính đúng đắn.)
+    assert all(r.job_id for r in rows), [r.reason for r in rows if not r.job_id]
+    assert {jid, djid} <= {r.job_id for r in rows}
 
 # 5) insufficient credits -> 402
 with SessionLocal() as db:

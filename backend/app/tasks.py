@@ -40,10 +40,10 @@ celery_app.conf.update(
 #   stt       -> D3  (faster-whisper + pyannote)        [DONE]
 #   translate -> D5  (cloud OpenAI-compatible / local Marian)  [DONE]
 #   dub       -> D5  (stt + translate + tts + timing-fit engine)  [DONE]
-#   subtitle  -> NOT WIRED (API returns 501, no credits charged)
+#   subtitle  -> D3+ (stt + diarize -> SRT/VTT/ASS, tuỳ chọn song ngữ)  [DONE]
 PIPELINES: dict[str, str] = {
     "tts": "done", "stt": "done", "translate": "done", "dub": "done",
-    "subtitle": "not implemented",
+    "subtitle": "done",
 }
 
 
@@ -200,6 +200,80 @@ def _run_stt(job_id: str, params: dict) -> dict:
         return {"ok": False, "error": str(exc)[:200]}
 
 
+def _run_subtitle(job_id: str, params: dict) -> dict:
+    """STT + tách người nói -> phụ đề SRT/VTT/ASS, tuỳ chọn song ngữ.
+
+    Dùng lại `_run_stt` ở phần đầu (transcribe + diarize + merge) thay vì viết lại:
+    cùng một đường, cùng một cách kiểm lỗi. Khác ở bước xuất và ở chỗ có thể dịch.
+    """
+    from .db import SessionLocal
+    from .models import Job, JobStatus
+    from .pipelines.stt import diarize, merge, transcribe
+    from .pipelines.subtitle import DEFAULT_FORMAT, extension, render
+    from .storage import get_storage
+
+    with SessionLocal() as db:
+        job = db.get(Job, job_id)
+        if job is None:
+            return {"ok": False, "error": "job not found"}
+        job.status = JobStatus.running
+        job.progress = 10
+        db.commit()
+    try:
+        storage = get_storage()
+        src = _resolve_media(params["media_url"], storage)
+
+        segs, _info = transcribe(src, language=params.get("source_lang"))
+        turns = diarize(src)
+        attributed = merge(segs, turns)
+
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            job.progress = 60
+            db.commit()
+
+        fmt = params.get("format") or DEFAULT_FORMAT
+        bilingual = bool(params.get("bilingual"))
+        show_speaker = params.get("show_speaker", True)
+
+        translations = None
+        if bilingual or params.get("target_lang"):
+            from .pipelines.translate import build_translator
+
+            source = params.get("source_lang") or "auto"
+            target = params.get("target_lang")
+            if not target:
+                raise ValueError("target_lang là bắt buộc khi cần dịch phụ đề")
+            tr = build_translator(source, target)
+            # Dịch từng cue MỘT, giữ nguyên số lượng và thứ tự — ghép lại theo
+            # chỉ số. Dịch gộp cả khối rồi tách lại sẽ lệch số dòng không báo lỗi.
+            translations = [tr.translate(s.text) if s.text.strip() else ""
+                            for s in attributed]
+
+        out = render(attributed, fmt, translations=translations,
+                     bilingual=bilingual, show_speaker=show_speaker)
+        key = f"jobs/{job_id}/subtitle.{extension(fmt)}"
+        storage.put(key, out.encode("utf-8"))
+
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            job.status = JobStatus.done
+            job.progress = 100
+            job.result_s3_key = key
+            job.error = None
+            db.commit()
+        _notify(params.get("webhook_url"),
+                {"job_id": job_id, "status": "done", "result_key": key})
+        return {"ok": True, "key": key}
+    except Exception as exc:  # noqa: BLE001
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            if job is not None:
+                _set_failed(job, exc, db)
+                db.commit()
+        return {"ok": False, "error": str(exc)[:200]}
+
+
 def _run_tts(job_id: str, params: dict) -> dict:
     """Real D4 pipeline: text (+ voice profile) -> WAV in media storage."""
     from .db import SessionLocal
@@ -314,6 +388,8 @@ def dispatch_inline(job_id: str, params: dict) -> dict:
         return _run_stt(job_id, params)
     if jtype == "translate":
         return _run_translate(job_id, params)
+    if jtype == "subtitle":
+        return _run_subtitle(job_id, params)
     return _run_stub(job_id, params)
 
 

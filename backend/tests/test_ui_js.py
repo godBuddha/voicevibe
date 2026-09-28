@@ -70,6 +70,32 @@ def main() -> None:
         print(f"inline JS syntax ({total} scripts) ..... OK")
     else:
         print(f"inline JS extraction ({total} scripts) .. OK (node missing — syntax not checked)")
+
+    # --- Mọi <section id="page-X"> phải nằm trong mảng PAGES của router.
+    # Router `go(page)` chỉ bật section nào có trong PAGES; thêm một trang mà quên
+    # nối vào danh sách thì trang đó KHÔNG BAO GIỜ hiện, không lỗi JS, không cảnh
+    # báo — sidebar bấm vào không có gì xảy ra. Đã gặp thật với trang `subtitle`
+    # (chỉ lộ ra khi chụp ảnh: "waiting for locator #subfile to be visible").
+    m = re.search(r"const PAGES\s*=\s*\[([^\]]*)\]", APP_HTML)
+    assert m, "không tìm thấy mảng PAGES trong app_ui.py"
+    pages = {p.strip().strip('"\'') for p in m.group(1).split(",") if p.strip()}
+    sections = set(re.findall(r'<section id="page-([\w-]+)"', APP_HTML))
+    assert sections, "không tìm thấy <section id='page-…'> nào"
+    missing = sorted(sections - pages)
+    assert not missing, (
+        f"các trang có markup nhưng KHÔNG có trong PAGES (sẽ không bao giờ hiện): {missing}")
+    orphan = sorted(pages - sections)
+    assert not orphan, f"PAGES có trang không tồn tại markup: {orphan}"
+    print(f"PAGES khớp markup ({len(pages)} trang) ..... OK")
+
+    # --- Mọi mục sidebar có data-page phải trỏ tới trang tồn tại (nếu không,
+    # bấm vào là `go()` âm thầm không làm gì).
+    targets = set(re.findall(r'class="nav"[\s\S]*?</nav>', APP_HTML))
+    nav = targets.pop() if targets else ""
+    bad = sorted({d for d in re.findall(r'data-page="([\w-]+)"', nav)} - pages)
+    assert not bad, f"sidebar trỏ tới trang không có trong PAGES: {bad}"
+    print("sidebar trỏ tới trang hợp lệ ......... OK")
+
     print("UI JS GUARD PASSED")
 
 

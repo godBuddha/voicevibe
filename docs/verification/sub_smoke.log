@@ -1,0 +1,40 @@
+[src] /workspace/samples/d3_2spk.wav
+[stt] 5 segment, ngôn ngữ vi p=1.00
+/workspace/yupvox-clone/.venv/lib/python3.12/site-packages/pyannote/audio/core/io.py:48: UserWarning: 
+torchcodec is not installed correctly so built-in audio decoding will fail. Solutions are:
+* use audio preloaded in-memory as a {'waveform': (channel, time) torch.Tensor, 'sample_rate': int} dictionary;
+* fix torchcodec installation. Error message was:
+
+libnvrtc.so.13: cannot open shared object file: No such file or directory
+  warnings.warn(
+/workspace/yupvox-clone/.venv/lib/python3.12/site-packages/pyannote/audio/models/blocks/pooling.py:103: UserWarning: std(): degrees of freedom is <= 0. Correction should be strictly less than the reduction factor (input numel divided by output numel). (Triggered internally at /pytorch/aten/src/ATen/native/ReduceOps.cpp:1839.)
+  std = sequences.std(dim=-1, correction=1)
+[diarize] 5 lượt nói, người nói: ['SPEAKER_00', 'SPEAKER_01']
+[srt] 447 ký tự -> /workspace/evidence/subtitle.srt
+[vtt] 455 ký tự -> /workspace/evidence/subtitle.vtt
+[ass] 1162 ký tự -> /workspace/evidence/subtitle.ass
+[check] 3 định dạng đúng quy ước thời gian của chúng
+/workspace/yupvox-clone/.venv/lib/python3.12/site-packages/transformers/models/marian/tokenization_marian.py:175: UserWarning: Recommended: pip install sacremoses.
+  warnings.warn("Recommended: pip install sacremoses.")
+[check] song ngữ: 5 cue, mỗi cue đúng 2 dòng
+[check] ASS song ngữ dùng \N
+
+--- SRT (bản gốc) ---
+1
+00:00:00,000 --> 00:00:01,540
+Người 1: Xin chào các bạn, mình là Long.
+
+2
+00:00:02,100 --> 00:00:03,700
+Người 1: Hôm nay chúng ta sẽ thử nghiệm hệ thống dịch
+
+3
+
+--- SRT (song ngữ, 1 cue) ---
+1
+00:00:00,000 --> 00:00:01,540
+Người 1: Xin chào các bạn, mình là Long.
+Hi, guys. I'm Long.
+
+DỮ LIỆU PHỤ ĐỀ: 5 cue, người nói ['SPEAKER_00', 'SPEAKER_01']
+SUBTITLE SMOKE PASSED

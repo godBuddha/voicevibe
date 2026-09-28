@@ -41,6 +41,7 @@ from .models import (
     User,
     Voice,
 )
+from .pipelines.subtitle import FORMATS as SUBTITLE_FORMATS
 from .prompts import seed_prompts
 from .providers_api import router as ai_admin_router
 from .ratelimit import check_rate as _check_rate
@@ -117,6 +118,12 @@ class JobIn(BaseModel):
     voice_id: str | None = None
     max_speed: float = 1.35
     webhook_url: str | None = None
+    # --- riêng cho type=subtitle
+    format: str = Field("srt", description="srt | vtt | ass (chỉ dùng cho subtitle)")
+    bilingual: bool = Field(
+        False, description="phụ đề 2 dòng: bản gốc trên, bản dịch dưới "
+                           "(cần target_lang)")
+    show_speaker: bool = Field(True, description="ghi nhãn người nói vào phụ đề")
 
 
 class VoiceIn(BaseModel):
@@ -142,9 +149,19 @@ def create_job(
     if job.type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"type must be one of {sorted(VALID_TYPES)}")
     if job.type == "subtitle":
-        # Chưa có pipeline thật — không nhận tiền của user (501, không trừ credits).
-        raise HTTPException(status_code=501,
-                            detail="subtitle pipeline chưa triển khai — job không bị trừ credits")
+        # Kiểm TRƯỚC khi trừ credit — cùng nguyên tắc với quyền sở hữu voice bên
+        # dưới: cấu hình sai phải bị chặn lúc tạo job, không phải sau khi đã thu tiền.
+        if not job.media_url:
+            raise HTTPException(status_code=422,
+                                detail="subtitle cần media_url (audio hoặc video)")
+        if job.format not in SUBTITLE_FORMATS:
+            raise HTTPException(
+                status_code=422,
+                detail=f"format phải là một trong {list(SUBTITLE_FORMATS)}")
+        if job.bilingual and not job.target_lang:
+            raise HTTPException(
+                status_code=422,
+                detail="bilingual cần target_lang (bản dịch lấy gì?)")
 
     # Quyền sở hữu voice phải kiểm tra TRƯỚC khi trừ credit. Trước đây chỉ worker
     # kiểm tra (tasks.py), tức là job đã tạo, đã trừ tiền rồi mới fail → user mất

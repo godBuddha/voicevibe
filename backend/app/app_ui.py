@@ -154,7 +154,7 @@ __THEME_CSS__
       <a data-page="voices" onclick="go('voices')">🎭 Tạo giọng nói của riêng bạn</a>
       <div class="group">Dịch thuật</div>
       <a class="soon" onclick="soon('Dịch văn bản')">🌐 Dịch văn bản</a>
-      <a class="soon" onclick="soon('Dịch phụ đề')">📄 Dịch phụ đề</a>
+      <a data-page="subtitle" onclick="go('subtitle')">📄 Dịch phụ đề</a>
       <a data-page="dub" onclick="go('dub')">🔊 Dịch âm thanh</a>
       <a data-page="dub" onclick="go('dub')">🎬 Dịch video</a>
       <div class="group">AI Giọng nói &amp; Video</div>
@@ -291,6 +291,29 @@ __THEME_CSS__
       </div>
     </section>
 
+    <!-- SUBTITLE -->
+    <section id="page-subtitle" class="page">
+      <div class="card">
+        <h2>📄 Dịch phụ đề</h2>
+        <p class="mut">Nghe file audio/video → phụ đề SRT / VTT / ASS, kèm nhãn người nói.
+          Bật song ngữ để có bản gốc ở trên và bản dịch ở dưới.</p>
+        <label>File audio/video</label>
+        <input type="file" id="subfile" accept="audio/*,video/*">
+        <div class="row">
+          <div><label>Ngôn ngữ gốc</label><select id="sublang"><option value="vi">Tiếng Việt</option><option value="en">English</option></select></div>
+          <div><label>Định dạng</label><select id="subformat"><option value="srt">SRT (phổ biến nhất)</option><option value="vtt">VTT (web)</option><option value="ass">ASS (có kiểu chữ)</option></select></div>
+        </div>
+        <div class="row">
+          <div><label>Dịch sang (bỏ trống = chỉ phiên âm)</label>
+            <select id="subtarget"><option value="">— không dịch —</option><option value="en">English</option><option value="vi">Tiếng Việt</option></select></div>
+          <div><label>Song ngữ</label>
+            <select id="subbilingual"><option value="0">Không</option><option value="1">Có — 2 dòng mỗi câu</option></select></div>
+        </div>
+        <button class="go" onclick="submitSubtitle()">📄 Tạo phụ đề</button>
+        <div id="submsg" class="status"></div>
+      </div>
+    </section>
+
     <!-- JOBS -->
     <section id="page-jobs" class="page">
       <div class="card">
@@ -325,7 +348,7 @@ const $ = (id) => document.getElementById(id);
 // Xác thực qua COOKIE PHIÊN do server đặt (HttpOnly) — JS không đọc/không lưu token.
 // `credentials:"same-origin"` để fetch gửi kèm cookie.
 const H = () => ({ "Content-Type": "application/json" });
-const PAGES = ["dashboard","dub","tts","voices","stt","jobs","api"];
+const PAGES = ["dashboard","dub","tts","voices","stt","subtitle","jobs","api"];
 let POLL = null, ME = {};
 
 function esc(s){ const d=document.createElement("div"); d.textContent=s==null?"":String(s); return d.innerHTML; }
@@ -503,6 +526,26 @@ async function submitSTT() {
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || r.status);
     flash("✔ Job " + d.job_id + " đã tạo (−" + d.credits_charged + " credits). SRT sẽ hiện ở tab Jobs.");
+    go("jobs");
+  } catch (e) { flash("✗ " + e.message, "err"); }
+}
+
+async function submitSubtitle() {
+  flash("⏳ tạo job phụ đề…");
+  try {
+    const up = await uploadTo("/v1/media/upload", "subfile");
+    const target = $("subtarget").value;
+    const body = {
+      type: "subtitle", media_url: up.media_key,
+      source_lang: $("sublang").value,
+      format: $("subformat").value,
+      bilingual: $("subbilingual").value === "1",
+    };
+    if (target) body.target_lang = target;
+    const r = await fetch("/v1/jobs", { method:"POST", headers:H(), credentials:"same-origin", body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || r.status);
+    flash("✔ Job " + d.job_id + " đã tạo (−" + d.credits_charged + " credits). Phụ đề sẽ hiện ở tab Jobs.");
     go("jobs");
   } catch (e) { flash("✗ " + e.message, "err"); }
 }

@@ -23,6 +23,39 @@ tách & clone nhiều người nói, API developer) — dựng bằng stack open
 |---|---|
 | ![jobs](docs/screenshots/05-jobs.png) | ![api](docs/screenshots/06-api-keys.png) |
 
+| Phụ đề (SRT/VTT/ASS + song ngữ) |
+|---|
+| ![subtitle](docs/screenshots/12-subtitle.png) |
+
+### Phụ đề — SRT / VTT / ASS, kể cả song ngữ
+
+Job `type=subtitle` nghe file audio/video rồi xuất phụ đề: STT + tách người nói,
+nhãn người nói đọc được (`Người 1`, `Người 2` — không phải `SPEAKER_00`), và
+tuỳ chọn **song ngữ** (bản gốc trên, bản dịch dưới).
+
+```bash
+curl -X POST $BASE/v1/jobs -H "X-API-Key: yv_…" -H 'Content-Type: application/json' \
+  -d '{"type":"subtitle","media_url":"media/u1/…/talk.wav","source_lang":"vi",
+       "target_lang":"en","format":"srt","bilingual":true}'
+```
+
+Ba định dạng có **ba quy ước thời gian khác nhau** — sai một dấu là phụ đề lệch
+giờ mà nhìn file không thấy:
+
+| | Thời gian | Ghi chú |
+|---|---|---|
+| `srt` | `00:00:01,500` | dấu **phẩy** thập phân |
+| `vtt` | `00:00:01.500` | đầu file có `WEBVTT` |
+| `ass` | `0:00:01.50` | **phần trăm** giây, không phải milli |
+
+Vì vậy phần xuất dùng **pysubs2 (MIT)** thay vì tự nối chuỗi: nó đã xử lý đúng
+quy ước từng định dạng, escape khối `{...}` của ASS, và `\N` cho xuống dòng cứng
+(ASS coi `\n` là khoảng trắng nên song ngữ sẽ dồn thành một dòng nếu tự viết).
+
+Kiểm chứng trên GPU thật: `docs/verification/subtitle.{srt,vtt,ass}` và
+`subtitle-bilingual.*` sinh từ file mẫu 2 người nói — xem
+`backend/scripts/subtitle_smoke.py`.
+
 ### Trang quản trị — `/admin`
 
 Ba tab: **AI** (nhà cung cấp + model + prompt) · **Cấu hình hệ thống** · **Người dùng**.

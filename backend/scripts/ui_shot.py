@@ -43,6 +43,7 @@ PANELS = [  # (screenshot name, app router target, element that must be visible)
     ("04-voices", "voices", "#voicelist"),
     ("05-jobs", "jobs", "#joblist"),
     ("06-api-keys", "api", "#keylist"),
+    ("12-subtitle", "subtitle", "#subfile"),
 ]
 
 

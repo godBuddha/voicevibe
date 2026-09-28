@@ -27,7 +27,9 @@ jobs:
       - name: Install ffmpeg (dub_pipeline selftest mixes audio via ffmpeg)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - name: Install API test deps
-        run: pip install fastapi "uvicorn[standard]" "sqlalchemy>=2.0" httpx cryptography pydantic "celery[redis]" python-multipart
+        # `pysubs2` cần cho test_subtitle — trong production nó nằm ở image worker
+        # (nơi pipeline phụ đề chạy), không nằm ở image api.
+        run: pip install fastapi "uvicorn[standard]" "sqlalchemy>=2.0" httpx cryptography pydantic "celery[redis]" python-multipart pysubs2
       - name: Run offline selftests
         env:
           PYTHONPATH: .
@@ -49,10 +51,12 @@ jobs:
             "tests/test_providers_admin.py"
             "tests/test_ci_config.py"
             "tests/test_ratelimit.py"
+            "tests/test_subtitle.py"
             "app.pipelines.dub --selftest"
             "app.pipelines.stt --selftest"
             "app.pipelines.translate --selftest"
             "app.pipelines.tts --selftest"
+            "app.pipelines.subtitle --selftest"
             "app.pipelines.dub_pipeline --selftest"
           )
           : > /tmp/results.txt

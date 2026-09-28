@@ -43,7 +43,7 @@ Lỗi chuẩn HTTP: 401 (key sai) · 402 (thiếu credits) · 404 · 409 (job ch
 ## Pipeline dispatch
 `YUPVOX_INLINE=1` (mặc định dev/máy cá nhân): chạy trong tiến trình API, không cần Redis.
 `YUPVOX_INLINE=0`: Celery qua Redis, worker GPU 1 job/lúc (prefetch=1, acks_late).
-Job types: `tts` ✅ · `stt` ✅ · `dub` ✅ · `translate`/`subtitle` → stub (D8+).
+Job types: `tts` ✅ · `stt` ✅ · `dub` ✅ · `translate` ✅ · `subtitle` ✅ (hết stub).
 
 ## Bổ sung (hardening pass 27/09)
 | Method | Path | Mô tả |
@@ -51,7 +51,10 @@ Job types: `tts` ✅ · `stt` ✅ · `dub` ✅ · `translate`/`subtitle` → stu
 | POST | /v1/auth/signup | `{email}` → 201 `{user_id, key}` — rate limit 5/phút/IP; trùng email → 409 |
 | GET | /v1/pricing | Bảng credits/job từ Settings (admin sửa được) |
 
-- POST /v1/jobs `type=subtitle` → **501, KHÔNG trừ credits** (pipeline chưa có).
+- POST /v1/jobs `type=subtitle` → **202**, pipeline thật (STT + tách người nói →
+  SRT/VTT/ASS). Tham số riêng: `format` (`srt`|`vtt`|`ass`), `bilingual` (bool),
+  `show_speaker` (bool). Cấu hình thiếu/sai bị chặn **422 TRƯỚC khi trừ credit**
+  (thiếu `media_url`; `format` lạ; `bilingual` mà không có `target_lang`).
 - **API key lưu SHA-256 hash** (cột `key`), cột `prefix` để hiển thị masked; DELETE /v1/keys/{raw}.
 - **Refund**: job failed hoàn 100% credits (ledger `refund:job:<type>`); `_set_failed(job, exc, db)`.
 - Webhook kèm `X-YupVox-Signature` = HMAC-SHA256(`webhook.secret`, body) khi secret được set trong Settings.

@@ -52,6 +52,8 @@ jobs:
             "tests/test_ci_config.py"
             "tests/test_ratelimit.py"
             "tests/test_subtitle.py"
+            "tests/test_hallucination.py"
+            "tests/test_retranslate.py"
             "app.pipelines.dub --selftest"
             "app.pipelines.stt --selftest"
             "app.pipelines.translate --selftest"

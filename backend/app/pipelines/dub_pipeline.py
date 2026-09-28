@@ -62,6 +62,77 @@ def _has_video(path: str) -> bool:
     return any(c not in ("mjpeg", "png", "bmp", "gif") for c in codecs)
 
 
+def _retranslate_pass(tr, plan, texts, gen_durations, seg_wavs, seg_voices,
+                      tts, tmpdir: str, round_no: int) -> int:
+    """Gọi lại translator cho các đoạn vượt thời lượng, đo trên AUDIO thật.
+
+    Vì sao cần: `plan_timing` chỉ GẮN CỜ `needs_shorter_text`; cách duy nhất để
+    khớp là ép `atempo` tới `max_speed` (1.35), và ở tốc độ đó giọng bị méo rõ.
+    Bản dịch ngắn hơn thì nghe tự nhiên hơn hẳn — prompt `retranslate_timing` đã
+    có sẵn trong bảng `prompts` cho đúng việc này.
+
+    Ba điều quyết định tính đúng đắn:
+      1. **Ngân sách ký tự tính từ tốc độ nói THẬT** của chính bản dịch hiện tại
+         (ký tự/giây đo từ audio đã tổng hợp), không phải một con số chung. Cùng
+         một câu, người nói nhanh/chậm cho ra ngân sách khác nhau.
+      2. **Đo trên audio tổng hợp, không tin độ dài chuỗi.** Model hoàn toàn có
+         thể trả về chuỗi ngắn hơn mà nói ra dài hơn (viết tắt, số, từ dài). Chỉ
+         nhận khi `gen_duration` thật sự giảm.
+      3. **Một lượt, không lặp vô hạn**: trả về số đoạn đã cải thiện; vòng ngoài
+         dừng khi không còn đoạn nào cờ, hoặc khi lượt này không cải thiện được gì
+         (translator không hỗ trợ / model trả về dài hơn) — tránh gọi LLM mãi không
+         tiến triển.
+
+    Trả về số đoạn đã được thay bằng bản ngắn hơn.
+    """
+    improved = 0
+    for s in plan:
+        if not s.needs_shorter_text:
+            continue
+        i = s.idx
+        cur = texts[i]
+        dur = gen_durations[i]
+        slot = s.end - s.start
+        if dur <= 0 or not cur.strip() or slot <= 0:
+            continue
+
+        chars_per_sec = len(cur) / dur
+        # 0.95: chừa biên, vì tốc độ nói không hoàn toàn tuyến tính theo ký tự
+        max_chars = max(8, int(chars_per_sec * slot * 0.95))
+        if max_chars >= len(cur):
+            continue  # bản dịch đã ngắn hơn cả ngân sách -> ép tốc độ là đủ
+
+        shorter_fn = getattr(tr, "retranslate_shorter", None)
+        if shorter_fn is None:
+            # Local Marian không có đường này (dịch lại ngắn hơn cần LLM). Không
+            # phải lỗi — giữ nguyên và để timing engine ép tốc độ như trước.
+            continue
+        try:
+            shorter = (shorter_fn(cur, max_chars) or "").strip()
+        except Exception:  # noqa: BLE001 — lỗi mạng/LLM không được giết cả job
+            continue
+        if not shorter or len(shorter) >= len(cur):
+            continue
+
+        voice = seg_voices[i]
+        try:
+            audio = tts.synthesize(shorter, voice=voice or None)
+        except Exception:  # noqa: BLE001
+            continue
+        path = os.path.join(tmpdir, f"seg{i}r{round_no}.wav")
+        with open(path, "wb") as f:
+            f.write(audio)
+        new_dur = _wav_duration(path)
+        if new_dur >= dur:
+            continue  # chuỗi ngắn hơn nhưng nói RA dài hơn -> không nhận
+
+        texts[i] = shorter
+        gen_durations[i] = new_dur
+        seg_wavs[i] = path
+        improved += 1
+    return improved
+
+
 def _make_bed(source_path: str, duration: float, mode: str, path: str,
               sr: int = 48000) -> None:
     """background_mode: silence (clean dub) | source_low (karaoke-style backing)."""
@@ -88,20 +159,24 @@ def dub_audio(source_path: str, source_lang: str, target_lang: str,
               speaker_voices: dict[str, str | None], storage,
               out_key: str | None = None, max_speed: float = 1.35,
               keep_temp: bool = False, background_mode: str = "silence",
-              mux_video: bool = True) -> tuple[str, list[Segment]]:
+              mux_video: bool = True, retranslate_rounds: int = 2,
+              ) -> tuple[str, list[Segment]]:
     """Dub an audio OR video file. speaker_voices: SPEAKER_xx -> preset name.
 
     Video in -> MP4 out (video stream copied, dubbed audio as AAC).
     background_mode: silence | source_low (original ducked to 12%).
+    retranslate_rounds: số lượt xin bản dịch ngắn hơn cho đoạn vượt thời lượng
+        (0 = tắt; chỉ có tác dụng với translator dạng LLM, xem `_retranslate_pass`).
     Returns (storage_key, planned_segments).
     """
     tmpdir = tempfile.mkdtemp(prefix="dub_")
     try:
         work_wav = os.path.join(tmpdir, "src16k.wav")
         _extract_wav(source_path, work_wav)
+        stt_stats: dict = {}
 
         # 1) STT + diarize + speaker attribution
-        segs, _info = transcribe(work_wav, language=source_lang)
+        segs, _info = transcribe(work_wav, language=source_lang, stats=stt_stats)
         turns = diarize(work_wav)
         attributed = merge(segs, turns)
         if not attributed:
@@ -116,7 +191,7 @@ def dub_audio(source_path: str, source_lang: str, target_lang: str,
         preset_rotation = ["Hải Đăng", "Mai Anh", "Quang Sơn", "Thùy Dung",
                            "Thái Sơn", "Trúc Ly", "Ngọc Huyền", "Thanh Bình"]
         auto_idx: dict[str, int] = {}
-        gen_durations, seg_wavs = [], []
+        gen_durations, seg_wavs, seg_voices = [], [], []
         for i, text_t in enumerate(texts):
             spk = attributed[i].speaker or ""
             voice = speaker_voices.get(spk) or ""
@@ -129,9 +204,22 @@ def dub_audio(source_path: str, source_lang: str, target_lang: str,
                 f.write(audio)
             gen_durations.append(_wav_duration(wav_path))
             seg_wavs.append(wav_path)
+            seg_voices.append(voice)
 
         # 4) timing fit
         plan_segs = build_plan(attributed, texts, gen_durations, max_speed=max_speed)
+
+        # 4b) đoạn nào vẫn không vừa -> xin bản dịch NGẮN HƠN rồi tổng hợp lại.
+        #     Làm trước khi mix, vì sau khi mix thì đã quá muộn.
+        for round_no in range(1, retranslate_rounds + 1):
+            if not any(s.needs_shorter_text for s in plan_segs):
+                break
+            n = _retranslate_pass(tr, plan_segs, texts, gen_durations, seg_wavs,
+                                  seg_voices, tts, tmpdir, round_no)
+            plan_segs = build_plan(attributed, texts, gen_durations,
+                                   max_speed=max_speed)
+            if n == 0:
+                break
 
         # 5) mix over the background bed
         src_dur = _ffprobe_duration(source_path)

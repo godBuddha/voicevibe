@@ -26,17 +26,120 @@ from ..providers.base import TranscriptSegment
 
 DIA_MODEL = "pyannote/speaker-diarization-3.1"
 
+# --- Ngưỡng chống hallucination -------------------------------------------------
+# Whisper "bịa" chữ ở đoạn im lặng, nhạc, hoặc tiếng ồn: nó vẫn phải sinh ra ký tự
+# nào đó, nên nhả ra những câu không hề có trong audio. Với pipeline lồng tiếng,
+# chuyện này nguy hiểm gấp đôi: câu bịa bị DỊCH rồi ĐỌC LÊN thành tiếng, tức là
+# thêm nội dung không có trong bản gốc.
+#
+# Vì sao lọc theo XÁC SUẤT của model thay vì danh sách câu: danh sách câu bịa phụ
+# thuộc ngôn ngữ, model và phiên bản — "Hãy subscribe cho kênh..." là câu bịa tiếng
+# Việt nổi tiếng, nhưng hardcode nó sẽ hụt mọi biến thể khác và mọi ngôn ngữ khác.
+# Ba tín hiệu dưới đây do chính model đưa ra, độc lập ngôn ngữ:
+#
+#   no_speech_prob  — model nghĩ đoạn này KHÔNG có tiếng nói
+#   avg_logprob     — độ "tự tin" trung bình khi giải mã; rất thấp = đang đoán bừa
+#   compression_ratio — mức nén của văn bản; cao bất thường = lặp lại cùng một câu
+#
+# Ngưỡng lấy theo mặc định của reference implementation (no_speech 0.6,
+# logprob -1.0, compression 2.4), tức là cùng thang đo mà chính Whisper dùng để
+# đánh dấu một đoạn là hỏng.
+NO_SPEECH_MAX = 0.6        # > mức này: coi như không có tiếng nói
+LOGPROB_MIN = -1.0         # < mức này: giải mã thiếu tự tin
+LOGPROB_MIN_HARD = -1.5    # < mức này: bỏ bất kể các chỉ số khác
+COMPRESSION_MAX = 2.4      # > mức này: văn bản lặp lại bất thường
+
+# Đoạn chỉ có ký hiệu/dấu câu — Whisper sinh ra ở đoạn nhạc hoặc tiếng động.
+# `\w` bắt cả chữ có dấu tiếng Việt nên so khớp này độc lập ngôn ngữ.
+import re as _re
+
+_ONLY_SYMBOLS = _re.compile(r"^[^\w]*$", _re.UNICODE)
+
+# Whisper chèn nhãn phi-lời-nói trong ngoặc: `[Music]`, `[Applause]`, `[nhạc]`,
+# `(tiếng cười)`. Với lồng tiếng, những nhãn này ĐẶC BIỆT tai hại: chúng bị dịch
+# rồi đọc lên thành tiếng ("Music" đọc thành "Âm nhạc") — thêm hẳn một câu không
+# ai nói. Nhận diện bằng hình dạng (cả chuỗi nằm trong một cặp ngoặc), không bằng
+# danh sách từ — danh sách sẽ hụt ngay khi đổi ngôn ngữ.
+_ANNOTATION = _re.compile(r"^[\[\(（【][^\[\]\(\)（）【】]*[\]\)）】]$", _re.UNICODE)
+
+
+def segment_is_hallucination(seg) -> str | None:
+    """Trả về LÝ DO nếu đoạn này là hallucination, hoặc None nếu giữ lại.
+
+    Trả lý do (thay vì True/False) để chỗ gọi ghi log được VÌ SAO bỏ — nếu không,
+    người vận hành chỉ thấy phụ đề thiếu câu mà không biết tại sao.
+    """
+    text = (getattr(seg, "text", "") or "").strip()
+    if not text:
+        return "empty"
+    if _ONLY_SYMBOLS.match(text):
+        return "chỉ có ký hiệu, không có chữ"
+    if _ANNOTATION.match(text):
+        return "nhãn phi-lời-nói (nhạc/tiếng động) — dịch rồi đọc lên là thêm câu không ai nói"
+
+    logprob = getattr(seg, "avg_logprob", 0.0)
+    if logprob is None:
+        logprob = 0.0
+    if logprob < LOGPROB_MIN_HARD:
+        return f"avg_logprob {logprob:.2f} < {LOGPROB_MIN_HARD}"
+
+    compression = getattr(seg, "compression_ratio", 0.0) or 0.0
+    if compression > COMPRESSION_MAX:
+        return f"compression_ratio {compression:.2f} > {COMPRESSION_MAX}"
+
+    no_speech = getattr(seg, "no_speech_prob", 0.0)
+    if no_speech is None:
+        no_speech = 0.0
+    # Cần CẢ HAI: no_speech cao mà logprob vẫn tốt là trường hợp bình thường với
+    # đoạn nói ngắn/ngắt quãng (model phân vân nhưng vẫn giải mã đúng).
+    if no_speech > NO_SPEECH_MAX and logprob < LOGPROB_MIN:
+        return f"no_speech_prob {no_speech:.2f} > {NO_SPEECH_MAX} và avg_logprob {logprob:.2f}"
+    return None
+
+
+def drop_hallucinations(raw_segments: list) -> tuple[list, list[tuple[str, str]]]:
+    """Lọc hallucination. Trả (giữ lại, [(text, lý do do bỏ)]).
+
+    Không bao giờ trả về danh sách rỗng vì lọc quá tay: nếu bỏ hết thì giữ nguyên
+    bản gốc và coi như không lọc — mất sạch nội dung là hỏng nặng hơn nhiễu.
+    """
+    kept, dropped = [], []
+    for seg in raw_segments:
+        reason = segment_is_hallucination(seg)
+        if reason:
+            dropped.append(((getattr(seg, "text", "") or "").strip(), reason))
+        else:
+            kept.append(seg)
+    if raw_segments and not kept:
+        return list(raw_segments), []
+    return kept, dropped
+
 
 def transcribe(audio_path: str, model_size: str = "large-v3",
                compute_type: str = "int8", language: str | None = None,
-               device: str = "auto"):
-    """faster-whisper transcription -> (segments, info)."""
+               device: str = "auto", filter_hallucinations: bool = True,
+               stats: dict | None = None):
+    """faster-whisper transcription -> (segments, info).
+
+    `filter_hallucinations=True` (mặc định) loại các đoạn model bịa ra — xem
+    `segment_is_hallucination`. Truyền `stats={}` để nhận số đoạn đã bỏ và lý do;
+    cần thiết vì bỏ nội dung là việc phải NHÌN THẤY ĐƯỢC, không được im lặng.
+    """
     from faster_whisper import WhisperModel
 
     model = WhisperModel(model_size, device=device, compute_type=compute_type)
     segments, info = model.transcribe(audio_path, language=language, vad_filter=True)
+    raw = list(segments)
+
+    dropped: list[tuple[str, str]] = []
+    if filter_hallucinations:
+        raw, dropped = drop_hallucinations(raw)
+
     out = [TranscriptSegment(start=s.start, end=s.end, text=s.text.strip())
-           for s in segments]
+           for s in raw]
+    if stats is not None:
+        stats["kept"] = len(out)
+        stats["dropped"] = [{"text": t[:120], "reason": r} for t, r in dropped]
     return out, info
 
 

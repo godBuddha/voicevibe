@@ -112,6 +112,31 @@ def _resolve_media(media_url: str, storage) -> str:
     raise FileNotFoundError(f"media not found: {media_url}")
 
 
+def _record_stt_stats(job_id: str, stats: dict) -> None:
+    """Lưu số đoạn bị loại vì hallucination vào `job.params`.
+
+    Cố ý đưa ra API thay vì chỉ ghi log: bỏ nội dung là quyết định ảnh hưởng tới
+    kết quả cuối, nên người dùng phải KIỂM TRA ĐƯỢC nó. Lỗi ở đây không được làm
+    chết job — đây là thông tin phụ, không phải kết quả.
+    """
+    dropped = stats.get("dropped") or []
+    if not dropped:
+        return
+    try:
+        from .db import SessionLocal
+        from .models import Job
+
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            if job is not None:
+                job.params = {**(job.params or {}),
+                              "stt_dropped": len(dropped),
+                              "stt_dropped_detail": dropped[:10]}
+                db.commit()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _run_dub(job_id: str, params: dict) -> dict:
     """Real D5/D7 pipeline: media -> STT -> translate -> TTS -> mix -> storage."""
     from .db import SessionLocal
@@ -175,7 +200,11 @@ def _run_stt(job_id: str, params: dict) -> dict:
     try:
         storage = get_storage()
         src = _resolve_media(params["media_url"], storage)
-        segs, _info = transcribe(src, language=params.get("source_lang"))
+        stt_stats: dict = {}
+        segs, _info = transcribe(src, language=params.get("source_lang"),
+                                 stats=stt_stats)
+        # Bỏ hallucination là quyết định ảnh hưởng nội dung -> phải nhìn thấy được.
+        _record_stt_stats(job_id, stt_stats)
         turns = diarize(src)
         attributed = merge(segs, turns)
         srt = to_srt(attributed)
@@ -223,7 +252,12 @@ def _run_subtitle(job_id: str, params: dict) -> dict:
         storage = get_storage()
         src = _resolve_media(params["media_url"], storage)
 
-        segs, _info = transcribe(src, language=params.get("source_lang"))
+        stt_stats: dict = {}
+        segs, _info = transcribe(src, language=params.get("source_lang"),
+                                 stats=stt_stats)
+        # Bỏ hallucination là việc PHẢI NHÌN THẤY ĐƯỢC: nếu im lặng, phụ đề
+        # thiếu câu mà không ai biết vì sao. Ghi vào params để /v1/jobs đọc ra.
+        _record_stt_stats(job_id, stt_stats)
         turns = diarize(src)
         attributed = merge(segs, turns)
 

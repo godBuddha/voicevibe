@@ -7,3 +7,5 @@ models/
 
 # Design reference (proprietary product mockup) — local only, never publish
 docs/design-mockup.jpeg
+node_modules/
+dist/

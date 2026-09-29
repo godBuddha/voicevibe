@@ -49,6 +49,14 @@ class LocalStorage:
         """Local backend: direct path (zero copy). Remote backends copy to tmp."""
         return str(self._path(key))
 
+    def delete(self, key: str) -> bool:
+        """Gỡ một object. False nếu không tồn tại (caller làm best-effort)."""
+        p = self._path(key)
+        if not p.exists():
+            return False
+        p.unlink()
+        return True
+
 
 class S3Storage:
     """MinIO / S3 — same key contract as LocalStorage, via the minio SDK."""
@@ -100,6 +108,16 @@ class S3Storage:
         with os.fdopen(fd, "wb") as f:
             f.write(self.get(key))
         return tmp
+
+    def delete(self, key: str) -> bool:
+        """Gỡ một object trên S3/MinIO (cùng hợp đồng với LocalStorage)."""
+        from minio.error import S3Error
+
+        try:
+            self._client.remove_object(self.bucket, key)
+            return True
+        except S3Error:
+            return False
 
     def presigned_url(self, key: str, expires_hours: float = 1.0) -> str:
         import datetime

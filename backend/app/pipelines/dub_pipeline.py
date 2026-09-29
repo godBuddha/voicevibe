@@ -253,7 +253,9 @@ def dub_audio(source_path: str, source_lang: str, target_lang: str,
         gen_durations, seg_wavs, seg_voices = [], [], []
         for i, text_t in enumerate(texts):
             spk = attributed[i].speaker or ""
-            voice = speaker_voices.get(spk) or ""
+            # "*" = "áp cho MỌI người nói" — UI không biết trước id speaker
+            # (SPEAKER_00…) vì diarization chạy sau, nên map-all phải có phím tắt.
+            voice = speaker_voices.get(spk) or speaker_voices.get("*") or ""
             if not voice:
                 idx = auto_idx.setdefault(spk, len(auto_idx))
                 voice = preset_rotation[idx % len(preset_rotation)]

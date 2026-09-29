@@ -206,13 +206,27 @@ def user_from_api_key(db: OrmSession, raw: str | None,
 
 
 def _check_csrf(request: Request) -> None:
-    """Chặn CSRF cho request đã xác thực bằng cookie (lớp hai sau SameSite=Lax)."""
+    """Chặn CSRF cho request đã xác thực bằng cookie (lớp hai sau SameSite=Lax).
+
+    Cross-origin ĐƯỢC PHÉP nếu origin nằm trong `VOICEVIBE_CORS_ORIGINS`: đó là
+    danh sách admin chủ động cho phép (lớp CORS đã gate trình duyệt ở trên),
+    vector CSRF thật là trang NGOÀI danh sách. Trước đây deploy tách frontend
+    (SPA 8080 → API 18080) bị 403 toàn bộ POST/PUT/DELETE dù CORS đã bật — origin
+    lệch cổng so với Host là tình trạng bình thường của kiến trúc đó (đã gặp thật
+    khi dò UI: nút "Tạo" nào cũng "HTTP 403").
+    """
     origin = request.headers.get("origin")
     if not origin:
         return  # curl/SDK/API-key: không có Origin, không phải vector CSRF
     host = request.headers.get("host") or urlparse(str(request.url)).netloc
-    if urlparse(origin).netloc != host:
-        raise HTTPException(status_code=403, detail="cross-origin request blocked")
+    if urlparse(origin).netloc == host:
+        return
+    # Cùng quy ước phân tích với parse_cors_origins (main.py): cắt `/` cuối để
+    # `https://x.com/` và `https://x.com` là một origin.
+    allowed = {o.strip().rstrip("/") for o in os.getenv("VOICEVIBE_CORS_ORIGINS", "").split(",") if o.strip()}
+    if origin.rstrip("/") in allowed:
+        return
+    raise HTTPException(status_code=403, detail="cross-origin request blocked")
 
 
 def auth_optional(

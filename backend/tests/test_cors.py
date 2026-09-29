@@ -84,9 +84,66 @@ def test_origin_unknown_rejected() -> None:
     print("origin lạ không được phép ..... OK")
 
 
+# ---------------------------------------------------------------
+# CSRF cookie-check (auth._check_csrf) — lớp hai sau CORS. Deploy tách frontend
+# (SPA 8080 → API 18080) từng bị 403 TOÀN BỘ POST/PUT/DELETE có cookie dù CORS
+# đã bật: origin lệch cổng so với Host là tình trạng bình thường của kiến trúc
+# đó, không phải tấn công. Origin trong VOICEVIBE_CORS_ORIGINS phải được thông
+# qua; origin lạ mới là CSRF thật.
+def test_csrf_allowlist() -> None:
+    import os
+
+    from fastapi import HTTPException
+    from starlette.requests import Request as StarletteRequest
+
+    from app.auth import _check_csrf
+
+    def _req(headers: dict) -> StarletteRequest:
+        scope = {
+            "type": "http", "method": "POST",
+            "path": "/v1/jobs", "headers": [
+                (k.lower().replace("_", "-").encode(), v.encode())
+                for k, v in headers.items()
+            ],
+            "query_string": b"", "server": ("api.local", 8000),
+            "scheme": "http", "root_path": "",
+        }
+        return StarletteRequest(scope)
+
+    old = os.environ.get("VOICEVIBE_CORS_ORIGINS")
+    os.environ["VOICEVIBE_CORS_ORIGINS"] = DEV
+    # cùng host → luôn thông qua
+    _check_csrf(_req({"origin": "http://api.local:8000", "host": "api.local:8000"}))
+    # origin trong danh sách cho phép (SPA tách cổng) → thông qua
+    _check_csrf(_req({"origin": DEV, "host": "api.local:8000"}))
+    # biến thể có `/` cuối vẫn là MỘT origin (cùng quy ước với parse_cors_origins)
+    _check_csrf(_req({"origin": DEV + "/", "host": "api.local:8000"}))
+    # không có Origin (curl/SDK) → không phải vector CSRF
+    _check_csrf(_req({"host": "api.local:8000"}))
+    # origin lạ + cookie-authenticated POST → 403 (CSRF thật)
+    try:
+        _check_csrf(_req({"origin": "https://evil.example", "host": "api.local:8000"}))
+        raise AssertionError("origin lạ phải bị chặn 403")
+    except HTTPException as e:
+        assert e.status_code == 403, e.status_code
+    # tắt allow-list → mọi cross-origin đều bị chặn lại (không có cửa sau)
+    os.environ["VOICEVIBE_CORS_ORIGINS"] = ""
+    try:
+        _check_csrf(_req({"origin": DEV, "host": "api.local:8000"}))
+        raise AssertionError("allow-list rỗng phải chặn")
+    except HTTPException as e:
+        assert e.status_code == 403
+    if old is None:
+        os.environ.pop("VOICEVIBE_CORS_ORIGINS", None)
+    else:
+        os.environ["VOICEVIBE_CORS_ORIGINS"] = old
+    print("CSRF allow-list VOICEVIBE_* .. OK")
+
+
 if __name__ == "__main__":
     test_parser()
     test_preflight_allowed()
     test_real_request_allowed()
     test_origin_unknown_rejected()
+    test_csrf_allowlist()
     print("CORS GUARD PASSED")

@@ -167,11 +167,29 @@ def _audio_dict(audio_path: str) -> dict:
     return {"waveform": waveform, "sample_rate": int(sr)}
 
 
+def _setting_hf_token() -> str | None:
+    """`hf_token` set trong UI (/admin/settings). None nếu chưa set/lỗi đọc.
+
+    Import bọc try: script chạy ngoài package (uv run scripts/…) không có
+    settings_service — khi đó rơi về env như cũ, không phá pipeline.
+    """
+    try:
+        from ..settings_service import get_setting
+    except Exception:
+        return None
+    try:
+        return get_setting("hf_token") or None
+    except Exception:
+        return None
+
+
 def diarize(audio_path: str, hf_token: str | None = None) -> list[TranscriptSegment]:
     """pyannote speaker-diarization -> speaker turns (text empty)."""
     from pyannote.audio import Pipeline
 
-    token = hf_token or os.getenv("HF_TOKEN")
+    # Token ưu tiên: tham số → Settings (`hf_token`, admin set qua UI — trước
+    # đây setting này chỉ để trang trí, pipeline chỉ đọc env, đã gặp thật) → env.
+    token = hf_token or _setting_hf_token() or os.getenv("HF_TOKEN")
     if not token:
         raise RuntimeError("HF_TOKEN not set — pyannote models are gated on Hugging Face")
     # huggingface_hub reads HF_TOKEN from the environment natively — this works

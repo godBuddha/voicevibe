@@ -152,11 +152,17 @@ class JobIn(BaseModel):
     max_speed: float = 1.35
     webhook_url: str | None = None
     # --- riêng cho type=dub
-    # UI GỬI field này, nhưng JobIn trước đây không khai báo → pydantic ÂM THẦM
-    # bỏ nó đi và pipeline luôn chạy background_mode="silence", bất kể người dùng
-    # chọn gì trên dropdown. Đã phát hiện khi đi qua tham số cho Demucs.
+    # Hai field này UI GỬI, nhưng JobIn trước đây không khai báo → pydantic ÂM
+    # THẦM bỏ đi (đã gặp thật): background_mode thì pipeline luôn chạy "silence"
+    # bất kể dropdown; speaker_voices thì mọi speaker bị xoay vòng preset, giọng
+    # người dùng chọn không bao giờ được dùng. Khai báo tường minh để worker
+    # nhận đủ.
     background_mode: str = Field(
         "silence", description="silence | source_low (nhạc nền kiểu karaoke)")
+    speaker_voices: dict[str, str] | None = Field(
+        None,
+        description='dub: map SPEAKER_xx (hoặc "*" = áp cho mọi người nói) '
+                    '→ tên giọng preset/clone')
     # --- riêng cho type=subtitle
     format: str = Field("srt", description="srt | vtt | ass (chỉ dùng cho subtitle)")
     bilingual: bool = Field(
@@ -227,9 +233,12 @@ def get_job(
     j = db.get(Job, job_id)
     if j is None or j.user_id != user.id:
         raise HTTPException(status_code=404, detail="job not found")
+    # params + updated_at: UI cần hiển thị "file nào / text nào" và mốc hoàn thành
+    # — không có hai field này panel chi tiết chỉ ra N/A vĩnh viễn.
     return {
         "job_id": j.id, "type": j.type, "status": j.status.value,
         "progress": j.progress, "error": j.error, "credits_charged": j.credits_charged,
+        "params": j.params, "updated_at": j.updated_at,
     }
 
 
@@ -245,7 +254,22 @@ def get_result(
     # Cố ý KHÔNG dùng presigned URL của S3. Media phải đi qua API để kiểm **quyền sở
     # hữu** (`_owns_media`); một presigned URL sẽ bỏ qua toàn bộ kiểm tra đó và biến
     # mọi key thành công khai trong thời gian URL còn hiệu lực.
-    return {"job_id": j.id, "download_url": f"/media/{j.result_s3_key}"}
+    key = j.result_s3_key
+    ext = key.rsplit(".", 1)[-1].lower() if "." in key else ""
+    kind = ("text" if ext in {"srt", "vtt", "ass", "txt"}
+            else "video" if ext in {"mp4", "mkv", "webm", "mov"} else "audio")
+    out = {"job_id": j.id, "download_url": f"/media/{key}",
+           "filename": os.path.basename(key), "kind": kind}
+    # Kết quả dạng chữ (SRT/TXT) gửi kèm nội dung để UI không phải tải lần 2 —
+    # chặn 64KB để endpoint không trở thành bơm-ram-vô-tận với kết quả khổng lồ.
+    if kind == "text":
+        try:
+            data = get_storage().get(key)
+            if len(data) <= 64 * 1024:
+                out["content"] = data.decode("utf-8", "replace")
+        except Exception:
+            pass  # đọc lỗi thì UI tự fallback sang download_url
+    return out
 
 
 @app.post("/v1/voices", status_code=201)
@@ -257,6 +281,41 @@ def create_voice(
     db.add(row)
     db.commit()
     return {"voice_id": row.id, "name": row.name, "engine": row.engine}
+
+
+@app.get("/v1/voices")
+def list_voices(user: User = Depends(auth), db: Session = Depends(get_db)) -> dict:
+    """Danh sách giọng của CHÍNH mình — trang Voices + bộ chọn giọng TTS/Dub.
+
+    Trước đây chỉ `GET /v1/me` trả voices kèm profile; SPA gọi `GET /v1/voices`
+    và nhận 405 (route POST-only), nên danh sách giọng luôn trống (đã gặp thật
+    khi dò UI: 405 Method Not Allowed × 2 trang).
+    """
+    rows = db.scalars(select(Voice).where(Voice.user_id == user.id)
+                      .order_by(Voice.created_at.desc())).all()
+    return {"voices": [{"id": v.id, "name": v.name, "lang": v.lang,
+                        "engine": v.engine, "created_at": v.created_at}
+                       for v in rows]}
+
+
+@app.delete("/v1/voices/{voice_id}")
+def delete_voice(voice_id: str, user: User = Depends(auth),
+                 db: Session = Depends(get_db)) -> dict:
+    """Xoá giọng + clip mẫu trên storage. Chỉ chủ sở hữu được xoá."""
+    v = db.get(Voice, voice_id)
+    if v is None or v.user_id != user.id:
+        raise HTTPException(status_code=404, detail="voice not found")
+    storage = get_storage()
+    for key in (v.ref_s3_key, f"voices/{v.id}/ref_clean.wav"):
+        # key "pending" (row tạo lỗi trước khi put) không có trên storage — bỏ qua.
+        if key and key != "pending":
+            try:
+                storage.delete(key)
+            except Exception:
+                pass  # dọn file là best-effort; row DB phải chết chắc
+    db.delete(v)
+    db.commit()
+    return {"voice_id": v.id, "deleted": True}
 
 
 @app.post("/v1/voices/upload", status_code=201)
@@ -551,7 +610,8 @@ def list_jobs(limit: int = 20, user: User = Depends(auth),
     ).all()
     return {"jobs": [{"job_id": j.id, "type": j.type, "status": j.status.value,
                       "progress": j.progress, "result_key": j.result_s3_key,
-                      "error": j.error, "created_at": j.created_at} for j in rows]}
+                      "error": j.error, "created_at": j.created_at,
+                      "params": j.params, "updated_at": j.updated_at} for j in rows]}
 
 
 @app.get("/v1/usage")
@@ -609,16 +669,24 @@ def create_api_key(user: User = Depends(auth), db: Session = Depends(get_db)) ->
 @app.get("/v1/keys")
 def list_api_keys(user: User = Depends(auth), db: Session = Depends(get_db)) -> dict:
     keys = db.scalars(select(ApiKey).where(ApiKey.user_id == user.id)).all()
-    return {"keys": [{"key": mask(k.prefix), "active": k.active,
-                      "rate_limit_per_min": k.rate_limit_per_min} for k in keys]}
+    # prefix (raw, không phải hash) KHÔNG phải secret — đã hiện qua "mask" từ trước.
+    # Trả nguyên để UI thu hồi được khi người dùng không giữ raw key nữa.
+    return {"keys": [{"key": mask(k.prefix), "prefix": k.prefix, "active": k.active,
+                      "rate_limit_per_min": k.rate_limit_per_min,
+                      "created_at": k.created_at} for k in keys]}
 
 
 @app.delete("/v1/keys/{key}")
 def revoke_api_key(key: str, user: User = Depends(auth),
                    db: Session = Depends(get_db)) -> dict:
-    # Accepts the RAW key (the only form a client still holds); lookup is hashed.
+    # Chấp nhận raw key (hình thức duy nhất client còn giữ) HOẶC prefix — UI chỉ
+    # còn prefix sau khi đóng modal "hiện 1 lần". Lookup raw là hash; prefix thì
+    # so trực tiếp, vẫn giới hạn trong key của chính user.
     row = db.get(ApiKey, _hash_key(key))
     if row is None or row.user_id != user.id:
+        row = db.scalar(select(ApiKey).where(ApiKey.prefix == key,
+                                             ApiKey.user_id == user.id))
+    if row is None:
         raise HTTPException(status_code=404, detail="key not found")
     db.delete(row)
     db.commit()

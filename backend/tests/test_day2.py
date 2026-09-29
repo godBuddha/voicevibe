@@ -104,6 +104,13 @@ assert r.json()["progress"] == 100
 r = c.get(f"/v1/jobs/{jid}/result", headers=h)
 assert r.status_code == 200 and "jobs/" in r.json()["download_url"]
 
+# 3f) result payload đủ hình dạng cho UI: kind/filename/content (chữ, ≤64KB).
+#     Trước đây chỉ trả {job_id, download_url} — SPA không biết kết quả là
+#     audio/video/chữ và phải tự tải file thêm một lượt.
+res = r.json()
+assert res["kind"] == "text" and res["filename"].endswith(".txt"), res
+assert res["content"] == "TRANSLATED", res
+
 # 3b) dub job with missing media -> status failed + FULL REFUND (failed jobs
 #     are free; regression guard for the JobStatus NameError + refund logic).
 r = c.post("/v1/jobs", json={
@@ -167,6 +174,45 @@ r = c.post("/v1/auth/signup", json={"email": "new@example.io", "password": "matk
 assert r.status_code == 409, r.text
 set_setting("auth.allow_signup", False, is_secret=False, category="security")
 
+# 3e) voices surface: SPA gọi GET /v1/voices (trước đây 405 — chỉ có POST nên
+#     danh sách giọng luôn trống) và cần Xoá THẬT (DELETE), không phải xoá trên
+#     client rồi giọng hồi sinh sau khi tải lại trang.
+import io  # noqa: E402
+
+r = c.post("/v1/voices/upload", files={"file": ("ref.wav", io.BytesIO(b"RIFFaudit"), "audio/wav")},
+           data={"name": "Giọng audit", "lang": "vi"}, headers=h)
+assert r.status_code == 201, r.text
+vid = r.json()["voice_id"]
+r = c.get("/v1/voices", headers=h)
+assert r.status_code == 200, r.text
+mine = [v for v in r.json()["voices"] if v["id"] == vid]
+assert mine and mine[0]["name"] == "Giọng audit" and mine[0]["engine"] == "vieneu", r.text
+# user khác không được thấy giọng của người này
+r2 = c.get("/v1/voices", headers={"X-API-Key": su["key"]})
+assert all(v["id"] != vid for v in r2.json()["voices"]), r2.text
+r = c.delete(f"/v1/voices/{vid}", headers=h)
+assert r.status_code == 200 and r.json()["deleted"] is True, r.text
+r = c.delete(f"/v1/voices/{vid}", headers=h)
+assert r.status_code == 404, r.text
+r = c.get("/v1/voices", headers=h)
+assert all(v["id"] != vid for v in r.json()["voices"]), r.text
+
+# 3h) API keys: list trả prefix + created_at, thu hồi được theo PREFIX (UI không
+#     còn raw key sau khi đóng modal "hiện 1 lần") — trước đây DELETE chỉ nhận
+#     raw key nên nút Xoá trên UI chết cứng.
+r = c.post("/v1/keys", headers=h)
+assert r.status_code == 201, r.text
+raw_key = r.json()["key"]
+r = c.get("/v1/keys", headers=h)
+rows = [k for k in r.json()["keys"] if k["prefix"] == raw_key[:12]]
+assert rows and rows[0]["active"] and rows[0]["created_at"], r.text
+r = c.delete(f"/v1/keys/{raw_key[:12]}", headers=h)
+assert r.status_code == 200 and r.json()["revoked"], r.text
+r = c.delete(f"/v1/keys/{raw_key[:12]}", headers=h)
+assert r.status_code == 404, r.text
+r = c.get("/v1/me", headers={"X-API-Key": raw_key})
+assert r.status_code == 401, "key đã thu hồi mà vẫn dùng được?"
+
 # 4) credit metering + ledger: translate -2 stays; dub -60 và subtitle -8 hoàn lại
 #    vì cả hai đều fail (thiếu media thật) — mỗi lần trừ đều phải có dòng ledger.
 r = c.get("/v1/me", headers=h)
@@ -186,6 +232,24 @@ with SessionLocal() as db:
     assert all(r.job_id for r in rows), [r.reason for r in rows if not r.job_id]
     assert {jid, djid} <= {r.job_id for r in rows}
 
+# 3g) speaker_voices: JobIn phải GIỮ được map người-nói→giọng. Trước đây
+#     pydantic ÂM THẦM bỏ field này → pipeline luôn xoay vòng preset bất kể
+#     người dùng chọn giọng nào trên UI.
+r = c.post("/v1/jobs", json={
+    "type": "dub",
+    "media_url": "s3://inbox/khong-ton-tai.mp4",
+    "source_lang": "zh", "target_lang": "vi",
+    "speaker_voices": {"*": "Ngọc Huyền"},
+}, headers=h)
+assert r.status_code == 202, r.text
+sv_jid = r.json()["job_id"]
+r = c.get(f"/v1/jobs/{sv_jid}", headers=h)
+assert r.json()["params"].get("speaker_voices") == {"*": "Ngọc Huyền"}, r.text
+# job sẽ fail (media không tồn tại) — chờ rồi coi như refund, không đọng tiền
+_t.sleep(1)
+r = c.get(f"/v1/jobs/{sv_jid}", headers=h)
+assert r.json()["status"] == "failed", r.text
+
 # 5) insufficient credits -> 402
 with SessionLocal() as db:
     u = db.get(User, uid)
@@ -201,6 +265,10 @@ assert r.status_code == 402 or r.status_code == 401 or r.status_code == 422
 print("ORM roundtrip ......... OK")
 print("Celery registration ... OK")
 print("API 202/200/409/404 ... OK")
+print("Voices GET/DELETE ..... OK")
+print("Keys prefix revoke ... OK")
+print("speaker_voices field .. OK")
+print("Result payload shape .. OK")
 print("Credit metering 402 ... OK")
 print("Ledger row ............ OK")
 print("DAY 2 SELFTEST PASSED")

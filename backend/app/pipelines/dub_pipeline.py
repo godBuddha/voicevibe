@@ -65,10 +65,10 @@ def _separate_vocals(source_path: str, stem_path: str,
     job chạy — rơi về đường giảm âm lượng cũ, job vẫn hoàn thành. Nhưng fallback
     cần được NHÌN THẤY: caller ghi vào kế hoạch.
 
-    `htdemucs` (2 stem đủ dùng cho bed): `separate_audio_file()` trả
-    `(wav, {stem_name: tensor})`; stem **`no_vocals`** chính là nhạc không lời.
-    Ghi qua `demucs.api.save_audio` thay vì tự viết WAV — nó lo đúng
-    samplerate/channels của model.
+    `htdemucs` trả **4 stem** (`drums`, `bass`, `other`, `vocals`) — KHÔNG có stem
+    `no_vocals` (đã kiểm thật: `separate_audio_file` trả đúng bốn tên đó; tài liệu
+    không có, phải đoán theo trí nhớ là sai). Nhạc không lời = tổng 3 stem phi
+    giọng, qua `save_audio` để lo đúng samplerate/channels.
     """
     try:
         from demucs import api
@@ -78,10 +78,16 @@ def _separate_vocals(source_path: str, stem_path: str,
         separator = api.Separator(model="htdemucs", device=device, shifts=0,
                                   progress=False)
         _orig, stems = separator.separate_audio_file(source_path)
-        no_vocals = stems.get("no_vocals")
-        if no_vocals is None:  # model 4 stem (drums/bass/other/vocals) không có
+        parts = [stems[k] for k in ("drums", "bass", "other") if k in stems]
+        if not parts:  # dạng model khác — không dựng được accompaniment
             return None
-        api.save_audio(stem_path, no_vocals,
+        accompaniment = parts[0]
+        for t in parts[1:]:
+            accompaniment = accompaniment + t
+        # CHÚ Ý THỨ TỰ: `save_audio(wav_tensor, path, …)` — tensor TRƯỚC, đường
+        # dẫn SAU. Truyền ngược lại thì traceback chỉ nói "'str' object has no
+        # attribute 'dtype'" (đã gặp thật) — và broad except biến nó thành None.
+        api.save_audio(accompaniment, stem_path,
                        samplerate=separator.samplerate, clip="clamp")
         return "htdemucs"
     except Exception:  # noqa: BLE001 — mọi lỗi tách đều rơi về đường cũ

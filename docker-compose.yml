@@ -61,6 +61,9 @@ services:
       VOICEVIBE_API_KEYS: ${VOICEVIBE_API_KEYS:-}
       VOICEVIBE_SECURE_COOKIES: ${VOICEVIBE_SECURE_COOKIES:-}
       VOICEVIBE_ENABLE_DOCS: ${VOICEVIBE_ENABLE_DOCS:-}
+      # CORS cho dev cross-origin (SPA static server trên port khác, Vite dev…).
+      # Prod same-origin qua service `web` KHÔNG cần — để trống.
+      VOICEVIBE_CORS_ORIGINS: ${VOICEVIBE_CORS_ORIGINS:-}
       # Lưu trữ mặc định = volume dùng chung (`media`). Không cần dịch vụ S3 nào:
       # media luôn được phục vụ qua API để KIỂM QUYỀN SỞ HỮU (`/media/{key}`), nên
       # presigned URL không được dùng — xem ghi chú trong README.

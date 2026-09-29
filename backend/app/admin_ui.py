@@ -16,7 +16,7 @@ ADMIN_HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>YupVox-Clone — Settings</title>
+<title>VoiceVibe — Settings</title>
 __THEME_BOOT__
 <style>
 __THEME_CSS__
@@ -89,11 +89,11 @@ __THEME_CSS__
 <div id="app">
   <div class="topbar">
     <div>
-      <h1>⚙️ YupVox-Clone — Quản trị</h1>
+      <h1>⚙️ VoiceVibe — Quản trị</h1>
       <p class="sub">Mọi cấu hình lưu DB (secret mã hóa at rest) — không hardcode .env <span id="saved" class="ok"></span></p>
     </div>
     <div class="row-actions">
-      <button class="theme-btn" data-theme-label onclick="yvToggleTheme()">🌙 Chế độ tối</button>
+      <button class="theme-btn" data-theme-label onclick="vvToggleTheme()">🌙 Chế độ tối</button>
       <a href="/"><button class="ghost">← Về ứng dụng</button></a>
       <button class="ghost" onclick="logout()">Đăng xuất</button>
     </div>
@@ -546,7 +546,7 @@ async function resetPrompt(key) {
 }
 
 loadAi();             // tab mặc định là AI
-yvThemeChanged();     // đồng bộ nhãn nút sáng/tối với theme đã áp ở <head>
+vvThemeChanged();     // đồng bộ nhãn nút sáng/tối với theme đã áp ở <head>
 </script>
 </body></html>"""
 

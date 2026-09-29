@@ -5,7 +5,7 @@ Steps: STT+diarize -> translate (opus-mt vi->en) -> TTS per speaker (VieNeu)
        -> timing-fit -> ffmpeg mix -> duration check + round-trip ASR (en).
 
 Run on the GPU box:
-  cd /workspace/yupvox-clone && source .venv/bin/activate
+  cd /workspace/voicevibe && source .venv/bin/activate
   cd backend && PYTHONPATH=. python scripts/d5_smoke.py
 """
 from __future__ import annotations
@@ -17,7 +17,7 @@ import wave
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.setdefault("MEDIA_ROOT", "/workspace/media")
-os.environ.setdefault("DATABASE_URL", "sqlite:////workspace/yupvox-clone/backend/yupvox.db")
+os.environ.setdefault("DATABASE_URL", "sqlite:////workspace/voicevibe/backend/voicevibe.db")
 
 from app.pipelines.dub_pipeline import dub_audio  # noqa: E402
 from app.pipelines.stt import transcribe  # noqa: E402

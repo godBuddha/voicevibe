@@ -6,7 +6,7 @@
 4. Round-trip ASR on the dubbed MP4's audio track
 
 Run on the GPU box:
-  cd /workspace/yupvox-clone && source .venv/bin/activate
+  cd /workspace/voicevibe && source .venv/bin/activate
   cd backend && PYTHONPATH=. python scripts/d7_smoke.py
 """
 from __future__ import annotations
@@ -18,7 +18,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.setdefault("MEDIA_ROOT", "/workspace/media")
-os.environ.setdefault("DATABASE_URL", "sqlite:////workspace/yupvox-clone/backend/yupvox.db")
+os.environ.setdefault("DATABASE_URL", "sqlite:////workspace/voicevibe/backend/voicevibe.db")
 
 from app.pipelines.dub_pipeline import _has_video, dub_audio  # noqa: E402
 from app.pipelines.stt import transcribe  # noqa: E402

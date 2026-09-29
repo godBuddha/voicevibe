@@ -112,8 +112,8 @@ check("grep -q pong" in wblk, "healthcheck `worker` xác nhận worker thật tr
 
 # ------------------------------------------------------ 4. Dockerfile non-root
 df = DOCKERFILE.read_text(encoding="utf-8")
-check("USER yupvox" in df, "Dockerfile chạy bằng user không phải root")
-check(df.count("USER yupvox") == 2, "CẢ HAI stage (api + worker) đều non-root")
+check("USER voicevibe" in df, "Dockerfile chạy bằng user không phải root")
+check(df.count("USER voicevibe") == 2, "CẢ HAI stage (api + worker) đều non-root")
 check("useradd" in df and "10001" in df,
       "uid cố định (volume giữ được quyền sở hữu qua các lần deploy)")
 
@@ -216,8 +216,8 @@ check("reservations:" in gpu and "driver: nvidia" in gpu,
 check("worker:" in gpu, "GPU override áp cho service worker")
 
 # proxy nằm trong profile -> mặc định không dựng
-cblk = service_block("caddy", yaml)
-check("profiles: [proxy]" in cblk, "Caddy nằm trong profile `proxy` (opt-in)")
+cblk = service_block("web", yaml)
+check("profiles: [proxy]" in cblk, "web (Caddy) nằm trong profile `proxy` (opt-in)")
 
 # ------------------------------------------------------------ 7. Caddyfile
 cf = CADDYFILE.read_text(encoding="utf-8")

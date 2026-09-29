@@ -37,7 +37,7 @@ MODEL = os.environ.get("OPENROUTER_MODEL", "openai/gpt-4o-mini")
 # Câu tiếng Việt dài, dịch sang tiếng Anh chắc chắn vượt slot 1.6 giây.
 SRC = "Hôm nay chúng ta sẽ thử nghiệm toàn bộ hệ thống dịch và lồng tiếng tự động"
 SLOT = 1.6
-TMP = tempfile.mkdtemp(prefix="yv_rtllm_")
+TMP = tempfile.mkdtemp(prefix="vv_rtllm_")
 
 
 def wav_bytes(seconds: float, sr: int = 16000) -> bytes:

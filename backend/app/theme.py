@@ -67,7 +67,7 @@ html[data-theme="dark"] {
 # sáng rồi mới chuyển sang tối. Cố tình viết rất ngắn và bọc try/catch vì
 # localStorage có thể bị chặn (chế độ riêng tư) — khi đó rơi về mặc định hệ thống.
 THEME_BOOT = """<script>(function(){try{
-var t=localStorage.getItem('yv_theme');
+var t=localStorage.getItem('vv_theme');
 if(t!=='light'&&t!=='dark'){
   t=(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';
 }
@@ -78,30 +78,30 @@ document.documentElement.setAttribute('data-theme',t);
 # Không chứa hex: màu biểu đồ đọc từ CSS var nên tự đổi theo theme.
 # Nhãn nút lật theo trạng thái qua thuộc tính data-theme-label.
 THEME_JS = """
-var YV_THEME_KEY = 'yv_theme';
-var YV_THEME_LISTENERS = [];
+var VV_THEME_KEY = 'vv_theme';
+var VV_THEME_LISTENERS = [];
 
-function yvGetTheme() {
+function vvGetTheme() {
   return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
 }
-function yvSetTheme(t) {
+function vvSetTheme(t) {
   document.documentElement.setAttribute('data-theme', t);
-  try { localStorage.setItem(YV_THEME_KEY, t); } catch (e) {}
-  yvThemeChanged();
+  try { localStorage.setItem(VV_THEME_KEY, t); } catch (e) {}
+  vvThemeChanged();
 }
-function yvToggleTheme() {
-  yvSetTheme(yvGetTheme() === 'dark' ? 'light' : 'dark');
+function vvToggleTheme() {
+  vvSetTheme(vvGetTheme() === 'dark' ? 'light' : 'dark');
 }
-function yvOnThemeChange(fn) { YV_THEME_LISTENERS.push(fn); }
-function yvCssVar(name) {
+function vvOnThemeChange(fn) { VV_THEME_LISTENERS.push(fn); }
+function vvCssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
-function yvThemeChanged() {
-  var dark = yvGetTheme() === 'dark';
+function vvThemeChanged() {
+  var dark = vvGetTheme() === 'dark';
   var label = dark ? '☀️ Chế độ sáng' : '🌙 Chế độ tối';
   document.querySelectorAll('[data-theme-label]').forEach(function (el) {
     el.textContent = label;
   });
-  YV_THEME_LISTENERS.forEach(function (fn) { try { fn(); } catch (e) {} });
+  VV_THEME_LISTENERS.forEach(function (fn) { try { fn(); } catch (e) {} });
 }
 """

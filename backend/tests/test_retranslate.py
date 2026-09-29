@@ -35,7 +35,7 @@ from app.pipelines.dub_pipeline import build_plan  # noqa: E402
 from app.pipelines.dub_pipeline import _retranslate_pass  # noqa: E402
 from app.providers.base import TranscriptSegment  # noqa: E402
 
-TMP = tempfile.mkdtemp(prefix="yv_rt_")
+TMP = tempfile.mkdtemp(prefix="vv_rt_")
 
 
 def wav_bytes(seconds: float, sr: int = 16000) -> bytes:

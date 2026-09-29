@@ -3,7 +3,7 @@
 Kiểm chứng đường thật, không phải mock: file mẫu 2 người nói có sẵn trên box.
 
 Chạy trên box GPU:
-  cd /workspace/yupvox-clone && source .venv/bin/activate
+  cd /workspace/voicevibe && source .venv/bin/activate
   cd backend && PYTHONPATH=. python scripts/subtitle_smoke.py
 """
 from __future__ import annotations
@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.setdefault("MEDIA_ROOT", "/workspace/media")
 os.environ.setdefault(
-    "DATABASE_URL", "sqlite:////workspace/yupvox-clone/backend/yupvox.db")
+    "DATABASE_URL", "sqlite:////workspace/voicevibe/backend/voicevibe.db")
 
 from app.pipelines.stt import diarize, merge, transcribe  # noqa: E402
 from app.pipelines.subtitle import render  # noqa: E402

@@ -32,7 +32,7 @@ SETTING_DEFS: list[dict] = [
     # sửa thì ĐỔI giá trị này sang kho của bạn — đó là nghĩa vụ giấy phép.
     {"key": "app.source_url", "category": "general", "secret": False,
      "label": "Liên kết mã nguồn (AGPL-3.0 §13)",
-     "default": "https://github.com/godBuddha/yupvox-clone"},
+     "default": "https://github.com/godBuddha/voicevibe"},
     {"key": "hf_token", "category": "credentials", "secret": True,
      "label": "Hugging Face token (pyannote gated)", "env": "HF_TOKEN"},
     {"key": "translate.backend", "category": "translation", "secret": False,
@@ -62,9 +62,9 @@ SETTING_DEFS: list[dict] = [
      "label": "Cho phép đăng ký công khai", "default": False},
     {"key": "admin.api_key", "category": "security", "secret": True,
      "label": "Admin API key (để trống = tắt đường key, chỉ dùng phiên đăng nhập)",
-     "env": "YUPVOX_ADMIN_KEY", "default": ""},
+     "env": "VOICEVIBE_ADMIN_KEY", "default": ""},
     {"key": "webhook.secret", "category": "security", "secret": True,
-     "label": "Webhook HMAC secret (X-YupVox-Signature)", "default": ""},
+     "label": "Webhook HMAC secret (X-VoiceVibe-Signature)", "default": ""},
 ]
 
 

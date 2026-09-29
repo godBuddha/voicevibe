@@ -6,7 +6,7 @@ không node_modules — self-host chỉ cần `python -m uvicorn`.
 ## App UI (app_ui.py)
 | Component | Trạng thái xử lý | Ghi chú |
 |---|---|---|
-| Gate (API key) | loading → ok / err 401 | localStorage `yv_api_key`, auto-enter nếu còn hạn |
+| Gate (API key) | loading → ok / err 401 | localStorage `vv_api_key`, auto-enter nếu còn hạn |
 | TabBar | active tab | 4 tab |
 | CreditsBadge | GET /v1/me | refresh sau mỗi job |
 | FileUploader | upload progress → media_key | dùng cho dub + voice clip |

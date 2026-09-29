@@ -114,7 +114,7 @@ def render(segments: list[TranscriptSegment], fmt: str = DEFAULT_FORMAT, *,
 
     subs = pysubs2.SSAFile()
     if fmt == "ass":
-        subs.info["Title"] = "YupVox-Clone"
+        subs.info["Title"] = "VoiceVibe"
         # Tên style KHÔNG phải một tham số của SSAStyle — nó là KHOÁ trong
         # `subs.styles` (đã gặp thật: `SSAStyle(name=...)` -> TypeError).
         subs.styles["Default"] = pysubs2.SSAStyle(

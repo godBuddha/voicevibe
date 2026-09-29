@@ -68,15 +68,15 @@ def main() -> None:
             bad = HEX_RE.findall(js)
             assert not bad, (
                 f"{name}: script #{i} còn màu hardcode {bad[:6]} — "
-                "đọc bằng yvCssVar('--chart-...') thay vì viết hex"
+                "đọc bằng vvCssVar('--chart-...') thay vì viết hex"
             )
 
         # 4) boot script trước stylesheet
         head = html.split("</head>", 1)[0]
         assert "data-theme" in head, f"{name}: boot script chưa đặt data-theme"
-        boot_at = head.find("localStorage.getItem('yv_theme')")
+        boot_at = head.find("localStorage.getItem('vv_theme')")
         style_at = head.find("<style>")
-        assert boot_at != -1, f"{name}: boot script không đọc 'yv_theme'"
+        assert boot_at != -1, f"{name}: boot script không đọc 'vv_theme'"
         assert boot_at < style_at, f"{name}: boot script phải nằm TRƯỚC <style>"
 
     # 2) phủ token

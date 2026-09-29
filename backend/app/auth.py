@@ -1,7 +1,7 @@
 """Xác thực & phân quyền — phiên cookie cho web, X-API-Key cho máy gọi.
 
 HAI ĐƯỜNG, MỘT CHỮ KÝ:
-  - **Cookie phiên** (`yv_session`) cho trình duyệt — đăng nhập bằng email/mật khẩu.
+  - **Cookie phiên** (`vv_session`) cho trình duyệt — đăng nhập bằng email/mật khẩu.
   - **X-API-Key** cho script/SDK/CI — không đổi so với trước.
 Cả hai đều trả về cùng một `User`, nên **mọi endpoint `Depends(auth)` hiện có không
 phải sửa một dòng nào** (13 chỗ).
@@ -36,7 +36,7 @@ from .models import ApiKey, ROLE_ADMIN, Session, SystemFlag, User, _now
 from .ratelimit import check_rate
 from .security import dummy_verify, verify_password
 
-COOKIE_NAME = "yv_session"
+COOKIE_NAME = "vv_session"
 SESSION_TTL = 14 * 24 * 3600      # tuyệt đối: 14 ngày
 SESSION_RENEW_AFTER = 24 * 3600   # gia hạn trượt nếu idle quá 24h
 SETUP_FLAG = "setup.completed"
@@ -44,7 +44,7 @@ SETUP_FLAG = "setup.completed"
 # Dev API keys: CHỈ để tiện phát triển trên máy cá nhân.
 # Bỏ default (trước đây là "dev-key-1") vì đó là backdoor luôn mở ở production,
 # và nhánh này còn bị vô hiệu hoàn toàn khi đã có admin (xem `user_from_api_key`).
-DEV_KEYS = set(filter(None, (k.strip() for k in os.getenv("YUPVOX_API_KEYS", "").split(","))))
+DEV_KEYS = set(filter(None, (k.strip() for k in os.getenv("VOICEVIBE_API_KEYS", "").split(","))))
 
 
 # ------------------------------------------------------------------ mật khẩu
@@ -61,7 +61,7 @@ def cookie_secure(request: Request) -> bool:
     `request.url.scheme` là http dù người dùng đang ở https, và cookie thiếu Secure
     sẽ bị trình duyệt coi là không an toàn.
     """
-    forced = os.getenv("YUPVOX_SECURE_COOKIES")
+    forced = os.getenv("VOICEVIBE_SECURE_COOKIES")
     if forced is not None:
         return forced == "1"
     if request.url.scheme == "https":

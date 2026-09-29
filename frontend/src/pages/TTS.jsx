@@ -109,7 +109,7 @@ export default function TTS() {
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="Xin chào, đây là YupVox TTS Studio. Hãy nhập văn bản bạn muốn chuyển đổi thành giọng nói tại đây..."
+              placeholder="Xin chào, đây là VoiceVibe TTS Studio. Hãy nhập văn bản bạn muốn chuyển đổi thành giọng nói tại đây..."
               rows={12}
               style={{
                 width: '100%',

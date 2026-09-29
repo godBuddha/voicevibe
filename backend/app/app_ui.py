@@ -17,7 +17,7 @@ APP_HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>YupVox-Clone — AI Voice cho một thế giới mới</title>
+<title>VoiceVibe — AI Voice cho một thế giới mới</title>
 __THEME_BOOT__
 <style>
 __THEME_CSS__
@@ -144,7 +144,7 @@ __THEME_CSS__
 <div id="shell">
   <aside id="sidebar">
     <div class="logo"><div class="mark">🎙️</div>
-      <div><b>YupVox-Clone</b><div class="mut">AI Voice cho một thế giới mới</div></div></div>
+      <div><b>VoiceVibe</b><div class="mut">AI Voice cho một thế giới mới</div></div></div>
     <nav class="nav">
       <a data-page="dashboard" class="on" onclick="go('dashboard')">🏠 Bảng điều khiển</a>
       <div class="group">Tạo nội dung với AI</div>
@@ -180,7 +180,7 @@ __THEME_CSS__
       <button id="burger" onclick="toggleSide()">☰</button>
       <div class="search">🔍<input id="q" placeholder="Tìm kiếm dự án, giọng nói, công cụ…"></div>
       <div class="credits-pill">💰 <b id="top-credits">…</b> Credits</div>
-      <button class="theme-btn" data-theme-label onclick="yvToggleTheme()" title="Chuyển chế độ sáng/tối">🌙 Chế độ tối</button>
+      <button class="theme-btn" data-theme-label onclick="vvToggleTheme()" title="Chuyển chế độ sáng/tối">🌙 Chế độ tối</button>
       <div class="who"><div class="avatar" id="avatar">?</div>
         <div><b id="whoemail">…</b><div class="mut" id="whorole"></div></div></div>
       <button class="linkbtn" onclick="logout()">Đăng xuất</button>
@@ -334,7 +334,7 @@ __THEME_CSS__
         <table class="keys" style="margin-top:14px"><tbody id="keylist"></tbody></table>
         <h3 style="margin-top:20px">Ví dụ</h3>
 <pre>curl -X POST http://&lt;host&gt;/v1/jobs \
-  -H "X-API-Key: yv_..." -H "Content-Type: application/json" \
+  -H "X-API-Key: vv_..." -H "Content-Type: application/json" \
   -d '{"type":"dub","media_url":"&lt;media_key&gt;","source_lang":"vi","target_lang":"en"}'</pre>
       </div>
     </section>
@@ -426,7 +426,7 @@ async function loadUsage() {
   const names = { tts:"TTS", stt:"STT", translate:"Dịch thuật", dub:"Dub video", subtitle:"Phụ đề", other:"Khác" };
   let html = "";
   for (const [t, n] of Object.entries(d.by_type)) {
-    const c = colors[t.split("_")[0]] || yvCssVar("--chart-other");
+    const c = colors[t.split("_")[0]] || vvCssVar("--chart-other");
     html += `<div><i style="background:${c}"></i>${esc(names[t.split("_")[0]]||t)} — <b>${fmt(n)}</b>
       <div class="usagebar"><i style="width:${total?n/total*100:0}%;background:${c}"></i></div></div>`;
   }
@@ -434,13 +434,13 @@ async function loadUsage() {
 }
 
 function chartColors() {
-  return { tts:yvCssVar("--chart-tts"), stt:yvCssVar("--chart-stt"),
-           translate:yvCssVar("--chart-translate"), dub:yvCssVar("--chart-dub"),
-           subtitle:yvCssVar("--chart-subtitle") };
+  return { tts:vvCssVar("--chart-tts"), stt:vvCssVar("--chart-stt"),
+           translate:vvCssVar("--chart-translate"), dub:vvCssVar("--chart-dub"),
+           subtitle:vvCssVar("--chart-subtitle") };
 }
 
 // Đổi theme -> vẽ lại donut/legend để lấy màu mới.
-yvOnThemeChange(loadUsage);
+vvOnThemeChange(loadUsage);
 
 async function loadDashJobs() {
   const r = await fetch("/v1/jobs?limit=5", { headers: H(), credentials: "same-origin" });
@@ -582,7 +582,7 @@ fetch("/v1/me", { headers: H(), credentials: "same-origin" })
   .then(r => { if (r.ok) boot(); else needLogin(); })
   .catch(() => needLogin());
 
-yvThemeChanged();  // đồng bộ nhãn nút sáng/tối với theme đã áp ở <head>
+vvThemeChanged();  // đồng bộ nhãn nút sáng/tối với theme đã áp ở <head>
 </script>
 </body></html>"""
 

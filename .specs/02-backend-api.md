@@ -27,7 +27,7 @@ Lỗi chuẩn HTTP: 401 (key sai) · 402 (thiếu credits) · 404 · 409 (job ch
 ## API keys
 | Method | Path | Mô tả |
 |---|---|---|
-| POST | /v1/keys | Tạo key `yv_...` — hiện 1 lần |
+| POST | /v1/keys | Tạo key `vv_...` — hiện 1 lần |
 | GET | /v1/keys | List (masked `••••xxxx`) |
 | DELETE | /v1/keys/{key} | Revoke |
 
@@ -41,8 +41,8 @@ Lỗi chuẩn HTTP: 401 (key sai) · 402 (thiếu credits) · 404 · 409 (job ch
 | DELETE | /admin/settings/{key} | Xóa → fallback env/default |
 
 ## Pipeline dispatch
-`YUPVOX_INLINE=1` (mặc định dev/máy cá nhân): chạy trong tiến trình API, không cần Redis.
-`YUPVOX_INLINE=0`: Celery qua Redis, worker GPU 1 job/lúc (prefetch=1, acks_late).
+`VOICEVIBE_INLINE=1` (mặc định dev/máy cá nhân): chạy trong tiến trình API, không cần Redis.
+`VOICEVIBE_INLINE=0`: Celery qua Redis, worker GPU 1 job/lúc (prefetch=1, acks_late).
 Job types: `tts` ✅ · `stt` ✅ · `dub` ✅ · `translate` ✅ · `subtitle` ✅ (hết stub).
 
 ## Bổ sung (hardening pass 27/09)
@@ -57,14 +57,14 @@ Job types: `tts` ✅ · `stt` ✅ · `dub` ✅ · `translate` ✅ · `subtitle` 
   (thiếu `media_url`; `format` lạ; `bilingual` mà không có `target_lang`).
 - **API key lưu SHA-256 hash** (cột `key`), cột `prefix` để hiển thị masked; DELETE /v1/keys/{raw}.
 - **Refund**: job failed hoàn 100% credits (ledger `refund:job:<type>`); `_set_failed(job, exc, db)`.
-- Webhook kèm `X-YupVox-Signature` = HMAC-SHA256(`webhook.secret`, body) khi secret được set trong Settings.
+- Webhook kèm `X-VoiceVibe-Signature` = HMAC-SHA256(`webhook.secret`, body) khi secret được set trong Settings.
 - `_run_tts` kiểm tra ownership voice profile (chống IDOR).
 - Storage: `S3_ENDPOINT` set → S3/MinIO (S3Storage); không → LocalStorage `MEDIA_ROOT` (mặc định `./media`).
 - Celery: `task_default_queue="media"` khớp worker `-Q media`.
 
 ## Phase 2 — xác thực & phân quyền
 
-**Hai đường, một chữ ký:** cookie phiên `yv_session` (trình duyệt) HOẶC `X-API-Key`
+**Hai đường, một chữ ký:** cookie phiên `vv_session` (trình duyệt) HOẶC `X-API-Key`
 (máy gọi). Cả hai trả về cùng `User` ⇒ 13 endpoint `Depends(auth)` cũ không phải sửa.
 Header phải khai `Header(None, …)` và coi chuỗi rỗng như không có.
 

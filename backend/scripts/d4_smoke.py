@@ -1,4 +1,4 @@
-"""Day 4 real-GPU smoke: voice cloning end-to-end (the core YupVox feature).
+"""Day 4 real-GPU smoke: voice cloning end-to-end (the core voice feature).
 
 1. Simulate a user clip: generate ~5s with a Vieneu preset ("Thái Sơn", Southern)
 2. Register voice profile (storage voices/{id}/ref.wav + DB row)
@@ -7,7 +7,7 @@
    it must contain the target words (TTS -> ASR loop closes)
 
 Run on the GPU box:
-  cd /workspace/yupvox-clone && source .venv/bin/activate
+  cd /workspace/voicevibe && source .venv/bin/activate
   cd backend && PYTHONPATH=. python scripts/d4_smoke.py
 """
 from __future__ import annotations
@@ -21,8 +21,8 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 os.environ.setdefault("MEDIA_ROOT", "/workspace/media")
-os.environ.setdefault("DATABASE_URL", "sqlite:////workspace/yupvox-clone/backend/yupvox.db")
-os.environ.setdefault("YUPVOX_INLINE", "1")
+os.environ.setdefault("DATABASE_URL", "sqlite:////workspace/voicevibe/backend/voicevibe.db")
+os.environ.setdefault("VOICEVIBE_INLINE", "1")
 
 from app.db import Base, SessionLocal, engine  # noqa: E402
 from app.models import Job, User, Voice  # noqa: E402

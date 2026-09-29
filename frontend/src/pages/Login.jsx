@@ -55,7 +55,7 @@ export default function Login() {
       >
         <h2 style={{ marginBottom: '12px', fontSize: 'var(--text-3xl)' }}>Chào mừng trở lại</h2>
         <p style={{ color: 'var(--text-dim)', marginBottom: '40px' }}>
-          Đăng nhập vào tài khoản YupVox của bạn
+          Đăng nhập vào tài khoản VoiceVibe của bạn
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

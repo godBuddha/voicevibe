@@ -68,6 +68,12 @@ const page = await browser.newPage();
 await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
 await page.setCookie(sessionCookie);
 
+// Chrome headless mặc định `prefers-color-scheme: dark` — useTheme đọc matchMedia
+// lúc mount nên mọi ảnh "sáng" thành ra dark y hệt ảnh dark (đã gặp thật: cả bộ
+// 15 ảnh F5 đều dark, 00=01=13 và 02=14 trùng byte). Ép sáng làm mặc định; ảnh
+// dark đặt riêng ở dưới.
+await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
+
 // protectedLoader đọc cờ localStorage (do useAuth đặt sau khi đăng nhập qua UI)
 // — gắn cookie một mình không đủ: SPA chạy từ đầu không biết có phiên. Đặt cờ
 // trước, đúng như UI thật sẽ có sau lần đăng nhập đầu tiên.
@@ -78,6 +84,26 @@ const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 
 for (const [name, route, authed, theme] of SHOTS) {
+  if (name === '00-login') {
+    // Chụp trang đăng nhập THẬT: gỡ cookie + cờ localStorage, nếu không guard
+    // thấy "đã đăng nhập" và redirect về dashboard (đã gặp thật).
+    await page.deleteCookie(sessionCookie);
+    await page.goto(`${BASE}/login`, { waitUntil: 'networkidle0', timeout: 30000 });
+    await page.evaluate(() => localStorage.clear());
+    await page.reload({ waitUntil: 'networkidle0', timeout: 30000 });
+    await new Promise((r) => setTimeout(r, 300));
+    await page.screenshot({ path: path.join(OUT, `${name}.png`) });
+    console.log(`shot ${name} ← ${route}`);
+    // Khôi phục phiên cho các ảnh còn lại.
+    await page.setCookie(sessionCookie);
+    continue;
+  }
+  // useTheme đọc localStorage 'theme' ĐÚNG LÚC KHỞI TẠO state — đặt qua
+  // evaluateOnNewDocument để giá trị có sẵn trước khi app mount (đặt sau mount
+  // chỉ đổi attribute DOM, React state vẫn cũ).
+  await page.evaluateOnNewDocument((t) => {
+    if (t) localStorage.setItem('theme', t);
+  }, theme || null);
   await page.goto(`${BASE}${route}`, { waitUntil: 'networkidle0', timeout: 30000 });
   if (authed) {
     // SPA không có server-render: mỗi goto là một app mới — đảm bảo cờ còn nằm
@@ -89,7 +115,6 @@ for (const [name, route, authed, theme] of SHOTS) {
     // Đặt theme TRƯỚC khi chụp và đợi transition kết thúc — tránh viền
     // chuyển màu nửa vời trong ảnh.
     await page.evaluate((t) => {
-      localStorage.setItem('yv-theme', t);
       document.documentElement.setAttribute('data-theme', t);
     }, theme);
     await new Promise((r) => setTimeout(r, 400));

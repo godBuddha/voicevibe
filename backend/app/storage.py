@@ -54,7 +54,7 @@ class S3Storage:
     """MinIO / S3 — same key contract as LocalStorage, via the minio SDK."""
 
     def __init__(self, endpoint: str, access_key: str, secret_key: str,
-                 bucket: str = "yupvox", secure: bool | None = None):
+                 bucket: str = "voicevibe", secure: bool | None = None):
         from minio import Minio
 
         if secure is None:
@@ -117,6 +117,6 @@ def get_storage() -> LocalStorage | S3Storage:
             endpoint,
             os.getenv("S3_ACCESS_KEY", os.getenv("MINIO_ROOT_USER", "minioadmin")),
             os.getenv("S3_SECRET_KEY", os.getenv("MINIO_ROOT_PASSWORD", "")),
-            bucket=os.getenv("S3_BUCKET", "yupvox"),
+            bucket=os.getenv("S3_BUCKET", "voicevibe"),
         )
     return LocalStorage(os.getenv("MEDIA_ROOT", "./media"))

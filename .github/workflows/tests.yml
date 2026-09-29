@@ -54,7 +54,7 @@ jobs:
       - name: Run offline selftests
         env:
           PYTHONPATH: .
-          YUPVOX_INLINE: "1"
+          VOICEVIBE_INLINE: "1"
         run: |
           # Chạy HẾT mọi suite rồi mới kết luận — không dừng ở suite đỏ đầu tiên.
           # Một lần chạy cho biết toàn cảnh hỏng/hở, thay vì sửa xong mới lộ cái
@@ -103,7 +103,7 @@ jobs:
         if: always()
         run: |
           {
-            echo "## YupVox-Clone — offline test results"
+            echo "## VoiceVibe — offline test results"
             echo
             echo "| Suite | Result |"
             echo "|---|---|"

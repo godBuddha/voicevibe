@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bootstrap YupVox-Clone trên instance GPU thuê (Ubuntu 24.04, driver 550 / CUDA 12.4).
+# Bootstrap VoiceVibe trên instance GPU thuê (Ubuntu 24.04, driver 550 / CUDA 12.4).
 # Chạy: bash setup_gpu.sh   (tại thư mục gốc repo)
 set -euo pipefail
 

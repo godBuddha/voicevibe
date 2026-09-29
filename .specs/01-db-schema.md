@@ -15,7 +15,7 @@ Engine: SQLAlchemy 2.0 (Postgres prod / SQLite dev — tự tạo bảng lúc st
 ### api_keys
 | Cột | Kiểu | Ghi chú |
 |---|---|---|
-| key | String(64) PK | `yv_` + 32 hex |
+| key | String(64) PK | `vv_` + 32 hex |
 | user_id | FK users.id, INDEX | |
 | active | Boolean | |
 | rate_limit_per_min | Integer | mặc định 60, enforce ở auth |

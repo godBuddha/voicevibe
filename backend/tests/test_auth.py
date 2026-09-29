@@ -7,7 +7,7 @@ Mọi ca ở đây tương ứng một hành vi BẢO MẬT cụ thể, không p
   3.  Đăng nhập / đăng xuất; sai mật khẩu trả lỗi chung, không lộ email nào tồn tại
   4.  Phiên hết hạn -> 401 và row bị xoá; gia hạn trượt khi dùng lại sau 24h
   5.  Phân quyền: user thường không vào được /admin/settings và /v1/admin/users
-  6.  Dev key (YUPVOX_API_KEYS) CHẾT sau khi đã có admin — không còn backdoor env
+  6.  Dev key (VOICEVIBE_API_KEYS) CHẾT sau khi đã có admin — không còn backdoor env
   7.  X-Admin-Key chỉ hoạt động khi `admin.api_key` được đặt tường minh
   8.  Công tắc `auth.allow_signup` (mặc định TẮT) + signup không bao giờ tạo admin
   9.  voice_id của người khác -> 404 TRƯỚC khi trừ credit (không mất tiền oan)
@@ -24,13 +24,13 @@ import pathlib
 import sys
 import tempfile
 
-WORK = pathlib.Path(tempfile.mkdtemp(prefix="yv_auth_"))
+WORK = pathlib.Path(tempfile.mkdtemp(prefix="vv_auth_"))
 DB = WORK / "auth.db"
 os.environ["DATABASE_URL"] = f"sqlite:///{DB}"
 os.environ["MEDIA_ROOT"] = str(WORK / "media")
-os.environ["YUPVOX_INLINE"] = "1"
-os.environ["YUPVOX_API_KEYS"] = "dev-key-1"   # để kiểm tra nhánh dev key BỊ VÔ HIỆU
-os.environ.pop("YUPVOX_ADMIN_KEY", None)      # không có sẵn admin key từ env
+os.environ["VOICEVIBE_INLINE"] = "1"
+os.environ["VOICEVIBE_API_KEYS"] = "dev-key-1"   # để kiểm tra nhánh dev key BỊ VÔ HIỆU
+os.environ.pop("VOICEVIBE_ADMIN_KEY", None)      # không có sẵn admin key từ env
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
@@ -240,7 +240,7 @@ set_setting("auth.allow_signup", True, is_secret=False, category="security")
 r = c.post("/v1/auth/signup", json={"email": "moi@local", "password": "matkhau789"})
 assert r.status_code == 201, r.text
 assert r.json()["role"] == "user", "signup không bao giờ được tạo admin"
-assert r.json()["key"].startswith("yv_")
+assert r.json()["key"].startswith("vv_")
 set_setting("auth.allow_signup", False, is_secret=False, category="security")
 print("bật signup -> tạo user thường ........... OK")
 

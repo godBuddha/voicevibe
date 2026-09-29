@@ -12,12 +12,12 @@ import os
 import pathlib
 import tempfile
 
-os.environ["DATABASE_URL"] = "sqlite:///./yupvox_test.db"
-os.environ["YUPVOX_INLINE"] = "1"
-os.environ["MEDIA_ROOT"] = tempfile.mkdtemp(prefix="yv_media_")  # never touch /workspace
-os.environ.pop("YUPVOX_API_KEYS", None)  # force DB-key auth path
+os.environ["DATABASE_URL"] = "sqlite:///./voicevibe_test.db"
+os.environ["VOICEVIBE_INLINE"] = "1"
+os.environ["MEDIA_ROOT"] = tempfile.mkdtemp(prefix="vv_media_")  # never touch /workspace
+os.environ.pop("VOICEVIBE_API_KEYS", None)  # force DB-key auth path
 
-pathlib.Path("yupvox_test.db").unlink(missing_ok=True)
+pathlib.Path("voicevibe_test.db").unlink(missing_ok=True)
 
 from app.db import Base, SessionLocal, engine  # noqa: E402
 from app.models import ApiKey, CreditLedger, User, Voice  # noqa: E402
@@ -159,7 +159,7 @@ set_setting("auth.allow_signup", True, is_secret=False, category="security")
 r = c.post("/v1/auth/signup", json={"email": "New@Example.io", "password": "matkhau123"})
 assert r.status_code == 201, r.text
 su = r.json()
-assert su["key"].startswith("yv_") and su["role"] == "user", su
+assert su["key"].startswith("vv_") and su["role"] == "user", su
 r = c.get("/v1/me", headers={"X-API-Key": su["key"]})
 assert r.status_code == 200 and r.json()["user_id"] == su["user_id"], r.text
 # duplicate email -> 409

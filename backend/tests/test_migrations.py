@@ -20,7 +20,7 @@ import sqlite3
 import sys
 import tempfile
 
-WORK = pathlib.Path(tempfile.mkdtemp(prefix="yv_mig_"))
+WORK = pathlib.Path(tempfile.mkdtemp(prefix="vv_mig_"))
 DB = WORK / "legacy.db"
 
 # Bảng users + api_keys + settings HÌNH DẠNG CŨ (trước Phase 2), có sẵn index.

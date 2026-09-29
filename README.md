@@ -1,4 +1,7 @@
-# YupVox-Clone — 7-day challenge (mục tiêu: 100% open source)
+# VoiceVibe — 7-day challenge (mục tiêu: 100% open source)
+
+> Tên trước đây là **YupVox-Clone** (dự án lấy cảm hứng từ sản phẩm YupVox.com);
+> hiện đã đổi thành **VoiceVibe**.
 
 Clone của một SaaS AI voice/dubbing (TTS, STT, dubbing video/audio, dịch phụ đề,
 tách & clone nhiều người nói, API developer) — dựng bằng stack open-source.
@@ -30,7 +33,7 @@ tách & clone nhiều người nói, API developer) — dựng bằng stack open
 ### SPA React — `frontend/` (bản UI tách riêng, cùng API)
 
 Từ v0.4: giao diện React + Vite nằm ở `frontend/`, gọi đúng API `/v1/*` (cookie
-phiên, CORS cấu hình qua `YUPVOX_CORS_ORIGINS` khi chạy khác origin). Prod qua
+phiên, CORS cấu hình qua `VOICEVIBE_CORS_ORIGINS` khi chạy khác origin). Prod qua
 Caddy là **same-origin** — không cần CORS; image `web` (profile `proxy`) build
 SPA ngay trong Docker rồi phục vụ cùng một domain với API:
 
@@ -39,7 +42,7 @@ docker compose --profile proxy build web
 docker compose --profile proxy up -d
 ```
 
-Dev: `cd frontend && npm install && YV_API_TARGET=http://127.0.0.1:8000 npm run dev`
+Dev: `cd frontend && npm install && VV_API_TARGET=http://127.0.0.1:8000 npm run dev`
 (Vite proxy `/v1` + `/media` về backend — same-origin, không cần CORS).
 Mock thuần UI (không cần backend): `VITE_USE_MOCK=1 npm run dev`.
 
@@ -61,7 +64,7 @@ nhãn người nói đọc được (`Người 1`, `Người 2` — không phả
 tuỳ chọn **song ngữ** (bản gốc trên, bản dịch dưới).
 
 ```bash
-curl -X POST $BASE/v1/jobs -H "X-API-Key: yv_…" -H 'Content-Type: application/json' \
+curl -X POST $BASE/v1/jobs -H "X-API-Key: vv_…" -H 'Content-Type: application/json' \
   -d '{"type":"subtitle","media_url":"media/u1/…/talk.wav","source_lang":"vi",
        "target_lang":"en","format":"srt","bilingual":true}'
 ```
@@ -99,7 +102,7 @@ Ba tab: **AI** (nhà cung cấp + model + prompt) · **Cấu hình hệ thống*
 
 Toàn bộ giao diện dùng chung một bộ token màu (`backend/app/theme.py`): chế độ sáng là
 mặc định, chế độ tối lật ngay trên thanh trên cùng và được ghi nhớ trong `localStorage`
-(`yv_theme`). Không có hex nào nằm ngoài khối token — `tests/test_theme.py` cưỡng chế điều này.
+(`vv_theme`). Không có hex nào nằm ngoài khối token — `tests/test_theme.py` cưỡng chế điều này.
 
 | Bảng điều khiển (tối) | Dub (tối) |
 |---|---|
@@ -128,7 +131,7 @@ Chạy tại chỗ, đúng những gì CI chạy:
 
 ```bash
 cd backend
-PYTHONPATH=. YUPVOX_INLINE=1 python tests/test_day2.py     # ... và 9 suite còn lại
+PYTHONPATH=. VOICEVIBE_INLINE=1 python tests/test_day2.py     # ... và 9 suite còn lại
 python -m app.pipelines.dub_pipeline --selftest            # cần ffmpeg
 ```
 
@@ -210,7 +213,7 @@ Selftest: `PYTHONPATH=. python tests/test_providers.py`
 | Sync + mix | ❌ | — | ffmpeg + timing engine | core IP |
 
 → Hai tính năng định vị sản phẩm (clone giọng + tách người nói) KHÔNG có trong
-chuẩn OpenAI: một clone "thuần cloud API" không thể tái tạo YupVox. Kiến trúc
+chuẩn OpenAI: một clone "thuần cloud API" không thể tái tạo sản phẩm gốc. Kiến trúc
 local-first là bắt buộc; cloud chỉ tùy chọn cho các stage hàng hóa.
 
 ```yaml
@@ -310,7 +313,7 @@ chính thức; repo chỉ cung cấp core SDK → pipeline dub (D5) là phần c
 
 ## Kết quả challenge (26/09 – 03/10/2026) — 7/7 ngày ✅
 
-| Tính năng YupVox | Clone | Verify trên RTX 3060 |
+| Tính năng sản phẩm gốc | Clone | Verify trên RTX 3060 |
 |---|---|---|
 | Chuyển văn bản thành giọng nói (TTS) | ✅ VieNeu v3 Turbo (Apache-2.0) | preset + streaming OK |
 | Chuyển giọng nói thành văn bản (STT) | ✅ faster-whisper large-v3 (MIT) | vi p=1.00 |
@@ -334,7 +337,7 @@ Không bắt buộc GPU — chạy được trên máy cá nhân.
 ## Bước 0 — Yêu cầu chung
 
 ```bash
-git clone <repo-url> && cd yupvox-clone
+git clone <repo-url> && cd voicevibe
 cp .env.example .env
 # Sinh master key (BẮT BUỘC — mã hóa secret settings):
 openssl rand -hex 32   # dán vào SETTINGS_MASTER_KEY trong .env
@@ -364,7 +367,7 @@ pip install -r backend/requirements-api.txt
 pip install faster-whisper pyannote.audio vieneu srt soundfile sentencepiece numpy cryptography
 sudo apt install -y ffmpeg   # hoặc brew install ffmpeg (macOS)
 cd backend
-YUPVOX_INLINE=1 MEDIA_ROOT=./media uvicorn app.main:app --port 8000
+VOICEVIBE_INLINE=1 MEDIA_ROOT=./media uvicorn app.main:app --port 8000
 # Mở http://localhost:8000 → tự chuyển tới /setup → tạo tài khoản quản trị đầu tiên
 ```
 
@@ -397,7 +400,7 @@ docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi  # ki�
 **Có tên miền, muốn TLS tự động** (Let's Encrypt qua Caddy):
 
 ```bash
-echo "APP_DOMAIN=yupvox.example.com" >> .env
+echo "APP_DOMAIN=voicevibe.example.com" >> .env
 docker compose --profile proxy up -d
 ```
 
@@ -442,14 +445,14 @@ Không đặt `APP_DOMAIN` thì Caddy dùng chứng chỉ **tự ký cho localho
 
 - **`admin-dev-key` và `dev-key-1` đã bị bỏ.** Trang `/admin` giờ dùng **phiên đăng nhập**;
   đường `X-Admin-Key` chỉ hoạt động khi bạn đặt `admin.api_key` tường minh (dùng cho CI/script).
-  Dev key từ `YUPVOX_API_KEYS` cũng **tự vô hiệu ngay khi hệ thống đã có admin**.
+  Dev key từ `VOICEVIBE_API_KEYS` cũng **tự vô hiệu ngay khi hệ thống đã có admin**.
 - **Tài khoản cũ (chưa có mật khẩu)** không đăng nhập được — Admin cần *Đặt lại mật khẩu*
   cho họ trong tab Người dùng. API key cũ vẫn dùng bình thường.
 - **Media cũ trở nên không truy cập được**: `/media/{key}` giờ kiểm tra **quyền sở hữu**
   (trước đây bất kỳ credential nào cũng đọc được media của người khác — lỗ hổng đã vá).
   File upload mới có dạng `media/{user_id}/…`; kết quả job và clip giọng vẫn đọc được
   bình thường vì tra được chủ qua `jobs` / `voices`.
-- `/docs` **tắt mặc định** (bật bằng `YUPVOX_ENABLE_DOCS=1`).
+- `/docs` **tắt mặc định** (bật bằng `VOICEVIBE_ENABLE_DOCS=1`).
 
 ## 🔌 Cấu hình AI (Cloud API + Ollama)
 

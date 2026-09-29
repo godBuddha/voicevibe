@@ -1,4 +1,4 @@
-name: yupvox-clone
+name: voicevibe
 
 # Self-host stack: postgres + redis + api + worker.
 #
@@ -23,13 +23,13 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: yupvox
+      POSTGRES_USER: voicevibe
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
-      POSTGRES_DB: yupvox
+      POSTGRES_DB: voicevibe
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U yupvox"]
+      test: ["CMD-SHELL", "pg_isready -U voicevibe"]
       interval: 5s
       timeout: 3s
       retries: 10
@@ -52,15 +52,15 @@ services:
       target: api
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     environment:
-      DATABASE_URL: postgresql+psycopg://yupvox:${POSTGRES_PASSWORD}@postgres:5432/yupvox
+      DATABASE_URL: postgresql+psycopg://voicevibe:${POSTGRES_PASSWORD}@postgres:5432/voicevibe
       REDIS_URL: redis://redis:6379/0
       SETTINGS_MASTER_KEY: ${SETTINGS_MASTER_KEY:?set in .env}
       # Để TRỐNG mặc định: đường key admin tắt, dev key không tồn tại.
       # Phase 2 dùng phiên đăng nhập cho /admin; chỉ đặt khi cần automation.
-      YUPVOX_ADMIN_KEY: ${YUPVOX_ADMIN_KEY:-}
-      YUPVOX_API_KEYS: ${YUPVOX_API_KEYS:-}
-      YUPVOX_SECURE_COOKIES: ${YUPVOX_SECURE_COOKIES:-}
-      YUPVOX_ENABLE_DOCS: ${YUPVOX_ENABLE_DOCS:-}
+      VOICEVIBE_ADMIN_KEY: ${VOICEVIBE_ADMIN_KEY:-}
+      VOICEVIBE_API_KEYS: ${VOICEVIBE_API_KEYS:-}
+      VOICEVIBE_SECURE_COOKIES: ${VOICEVIBE_SECURE_COOKIES:-}
+      VOICEVIBE_ENABLE_DOCS: ${VOICEVIBE_ENABLE_DOCS:-}
       # Lưu trữ mặc định = volume dùng chung (`media`). Không cần dịch vụ S3 nào:
       # media luôn được phục vụ qua API để KIỂM QUYỀN SỞ HỮU (`/media/{key}`), nên
       # presigned URL không được dùng — xem ghi chú trong README.
@@ -107,7 +107,7 @@ services:
       context: ./backend
       target: worker
     environment:
-      DATABASE_URL: postgresql+psycopg://yupvox:${POSTGRES_PASSWORD}@postgres:5432/yupvox
+      DATABASE_URL: postgresql+psycopg://voicevibe:${POSTGRES_PASSWORD}@postgres:5432/voicevibe
       REDIS_URL: redis://redis:6379/0
       SETTINGS_MASTER_KEY: ${SETTINGS_MASTER_KEY:?set in .env}
       MEDIA_ROOT: /media
@@ -156,7 +156,9 @@ services:
     build:
       context: .
       dockerfile: docker/web.Dockerfile
-    image: yupvox-clone-web:latest
+    # Tag cứng (không :latest, không ${}) — check_deploy bắt mọi image phải
+    # giải được thành tag cụ thể; bump khi đổi build.
+    image: voicevibe-web:0.1.0
     profiles: [proxy]
     environment:
       # KHÔNG dùng `${APP_DOMAIN:?...}` ở đây. Compose nội suy biến của MỌI service

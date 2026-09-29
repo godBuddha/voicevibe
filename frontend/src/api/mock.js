@@ -1,7 +1,7 @@
 const USER = {
   id: 1,
   name: 'Admin User',
-  email: 'admin@yupvox-clone.local',
+  email: 'admin@voicevibe.local',
   avatar: '/avatar.png',
   role: 'admin',
   credits: 283_416,
@@ -43,7 +43,7 @@ const MOCK_JOBS = [
     type: 'tts',
     status: 'running',
     file: { name: 'script.txt', size: 248, type: 'text/plain', duration: null },
-    text: 'Xin chào, đây là bài test giọng nói AI của hệ thống YupVox Clone...',
+    text: 'Xin chào, đây là bài test giọng nói AI của hệ thống VoiceVibe...',
     voiceId: 1,
     creditsUsed: 340,
     createdAt: new Date(Date.now() - 45_000),
@@ -61,7 +61,7 @@ const MOCK_JOBS = [
 ];
 
 const MOCK_V2USERS = [
-  { id: 1, email: 'admin@yupvox-clone.local', role: 'admin', credits: 283_416, status: 'active' },
+  { id: 1, email: 'admin@voicevibe.local', role: 'admin', credits: 283_416, status: 'active' },
   { id: 2, email: 'user1@example.com', role: 'user', credits: 45_000, status: 'active' },
   { id: 3, email: 'user2@example.com', role: 'user', credits: 0, status: 'suspended' },
 ];
@@ -84,8 +84,8 @@ const MOCK_PROMPTS = [
 ];
 
 const MOCK_SETTINGS = {
-  app_name: 'YupVox-Clone',
-  app_url: 'https://yupvox-clone.local',
+  app_name: 'VoiceVibe',
+  app_url: 'https://voicevibe.local',
   default_language: 'vi',
   max_file_size: '200',
   max_duration: '600',
@@ -152,13 +152,13 @@ export async function mockRequest(method, path, options) {
 
   if (path === '/v1/keys' && method === 'GET') {
     return [
-      { id: 1, key: 'yv_sk_live_abc123xyz789', name: 'Production API Key', permissions: 'full', created: new Date('2024-01-20'), lastUsed: new Date('2024-09-28') },
-      { id: 2, key: 'yv_sk_test_def456uvw012', name: 'Test API Key', permissions: 'limited', created: new Date('2024-03-15'), lastUsed: null },
+      { id: 1, key: 'vv_sk_live_abc123xyz789', name: 'Production API Key', permissions: 'full', created: new Date('2024-01-20'), lastUsed: new Date('2024-09-28') },
+      { id: 2, key: 'vv_sk_test_def456uvw012', name: 'Test API Key', permissions: 'limited', created: new Date('2024-03-15'), lastUsed: null },
     ];
   }
 
   if (path === '/v1/keys' && method === 'POST') {
-    const key = 'yv_sk_' + Math.random().toString(36).substring(2, 14);
+    const key = 'vv_sk_' + Math.random().toString(36).substring(2, 14);
     return { key, id: Date.now(), name: body.name, permissions: body.permissions };
   }
 

@@ -6,7 +6,7 @@
 4. merge -> SRT with speaker tags
 
 Run on the GPU instance:
-  cd /workspace/yupvox-clone && source .venv/bin/activate
+  cd /workspace/voicevibe && source .venv/bin/activate
   cd backend && PYTHONPATH=. python scripts/d3_smoke.py [--skip-gen]
 """
 from __future__ import annotations

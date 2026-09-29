@@ -26,12 +26,12 @@ import pathlib
 import sys
 import tempfile
 
-WORK = pathlib.Path(tempfile.mkdtemp(prefix="yv_ai_"))
+WORK = pathlib.Path(tempfile.mkdtemp(prefix="vv_ai_"))
 os.environ["DATABASE_URL"] = f"sqlite:///{WORK}/ai.db"
 os.environ["MEDIA_ROOT"] = str(WORK / "media")
-os.environ["YUPVOX_INLINE"] = "1"
-os.environ.pop("YUPVOX_API_KEYS", None)
-os.environ.pop("YUPVOX_ADMIN_KEY", None)
+os.environ["VOICEVIBE_INLINE"] = "1"
+os.environ.pop("VOICEVIBE_API_KEYS", None)
+os.environ.pop("VOICEVIBE_ADMIN_KEY", None)
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 

@@ -12,7 +12,7 @@ Script dựng đúng DB cũ đó rồi khẳng định:
   5. sau migrate + gán công đoạn, `stage_translator()` dùng được cấu hình mới
 
 Chạy trên box GPU:
-  cd /workspace/yupvox-clone && source .venv/bin/activate
+  cd /workspace/voicevibe && source .venv/bin/activate
   cd backend && PYTHONPATH=. python scripts/migration_smoke.py
 """
 from __future__ import annotations

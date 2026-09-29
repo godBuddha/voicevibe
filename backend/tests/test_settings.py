@@ -16,10 +16,10 @@ import os
 import pathlib
 import sqlite3
 
-os.environ["DATABASE_URL"] = "sqlite:///./yupvox_test_settings.db"
-os.environ.pop("YUPVOX_API_KEYS", None)
-os.environ.pop("YUPVOX_ADMIN_KEY", None)
-pathlib.Path("yupvox_test_settings.db").unlink(missing_ok=True)
+os.environ["DATABASE_URL"] = "sqlite:///./voicevibe_test_settings.db"
+os.environ.pop("VOICEVIBE_API_KEYS", None)
+os.environ.pop("VOICEVIBE_ADMIN_KEY", None)
+pathlib.Path("voicevibe_test_settings.db").unlink(missing_ok=True)
 
 from app.db import Base, SessionLocal, engine  # noqa: E402
 from app import models  # noqa: E402
@@ -37,7 +37,7 @@ from app.settings_service import (  # noqa: E402
 # 1) secret round-trip + encryption at rest
 set_setting("hf_token", "hf_super_secret_value")
 assert get_setting("hf_token") == "hf_super_secret_value"
-raw = sqlite3.connect("yupvox_test_settings.db").execute(
+raw = sqlite3.connect("voicevibe_test_settings.db").execute(
     "select value from settings where key='hf_token'").fetchone()[0]
 assert "hf_super_secret_value" not in raw, "SECRET STORED IN PLAINTEXT!"
 assert raw.startswith("gAAAA"), raw[:20]  # Fernet token prefix
@@ -125,7 +125,7 @@ KH = {"X-API-Key": "d6-test-key"}
 r = c.post("/v1/keys", headers=KH)
 assert r.status_code == 201
 new_key = r.json()["key"]
-assert new_key.startswith("yv_")
+assert new_key.startswith("vv_")
 r = c.get("/v1/keys", headers=KH)
 # list shows the masked PREFIX (only a SHA-256 hash of the raw key is stored)
 assert any(k["key"] == "••••" + new_key[:12][-4:] for k in r.json()["keys"])

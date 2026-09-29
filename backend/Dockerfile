@@ -1,6 +1,6 @@
 # Multi-stage: `api` (light, no AI deps) and `worker` (GPU stack).
-# Build:   docker build --target api    -t yupvox-api    ./backend
-#          docker build --target worker -t yupvox-worker ./backend
+# Build:   docker build --target api    -t voicevibe-api    ./backend
+#          docker build --target worker -t voicevibe-worker ./backend
 # compose sets the target per service.
 FROM python:3.12-slim AS base
 
@@ -18,8 +18,8 @@ RUN apt-get update \
 # fresh named volume with the ownership of the image path it mounts over — do
 # this the other way round and the volume lands root-owned and the app cannot
 # write to it (silent failure: jobs complete, files never appear).
-RUN groupadd -g 10001 yupvox \
-    && useradd -u 10001 -g yupvox -M -s /usr/sbin/nologin yupvox
+RUN groupadd -g 10001 voicevibe \
+    && useradd -u 10001 -g voicevibe -M -s /usr/sbin/nologin voicevibe
 
 WORKDIR /srv
 
@@ -27,8 +27,8 @@ FROM base AS api
 COPY requirements-api.txt .
 RUN pip install --no-cache-dir -r requirements-api.txt
 COPY app ./app
-RUN mkdir -p /media && chown -R yupvox:yupvox /media
-USER yupvox
+RUN mkdir -p /media && chown -R voicevibe:voicevibe /media
+USER voicevibe
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
@@ -50,7 +50,7 @@ RUN pip install --no-cache-dir -r requirements-worker.txt
 
 COPY app ./app
 # Model cache volume must be writable by uid 10001 too (HF downloads land here).
-RUN mkdir -p /media /models/hf && chown -R yupvox:yupvox /media /models/hf
+RUN mkdir -p /media /models/hf && chown -R voicevibe:voicevibe /media /models/hf
 ENV HF_HOME=/models/hf
-USER yupvox
+USER voicevibe
 CMD ["celery", "-A", "app.tasks.celery_app", "worker", "-l", "info", "-Q", "media", "-c", "1"]

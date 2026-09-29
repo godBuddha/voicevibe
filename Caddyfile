@@ -9,7 +9,7 @@
 #
 # Prod chạy same-origin qua Caddy nên cookie SameSite=Lax hoạt động nguyên trạng,
 # KHÔNG cần CORS. CORS chỉ cần khi SPA dev server (Vite, khác origin) gọi thẳng
-# vào api — bật bằng env YUPVOX_CORS_ORIGINS bên api (xem app/main.py).
+# vào api — bật bằng env VOICEVIBE_CORS_ORIGINS bên api (xem app/main.py).
 #
 # `api:8000` là tên service trong mạng nội bộ của compose; Caddy là chỗ DUY NHẤT
 # phơi ra ngoài, còn api đã bind vào loopback.

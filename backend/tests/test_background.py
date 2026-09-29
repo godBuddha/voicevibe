@@ -27,7 +27,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from app.pipelines import dub_pipeline as DP  # noqa: E402
 
-TMP = tempfile.mkdtemp(prefix="yv_bed_")
+TMP = tempfile.mkdtemp(prefix="vv_bed_")
 
 try:
     subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)

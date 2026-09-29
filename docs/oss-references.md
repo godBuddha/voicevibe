@@ -2,7 +2,7 @@
 
 Tài liệu này là kết quả rà soát **các dự án mã nguồn mở có chức năng tương tự ảnh mẫu
 giao diện** (`docs/design-mockup.jpeg` — sản phẩm proprietary, không public mã nguồn),
-mục đích: **học kiến trúc + tái sử dụng code** cho YupVox-Clone.
+mục đích: **học kiến trúc + tái sử dụng code** cho VoiceVibe.
 
 **Mọi license dưới đây đã được XÁC MINH bằng cách fetch file `LICENSE` thật của repo
 (hay GitHub/HuggingFace API), ngày 27/09/2026 — không lấy từ trí nhớ.**

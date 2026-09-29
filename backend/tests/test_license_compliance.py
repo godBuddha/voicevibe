@@ -23,11 +23,11 @@ import tempfile
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 
-os.environ["DATABASE_URL"] = f"sqlite:///{tempfile.mkdtemp(prefix='yv_lic_')}/lic.db"
-os.environ["YUPVOX_INLINE"] = "1"
-os.environ["MEDIA_ROOT"] = tempfile.mkdtemp(prefix="yv_lic_media_")
-os.environ["YUPVOX_API_KEYS"] = "lic-test-key"
-os.environ.pop("YUPVOX_ADMIN_KEY", None)
+os.environ["DATABASE_URL"] = f"sqlite:///{tempfile.mkdtemp(prefix='vv_lic_')}/lic.db"
+os.environ["VOICEVIBE_INLINE"] = "1"
+os.environ["MEDIA_ROOT"] = tempfile.mkdtemp(prefix="vv_lic_media_")
+os.environ["VOICEVIBE_API_KEYS"] = "lic-test-key"
+os.environ.pop("VOICEVIBE_ADMIN_KEY", None)
 
 sys.path.insert(0, str(REPO / "backend"))
 
@@ -71,15 +71,15 @@ assert "__SOURCE_URL__" not in html, (
     "placeholder __SOURCE_URL__ lọt ra HTML — liên kết mã nguồn bị gãy (vi phạm AGPL §13)"
 )
 assert "Mã nguồn" in html, "UI thiếu liên kết 'Mã nguồn' — AGPL §13 yêu cầu chỉ đường lấy source"
-assert "github.com/godBuddha/yupvox-clone" in html, "liên kết mã nguồn mặc định sai"
+assert "github.com/godBuddha/voicevibe" in html, "liên kết mã nguồn mặc định sai"
 
 # Đổi được qua Settings (self-host bản sửa phải trỏ về source của CHÍNH HỌ)
 from app.settings_service import set_setting  # noqa: E402
 
-mine = "https://git.example.org/toi/yupvox-fork"
+mine = "https://git.example.org/toi/voicevibe-fork"
 set_setting("app.source_url", mine, is_secret=False, category="general")
 html2 = c.get("/").text
-assert mine in html2 and "github.com/godBuddha/yupvox-clone" not in html2, (
+assert mine in html2 and "github.com/godBuddha/voicevibe" not in html2, (
     "app.source_url không điều khiển được liên kết mã nguồn"
 )
 

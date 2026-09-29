@@ -25,7 +25,7 @@ import threading
 import time
 import uuid
 
-log = logging.getLogger("yupvox.ratelimit")
+log = logging.getLogger("voicevibe.ratelimit")
 
 # ident -> danh sách timestamp (giây). Dùng khi KHÔNG có Redis.
 _RATE: dict[str, list[float]] = {}

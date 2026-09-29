@@ -3,7 +3,7 @@
 GPU worker runs ONE task at a time (prefetch=1, acks_late) — the models are
 large; parallel tasks on one GPU just thrash VRAM.
 
-Inline mode (YUPVOX_INLINE=1): run pipelines in-process against SQLite +
+Inline mode (VOICEVIBE_INLINE=1): run pipelines in-process against SQLite +
 local storage — dev/GPU-box mode without Redis/Postgres/MinIO.
 """
 from __future__ import annotations
@@ -22,7 +22,7 @@ from .migrations import ensure_schema as _ensure_schema  # noqa: E402
 
 _ensure_schema(_engine)
 
-celery_app = Celery("yupvox", broker=REDIS_URL, backend=REDIS_URL)
+celery_app = Celery("voicevibe", broker=REDIS_URL, backend=REDIS_URL)
 celery_app.conf.update(
     task_serializer="json",
     result_serializer="json",
@@ -72,7 +72,7 @@ def _notify(url: str | None, payload: dict) -> None:
     """Fire-and-forget webhook — failures must never fail the job.
 
     When `webhook.secret` is set (Settings UI → security), the body is signed:
-    receiver verifies X-YupVox-Signature = HMAC-SHA256(secret, raw_body).
+    receiver verifies X-VoiceVibe-Signature = HMAC-SHA256(secret, raw_body).
     """
     if not url:
         return
@@ -88,7 +88,7 @@ def _notify(url: str | None, payload: dict) -> None:
         if secret:
             body = json.dumps(payload, separators=(",", ":")).encode()
             sig = hmac.new(str(secret).encode(), body, hashlib.sha256).hexdigest()
-            headers["X-YupVox-Signature"] = sig
+            headers["X-VoiceVibe-Signature"] = sig
         httpx.post(url, json=payload, headers=headers, timeout=10.0)
     except Exception:  # noqa: BLE001
         pass
@@ -428,8 +428,8 @@ def dispatch_inline(job_id: str, params: dict) -> dict:
 
 
 def dispatch(job_id: str, params: dict) -> str:
-    """Send to Celery; inline fallback when YUPVOX_INLINE=1 (dev, no Redis)."""
-    if os.getenv("YUPVOX_INLINE") == "1":
+    """Send to Celery; inline fallback when VOICEVIBE_INLINE=1 (dev, no Redis)."""
+    if os.getenv("VOICEVIBE_INLINE") == "1":
         dispatch_inline(job_id, params)
         return "inline"
     try:

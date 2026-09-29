@@ -89,7 +89,7 @@ export default function Sidebar() {
               fontSize: expanded ? '18px' : '20px',
             }}
           >
-            {expanded ? 'YupVox' : 'Y'}
+            {expanded ? 'VoiceVibe' : 'V'}
           </div>
         </Link>
         {expanded && (

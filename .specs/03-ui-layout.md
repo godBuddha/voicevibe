@@ -5,7 +5,7 @@ Hai giao diện single-page (vanilla JS, KHÔNG build step — self-host chỉ c
 - `/admin` → Settings UI (app/admin_ui.py → ADMIN_HTML)
 
 ## App UI `/`
-Header: brand + API key (masked) + credits + nút đổi key (localStorage `yv_api_key`).
+Header: brand + API key (masked) + credits + nút đổi key (localStorage `vv_api_key`).
 Tabs dọc theo chiều ngang:
 
 1. **Dub video/audio**: file input (audio/video) → source_lang/target_lang select →
@@ -27,7 +27,7 @@ Cuối trang: form thêm custom key.
 - **Hai chế độ màu: sáng (mặc định) và tối**, cùng một bộ token trong `backend/app/theme.py`
   (`:root` = sáng, `html[data-theme="dark"]` = tối). Không được hardcode màu hex ngoài hai
   khối đó — `tests/test_theme.py` cưỡng chế. Nút lật nằm ở topbar, ghi nhớ ở
-  `localStorage['yv_theme']`; `THEME_BOOT` phải chèn TRƯỚC stylesheet để không nhấp nháy màu.
+  `localStorage['vv_theme']`; `THEME_BOOT` phải chèn TRƯỚC stylesheet để không nhấp nháy màu.
 - Viền mảnh phân tách khối, không shadow dày.
 - Emoji chỉ làm marker tab/tiêu đề (tradeoff cố ý: không build step).
 - Mọi fetch gắn header auth tương ứng; lỗi 401 → về gate.
@@ -37,7 +37,7 @@ Cuối trang: form thêm custom key.
 - `/setup` — *Thiết lập lần đầu* → form **Tạo tài khoản quản trị** (email, mật khẩu, nhập lại).
 - `/login` — **Đăng nhập**; lỗi chung *Email hoặc mật khẩu không đúng*.
 - `/` — topbar hiện email + vai trò + *Đăng xuất*; **không còn gate API key ở client**
-  (localStorage `yv_api_key` đã bỏ), mọi fetch dùng `credentials:"same-origin"`.
+  (localStorage `vv_api_key` đã bỏ), mọi fetch dùng `credentials:"same-origin"`.
 - `/admin` — hai tab: *Cấu hình hệ thống* (như cũ) và **Người dùng** (form tạo, bảng
   user với badge vai trò/trạng thái, nút Đặt lại mật khẩu · Cấp credits · Vô hiệu hóa).
 - Thông báo dùng **toast dùng chung** (`#toast`) — trước đây `flash()` ghi vào phần tử

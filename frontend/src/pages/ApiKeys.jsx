@@ -65,7 +65,7 @@ export default function ApiKeys() {
             API Keys
           </h1>
           <p style={{ color: 'var(--text-dim)' }}>
-            Quản lý khóa API để truy cập các dịch vụ YupVox
+            Quản lý khóa API để truy cập các dịch vụ VoiceVibe
           </p>
         </div>
         <button

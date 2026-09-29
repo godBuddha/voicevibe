@@ -1,8 +1,8 @@
 """
-YupVox-Clone API.
+VoiceVibe API.
 
 Persistence: Postgres (prod) / SQLite (dev) + Celery dispatch + credit metering.
-Feature surface mirrors YupVox:
+Feature surface (mirrors sản phẩm gốc — xem README):
   jobs:    tts | stt | translate | dub | subtitle   (async, credit-metered)
   voices:  reusable zero-shot voice profiles (5-10s reference clip)
   auth:    phiên cookie cho web + X-API-Key cho máy gọi (xem app/auth.py)
@@ -66,11 +66,11 @@ VALID_TYPES = {"tts", "stt", "translate", "dub", "subtitle"}
 COSTS = {"tts": 10, "stt": 5, "translate": 2, "dub": 60, "subtitle": 8}
 
 # Docs công khai mặc định TẮT: schema API lộ toàn bộ bề mặt tấn công. Bật khi cần
-# xem Swagger trên máy cá nhân: YUPVOX_ENABLE_DOCS=1
-_DOCS = os.getenv("YUPVOX_ENABLE_DOCS") == "1"
+# xem Swagger trên máy cá nhân: VOICEVIBE_ENABLE_DOCS=1
+_DOCS = os.getenv("VOICEVIBE_ENABLE_DOCS") == "1"
 
 app = FastAPI(
-    title="YupVox-Clone API",
+    title="VoiceVibe API",
     version="0.3.0",
     description="Open-source AI voice/dubbing platform — self-hosted, AGPL-3.0.",
     docs_url="/docs" if _DOCS else None,
@@ -82,7 +82,7 @@ app = FastAPI(
 def parse_cors_origins(raw: str) -> list[str]:
     """Danh sách origin được phép gọi API từ BẤT KỲ nguồn nào khác (tách frontend).
 
-    Đầu vào: nội dung env `YUPVOX_CORS_ORIGINS` — phân tách bằng dấu phẩy, ví dụ
+    Đầu vào: nội dung env `VOICEVIBE_CORS_ORIGINS` — phân tách bằng dấu phẩy, ví dụ
     `http://localhost:5173,https://app.example.com`. Chuỗi rỗng → rỗng (không bật
     CORS — trạng thái mặc định, web UI inline cùng origin không cần nó).
 
@@ -106,7 +106,7 @@ def add_cors(app: FastAPI, origins: list[str]) -> None:
     )
 
 
-_CORS_ORIGINS = parse_cors_origins(os.getenv("YUPVOX_CORS_ORIGINS", ""))
+_CORS_ORIGINS = parse_cors_origins(os.getenv("VOICEVIBE_CORS_ORIGINS", ""))
 if _CORS_ORIGINS:
     add_cors(app, _CORS_ORIGINS)
 
@@ -599,7 +599,7 @@ def admin_delete(key: str, _: None = Depends(admin_auth)) -> dict:
 
 @app.post("/v1/keys", status_code=201)
 def create_api_key(user: User = Depends(auth), db: Session = Depends(get_db)) -> dict:
-    raw = "yv_" + _secrets.token_hex(16)
+    raw = "vv_" + _secrets.token_hex(16)
     db.add(ApiKey(key=_hash_key(raw), prefix=raw[:12], user_id=user.id))
     db.commit()
     return {"key": raw, "rate_limit_per_min": 60,
@@ -663,7 +663,7 @@ def signup(body: SignupIn, request: Request,
     u = User(email=email, role=ROLE_USER, password_hash=pw_hash)  # không bao giờ admin
     db.add(u)
     db.flush()
-    raw = "yv_" + _secrets.token_hex(16)
+    raw = "vv_" + _secrets.token_hex(16)
     db.add(ApiKey(key=_hash_key(raw), prefix=raw[:12], user_id=u.id))
     db.commit()
     return {"user_id": u.id, "email": email, "role": u.role, "credits": u.credits,

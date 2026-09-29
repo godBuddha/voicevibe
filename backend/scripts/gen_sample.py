@@ -5,7 +5,7 @@ preset voices (Hải Đăng = SPEAKER_00, Mai Anh = SPEAKER_01), tiny silence
 gaps between turns — same shape as a real two-person conversation clip.
 
 Run on the GPU box:
-  cd /workspace/yupvox-clone && source .venv/bin/activate
+  cd /workspace/voicevibe && source .venv/bin/activate
   cd backend && PYTHONPATH=. python scripts/gen_sample.py
 """
 from __future__ import annotations

@@ -118,9 +118,9 @@ def main() -> int:
 
     sys.path.insert(0, str(REPO / "backend"))
     os.environ.setdefault("PYTHONPATH", str(REPO / "backend"))
-    os.environ["YUPVOX_INLINE"] = "1"
+    os.environ["VOICEVIBE_INLINE"] = "1"
     if not args.no_demo:
-        tmp = pathlib.Path(tempfile.mkdtemp(prefix="yv_ui_"))
+        tmp = pathlib.Path(tempfile.mkdtemp(prefix="vv_ui_"))
         os.environ.setdefault("MEDIA_ROOT", str(tmp / "media"))
         os.environ.setdefault("DATABASE_URL", f"sqlite:///{tmp}/ui.db")
         seed_demo()
@@ -225,7 +225,7 @@ def main() -> int:
             page.goto(f"{base}/")
             page.wait_for_selector("#shell", state="visible", timeout=20000)
             page.wait_for_timeout(1000)
-            page.evaluate("yvSetTheme('dark')")
+            page.evaluate("vvSetTheme('dark')")
             page.wait_for_timeout(600)
             applied = page.evaluate(
                 "document.documentElement.getAttribute('data-theme')")
@@ -236,7 +236,7 @@ def main() -> int:
             page.wait_for_timeout(500)
             shot("09-dub-dark")
             # trả về sáng để ảnh admin/những lần chạy sau không bị lệch
-            page.evaluate("yvSetTheme('light')")
+            page.evaluate("vvSetTheme('light')")
 
             browser.close()
 

@@ -60,7 +60,7 @@ LOGIN_HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Đăng nhập — YupVox-Clone</title>
+<title>Đăng nhập — VoiceVibe</title>
 __THEME_BOOT__
 <style>
 __THEME_CSS__
@@ -68,11 +68,11 @@ __AUTH_CSS__
 </style>
 </head>
 <body>
-<button class="theme-btn" data-theme-label onclick="yvToggleTheme()">🌙 Chế độ tối</button>
+<button class="theme-btn" data-theme-label onclick="vvToggleTheme()">🌙 Chế độ tối</button>
 <div class="card">
   <div class="mark">🎙️</div>
   <h1>Đăng nhập</h1>
-  <p class="sub">YupVox-Clone — AI Voice cho một thế giới mới</p>
+  <p class="sub">VoiceVibe — AI Voice cho một thế giới mới</p>
   <label for="email">Email</label>
   <input id="email" type="email" autocomplete="username" autofocus
          onkeydown="if(event.key==='Enter')submitLogin()">
@@ -96,7 +96,7 @@ async function submitLogin() {
     location.href = new URLSearchParams(location.search).get("next") || d.redirect || "/";
   } catch (e) { setMsg(e.message, "err"); busy(false); }
 }
-yvThemeChanged();
+vvThemeChanged();
 </script>
 </body></html>"""
 
@@ -106,7 +106,7 @@ SETUP_HTML = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Thiết lập lần đầu — YupVox-Clone</title>
+<title>Thiết lập lần đầu — VoiceVibe</title>
 __THEME_BOOT__
 <style>
 __THEME_CSS__
@@ -114,7 +114,7 @@ __AUTH_CSS__
 </style>
 </head>
 <body>
-<button class="theme-btn" data-theme-label onclick="yvToggleTheme()">🌙 Chế độ tối</button>
+<button class="theme-btn" data-theme-label onclick="vvToggleTheme()">🌙 Chế độ tối</button>
 <div class="card">
   <div class="mark">🚀</div>
   <h1>Tạo tài khoản quản trị</h1>
@@ -149,7 +149,7 @@ async function submitSetup() {
     location.href = d.redirect || "/";
   } catch (e) { setMsg(e.message, "err"); busy(false); }
 }
-yvThemeChanged();
+vvThemeChanged();
 </script>
 </body></html>"""
 

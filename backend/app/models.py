@@ -1,6 +1,6 @@
 """Day 2 schema: users, api_keys, voices, jobs, credit_ledger.
 
-Credits model mirrors the YupVox landing page: free starting credits,
+Credits model mirrors the original voice-product landing page: free starting credits,
 per-job metered spend (real metering lands D6 — placeholder pricing for now).
 
 Phase 2 (accounts): `users` gains real credentials (`password_hash`, `role`,
@@ -111,7 +111,7 @@ class ApiKey(Base):
     __tablename__ = "api_keys"
 
     # Stores the SHA-256 hex of the raw key — a DB dump cannot recover usable
-    # keys. `prefix` keeps the first chars for masked display ("yv_abcd…").
+    # keys. `prefix` keeps the first chars for masked display ("vv_abcd…").
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     prefix: Mapped[str] = mapped_column(String(16), default="")
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)

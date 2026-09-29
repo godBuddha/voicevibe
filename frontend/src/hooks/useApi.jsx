@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { mockRequest } from '../api/mock.js';
 import api, { setOnUnauthorized } from '../api/client.js';
 import { adaptUsage, adaptJob } from '../api/adapt.js';
@@ -25,7 +25,12 @@ export function ApiProvider({ children }) {
       // 401 từ bất kỳ fetch nào → quay về login. Ghi dấu localStorage để
       // protectedLoader (router) chặn ngay cả trước khi AuthProvider kịp hỏi.
       localStorage.removeItem('authenticated');
-      window.location.href = '/login';
+      // Đã đứng ở /login thì KHÔNG reload: AuthProvider hỏi /me lúc mount →
+      // 401 → reload → /me → ... vòng lặp reload vô hạn cho khách chưa đăng
+      // nhập (trang login nhấp nháy không dừng).
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     });
   }, []);
 
@@ -42,17 +47,25 @@ export function ApiProvider({ children }) {
     });
   }, [useMock]);
 
-  const value = {
-    api: {
-      get: (path, opts) => request('get', path, opts),
-      post: (path, opts) => request('post', path, opts),
-      put: (path, opts) => request('put', path, opts),
-      patch: (path, opts) => request('patch', path, opts),
-      del: (path, opts) => request('del', path, opts),
-    },
-    toggleMock: () => setUseMock((prev) => !prev),
-    useMock,
-  };
+  // useMemo BẮT BUỘC: value tạo mới mỗi render → `api` đổi tham chiếu →
+  // useEffect(..., [api]) ở useAuth bắn lại /v1/auth/me sau MỖI render → khi
+  // chưa đăng nhập: 401 → onUnauthorized reload /login → lặp vô hạn (networkidle
+  // không bao giờ ổn, người dùng thật thì liên tục gọi API). Bản cũ "chạy được"
+  // là nhờ backend rate-limit chấm dứt vòng lặp một cách may rủi.
+  const value = useMemo(
+    () => ({
+      api: {
+        get: (path, opts) => request('get', path, opts),
+        post: (path, opts) => request('post', path, opts),
+        put: (path, opts) => request('put', path, opts),
+        patch: (path, opts) => request('patch', path, opts),
+        del: (path, opts) => request('del', path, opts),
+      },
+      toggleMock: () => setUseMock((prev) => !prev),
+      useMock,
+    }),
+    [request, useMock],
+  );
 
   return <ApiContext.Provider value={value}>{children}</ApiContext.Provider>;
 }

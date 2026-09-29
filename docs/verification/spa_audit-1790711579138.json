@@ -1,0 +1,44 @@
+{
+  "startedAt": "2026-09-29T19:53:00.281Z",
+  "base": "http://127.0.0.1:18081",
+  "api": "http://127.0.0.1:18081",
+  "mode": "flows",
+  "fast": false,
+  "pages": [],
+  "flows": [
+    {
+      "name": "f-subtitle-job",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "chờ job subtitle",
+          "detail": "status=failed",
+          "ok": false
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 17470
+    }
+  ],
+  "summary": {
+    "pagesChecked": 0,
+    "pageErrors": 0,
+    "consoleErrors": 0,
+    "domFindings": 0,
+    "unexpectedHttp": 0,
+    "duplicateShots": 0,
+    "dialogs": 0,
+    "flowsRun": 1,
+    "failedFlows": 1,
+    "failedExpected": [
+      "f-subtitle-job"
+    ]
+  },
+  "unexpectedHttpDetail": []
+}

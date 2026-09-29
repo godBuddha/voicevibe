@@ -1,0 +1,468 @@
+{
+  "startedAt": "2026-09-29T16:50:10.083Z",
+  "base": "http://127.0.0.1:8080",
+  "api": "http://127.0.0.1:18080",
+  "mode": "flows",
+  "fast": true,
+  "pages": [],
+  "flows": [
+    {
+      "name": "f-login-wrong-password",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "sai mật khẩu",
+          "detail": "ở lại /login: true, lỗi hiện: có",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 2238
+    },
+    {
+      "name": "f-login",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "đăng nhập",
+          "detail": "hạ cánh ở / (admin kỳ vọng /admin: CHƯA — bug #14)",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 2167
+    },
+    {
+      "name": "f-permissions",
+      "expect": false,
+      "ok": true,
+      "steps": [
+        {
+          "action": "tạo/reuse user auditor",
+          "detail": "vv-auditor@local (status 409)",
+          "ok": true
+        },
+        {
+          "action": "user thường vào /admin/users",
+          "detail": "hạ cánh: /admin/users; sidebar có QUẢN TRỊ: true; bảng trống lặng lẽ: true",
+          "ok": false
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/auth/me",
+          "status": 401,
+          "snippet": "{\"detail\":\"chưa đăng nhập\"}"
+        },
+        {
+          "url": "http://127.0.0.1:18080/v1/admin/users",
+          "status": 403,
+          "snippet": "{\"detail\":\"cần quyền quản trị\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 3158
+    },
+    {
+      "name": "f-voice-create",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "upload giọng mẫu",
+          "detail": "alert: Lỗi khi tạo giọng: HTTP 403",
+          "ok": false
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/voices",
+          "status": 405,
+          "snippet": "{\"detail\":\"Method Not Allowed\"}"
+        },
+        {
+          "url": "http://127.0.0.1:18080/v1/voices/upload",
+          "status": 403,
+          "snippet": "{\"detail\":\"cross-origin request blocked\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 405 (Method Not Allowed)"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [
+        {
+          "type": "alert",
+          "message": "Lỗi khi tạo giọng: HTTP 403"
+        }
+      ],
+      "screenshots": [],
+      "durationMs": 2386
+    },
+    {
+      "name": "f-voice-delete",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "tìm giọng",
+          "detail": "không thấy giọng vừa tạo — bỏ qua xoá (tạo đã fail?)",
+          "ok": false
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/voices",
+          "status": 405,
+          "snippet": "{\"detail\":\"Method Not Allowed\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 405 (Method Not Allowed)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 1223
+    },
+    {
+      "name": "f-tts-generate",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "tạo TTS",
+          "detail": "alert: Lỗi khi tạo giọng nói: HTTP 403",
+          "ok": false
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/voices",
+          "status": 405,
+          "snippet": "{\"detail\":\"Method Not Allowed\"}"
+        },
+        {
+          "url": "http://127.0.0.1:18080/v1/jobs",
+          "status": 403,
+          "snippet": "{\"detail\":\"cross-origin request blocked\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 405 (Method Not Allowed)"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [
+        {
+          "type": "alert",
+          "message": "Lỗi khi tạo giọng nói: HTTP 403"
+        }
+      ],
+      "screenshots": [],
+      "durationMs": 2859
+    },
+    {
+      "name": "f-api-keys-create-revoke",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "mở trang",
+          "detail": "render bình thường",
+          "ok": true
+        },
+        {
+          "action": "flow",
+          "detail": "TimeoutError: Waiting failed: 5000ms exceeded",
+          "ok": false
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "TypeError: t.map is not a function"
+        },
+        {
+          "type": "error",
+          "text": "React Router caught the following error during render TypeError: t.map is not a function [object Object]"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "error": "TimeoutError: Waiting failed: 5000ms exceeded",
+      "durationMs": 6144
+    },
+    {
+      "name": "f-admin-users",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "cấp credit 1500",
+          "detail": "không thấy cập nhật",
+          "ok": false
+        },
+        {
+          "action": "flow",
+          "detail": "TypeError: Cannot read properties of undefined (reading 'click')",
+          "ok": false
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/admin/users/198abb4a87da/credits",
+          "status": 403,
+          "snippet": "{\"detail\":\"cross-origin request blocked\"}"
+        },
+        {
+          "url": "http://127.0.0.1:18080/v1/admin/users/198abb4a87da/deactivate",
+          "status": 403,
+          "snippet": "{\"detail\":\"cross-origin request blocked\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [
+        {
+          "type": "prompt",
+          "message": "Nhập mật khẩu mới cho user này:"
+        },
+        {
+          "type": "alert",
+          "message": "Lỗi khi cập nhật credits: HTTP 403"
+        },
+        {
+          "type": "alert",
+          "message": "Lỗi khi thay đổi trạng thái: HTTP 403"
+        }
+      ],
+      "screenshots": [],
+      "error": "TypeError: Cannot read properties of undefined (reading 'click')",
+      "durationMs": 3488
+    },
+    {
+      "name": "f-admin-modelhub",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "tạo provider (4 prompt)",
+          "detail": "KHÔNG xuất hiện (bug luồng prompt?)",
+          "ok": false
+        },
+        {
+          "action": "tab Stages/Prompts",
+          "detail": "stages=true, prompts=true",
+          "ok": true
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/admin/providers",
+          "status": 403,
+          "snippet": "{\"detail\":\"cross-origin request blocked\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [
+        {
+          "type": "prompt",
+          "message": "Tên provider (ví dụ: OpenRouter):"
+        },
+        {
+          "type": "prompt",
+          "message": "Base URL (ví dụ: https://openrouter.ai/api/v1):"
+        },
+        {
+          "type": "prompt",
+          "message": "Loại — openai | ollama:"
+        },
+        {
+          "type": "prompt",
+          "message": "API key (để trống nếu không cần):"
+        },
+        {
+          "type": "alert",
+          "message": "Lỗi khi tạo provider: HTTP 403"
+        }
+      ],
+      "screenshots": [],
+      "durationMs": 4208
+    },
+    {
+      "name": "f-admin-settings",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "thêm setting",
+          "detail": "không thấy",
+          "ok": false
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/admin/settings/audit.1790700609977",
+          "status": 403,
+          "snippet": "{\"detail\":\"cross-origin request blocked\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [
+        {
+          "type": "alert",
+          "message": "Lỗi khi thêm setting: HTTP 403"
+        }
+      ],
+      "screenshots": [],
+      "durationMs": 2955
+    },
+    {
+      "name": "f-theme-toggle",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "đổi theme",
+          "detail": "light → dark",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 2112
+    },
+    {
+      "name": "f-logout",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "đăng xuất",
+          "detail": "về /login: đúng, cờ localStorage dọn: true",
+          "ok": true
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/auth/me",
+          "status": 401,
+          "snippet": "{\"detail\":\"chưa đăng nhập\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 2116
+    }
+  ],
+  "summary": {
+    "pagesChecked": 0,
+    "pageErrors": 0,
+    "consoleErrors": 12,
+    "domFindings": 0,
+    "unexpectedHttp": 0,
+    "duplicateShots": 0,
+    "dialogs": 11,
+    "flowsRun": 12,
+    "failedFlows": 7,
+    "failedExpected": [
+      "f-voice-create",
+      "f-voice-delete",
+      "f-tts-generate",
+      "f-api-keys-create-revoke",
+      "f-admin-users",
+      "f-admin-modelhub",
+      "f-admin-settings"
+    ]
+  },
+  "unexpectedHttpDetail": []
+}

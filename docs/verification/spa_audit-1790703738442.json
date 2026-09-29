@@ -1,0 +1,629 @@
+{
+  "startedAt": "2026-09-29T17:42:18.511Z",
+  "base": "http://127.0.0.1:8080",
+  "api": "http://127.0.0.1:18080",
+  "mode": "all",
+  "fast": true,
+  "pages": [
+    {
+      "route": "/login",
+      "theme": "light",
+      "authed": false,
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/auth/me",
+          "status": 401,
+          "snippet": "{\"detail\":\"chưa đăng nhập\"}"
+        },
+        {
+          "url": "http://127.0.0.1:18080/v1/auth/me",
+          "status": 401,
+          "snippet": "{\"detail\":\"chưa đăng nhập\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/00-login.png",
+      "ok": true,
+      "durationMs": 2918
+    },
+    {
+      "route": "/",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/01-dashboard.png",
+      "ok": true,
+      "durationMs": 2903
+    },
+    {
+      "route": "/dub",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/02-dub.png",
+      "ok": true,
+      "durationMs": 2637
+    },
+    {
+      "route": "/tts",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/03-tts.png",
+      "ok": true,
+      "durationMs": 2208
+    },
+    {
+      "route": "/voices",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/04-voices.png",
+      "ok": true,
+      "durationMs": 3480
+    },
+    {
+      "route": "/stt",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/05-stt.png",
+      "ok": true,
+      "durationMs": 2321
+    },
+    {
+      "route": "/subtitle",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/06-subtitle.png",
+      "ok": true,
+      "durationMs": 2644
+    },
+    {
+      "route": "/jobs",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/07-jobs.png",
+      "ok": true,
+      "durationMs": 2634
+    },
+    {
+      "route": "/api-keys",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/08-api-keys.png",
+      "ok": true,
+      "durationMs": 2999
+    },
+    {
+      "route": "/pricing",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/09-pricing.png",
+      "ok": true,
+      "durationMs": 2432
+    },
+    {
+      "route": "/admin/users",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/10-admin-users.png",
+      "ok": true,
+      "durationMs": 3177
+    },
+    {
+      "route": "/admin/model-hub",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/11-admin-model-hub.png",
+      "ok": true,
+      "durationMs": 2517
+    },
+    {
+      "route": "/admin/settings",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/12-admin-settings.png",
+      "ok": true,
+      "durationMs": 2685
+    },
+    {
+      "route": "/",
+      "theme": "dark",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/13-dashboard-dark.png",
+      "ok": true,
+      "durationMs": 3206
+    },
+    {
+      "route": "/dub",
+      "theme": "dark",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/14-dub-dark.png",
+      "ok": true,
+      "durationMs": 2934
+    }
+  ],
+  "flows": [
+    {
+      "name": "f-login-wrong-password",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "sai mật khẩu",
+          "detail": "ở lại /login: true, lỗi hiện: có",
+          "ok": true
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/auth/login",
+          "status": 401,
+          "snippet": "{\"detail\":\"Email hoặc mật khẩu không đúng\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 3378
+    },
+    {
+      "name": "f-login",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "đăng nhập",
+          "detail": "hạ cánh ở /admin/users (admin kỳ vọng /admin: RỒI)",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 2192
+    },
+    {
+      "name": "f-permissions",
+      "expect": false,
+      "ok": true,
+      "steps": [
+        {
+          "action": "tạo/reuse user auditor",
+          "detail": "vv-auditor@local (status 409)",
+          "ok": true
+        },
+        {
+          "action": "user thường vào /admin/users",
+          "detail": "hạ cánh: /; sidebar có QUẢN TRỊ: false; bảng trống lặng lẽ: true",
+          "ok": true
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/auth/me",
+          "status": 401,
+          "snippet": "{\"detail\":\"chưa đăng nhập\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 3856
+    },
+    {
+      "name": "f-voice-create",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "upload giọng mẫu",
+          "detail": "không có alert",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 5554
+    },
+    {
+      "name": "f-voice-delete",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "xoá giọng + tải lại",
+          "detail": "đã mất thật sau reload",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [
+        {
+          "type": "confirm",
+          "message": "Bạn có chắc muốn xoá giọng này?"
+        }
+      ],
+      "screenshots": [],
+      "durationMs": 3316
+    },
+    {
+      "name": "f-tts-generate",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "chờ job tts",
+          "detail": "status=done",
+          "ok": true
+        },
+        {
+          "action": "trình phát audio",
+          "detail": "thẻ <audio> xuất hiện",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [
+        "/home/jewking/Documents/voicevibe/docs/screenshots-spa/flow-tts-player.png"
+      ],
+      "durationMs": 18521
+    },
+    {
+      "name": "f-api-keys-create-revoke",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "mở trang",
+          "detail": "render bình thường",
+          "ok": true
+        },
+        {
+          "action": "tạo key",
+          "detail": "raw=vv_b269e…",
+          "ok": true
+        },
+        {
+          "action": "thu hồi key qua UI",
+          "detail": "key VẪN còn trong danh sách API",
+          "ok": false
+        },
+        {
+          "action": "xoá key qua API (raw)",
+          "detail": "status 200",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 3455
+    },
+    {
+      "name": "f-admin-users",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "cấp credit 1500",
+          "detail": "hiển thị 1.500",
+          "ok": true
+        },
+        {
+          "action": "chặn user",
+          "detail": "chuyển Chặn",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [
+        {
+          "type": "prompt",
+          "message": "Nhập mật khẩu mới cho user này:"
+        }
+      ],
+      "screenshots": [],
+      "durationMs": 4743
+    },
+    {
+      "name": "f-admin-modelhub",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "tạo provider (4 prompt)",
+          "detail": "card xuất hiện",
+          "ok": true
+        },
+        {
+          "action": "Test kết nối",
+          "detail": "alert: Kết nối LỖI — không kết nối được: ConnectError",
+          "ok": true
+        },
+        {
+          "action": "Pull models",
+          "detail": "alert: Lỗi lấy model: không lấy được danh sách model: ConnectError",
+          "ok": true
+        },
+        {
+          "action": "xoá provider (UI)",
+          "detail": "đã mất khỏi danh sách",
+          "ok": true
+        },
+        {
+          "action": "tab Stages/Prompts",
+          "detail": "stages=true, prompts=true",
+          "ok": true
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/admin/providers/7b7c70766f8a/models",
+          "status": 502,
+          "snippet": "{\"detail\":\"không lấy được danh sách model: ConnectError\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [
+        {
+          "type": "prompt",
+          "message": "Tên provider (ví dụ: OpenRouter):"
+        },
+        {
+          "type": "prompt",
+          "message": "Base URL (ví dụ: https://openrouter.ai/api/v1):"
+        },
+        {
+          "type": "prompt",
+          "message": "Loại — openai | ollama:"
+        },
+        {
+          "type": "prompt",
+          "message": "API key (để trống nếu không cần):"
+        },
+        {
+          "type": "alert",
+          "message": "Kết nối LỖI — không kết nối được: ConnectError"
+        },
+        {
+          "type": "alert",
+          "message": "Lỗi lấy model: không lấy được danh sách model: ConnectError"
+        },
+        {
+          "type": "confirm",
+          "message": "Xoá provider?"
+        }
+      ],
+      "screenshots": [],
+      "durationMs": 11952
+    },
+    {
+      "name": "f-admin-settings",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "thêm setting",
+          "detail": "hàng xuất hiện",
+          "ok": true
+        },
+        {
+          "action": "xoá setting",
+          "detail": "đã mất",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [
+        {
+          "type": "confirm",
+          "message": "Xoá setting \"audit.1790703738442\" (quay về giá trị mặc định)?"
+        }
+      ],
+      "screenshots": [],
+      "durationMs": 5198
+    },
+    {
+      "name": "f-theme-toggle",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "đổi theme",
+          "detail": "light → dark",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 3122
+    },
+    {
+      "name": "f-logout",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "đăng xuất",
+          "detail": "về /login: đúng, cờ localStorage dọn: true",
+          "ok": true
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/auth/me",
+          "status": 401,
+          "snippet": "{\"detail\":\"chưa đăng nhập\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 1996
+    }
+  ],
+  "summary": {
+    "pagesChecked": 15,
+    "pageErrors": 0,
+    "consoleErrors": 1,
+    "domFindings": 0,
+    "unexpectedHttp": 0,
+    "duplicateShots": 0,
+    "dialogs": 10,
+    "flowsRun": 12,
+    "failedFlows": 1,
+    "failedExpected": [
+      "f-api-keys-create-revoke"
+    ]
+  },
+  "unexpectedHttpDetail": []
+}

@@ -1,0 +1,59 @@
+{
+  "startedAt": "2026-09-29T19:53:38.916Z",
+  "base": "http://127.0.0.1:18081",
+  "api": "http://127.0.0.1:18081",
+  "mode": "flows",
+  "fast": false,
+  "pages": [],
+  "flows": [
+    {
+      "name": "f-api-keys-create-revoke",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "mở trang",
+          "detail": "render bình thường",
+          "ok": true
+        },
+        {
+          "action": "tạo key",
+          "detail": "raw=vv_e461e…",
+          "ok": true
+        },
+        {
+          "action": "thu hồi key qua UI",
+          "detail": "key VẪN còn trong danh sách API",
+          "ok": false
+        },
+        {
+          "action": "xoá key qua API (raw)",
+          "detail": "status 200",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 17022
+    }
+  ],
+  "summary": {
+    "pagesChecked": 0,
+    "pageErrors": 0,
+    "consoleErrors": 0,
+    "domFindings": 0,
+    "unexpectedHttp": 0,
+    "duplicateShots": 0,
+    "dialogs": 0,
+    "flowsRun": 1,
+    "failedFlows": 1,
+    "failedExpected": [
+      "f-api-keys-create-revoke"
+    ]
+  },
+  "unexpectedHttpDetail": []
+}

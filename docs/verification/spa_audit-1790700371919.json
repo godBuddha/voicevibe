@@ -1,0 +1,375 @@
+{
+  "startedAt": "2026-09-29T16:46:12.027Z",
+  "base": "http://127.0.0.1:8080",
+  "api": "http://127.0.0.1:18080",
+  "mode": "flows",
+  "fast": true,
+  "pages": [],
+  "flows": [
+    {
+      "name": "f-login-wrong-password",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "flow",
+          "detail": "TypeError: page.$x is not a function",
+          "ok": false
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "error": "TypeError: page.$x is not a function",
+      "durationMs": 2203
+    },
+    {
+      "name": "f-login",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "flow",
+          "detail": "Error: No element found for selector: input[type=email]",
+          "ok": false
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "error": "Error: No element found for selector: input[type=email]",
+      "durationMs": 796
+    },
+    {
+      "name": "f-permissions",
+      "expect": false,
+      "ok": true,
+      "steps": [
+        {
+          "action": "tạo/reuse user auditor",
+          "detail": "vv-auditor@local (status 201)",
+          "ok": true
+        },
+        {
+          "action": "flow",
+          "detail": "TypeError: page.$x is not a function",
+          "ok": false
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/auth/me",
+          "status": 401,
+          "snippet": "{\"detail\":\"chưa đăng nhập\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "error": "TypeError: page.$x is not a function",
+      "durationMs": 1265
+    },
+    {
+      "name": "f-voice-create",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "flow",
+          "detail": "TypeError: page.$x is not a function",
+          "ok": false
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/voices",
+          "status": 405,
+          "snippet": "{\"detail\":\"Method Not Allowed\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 405 (Method Not Allowed)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "error": "TypeError: page.$x is not a function",
+      "durationMs": 1370
+    },
+    {
+      "name": "f-voice-delete",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "tìm giọng",
+          "detail": "không thấy giọng vừa tạo — bỏ qua xoá (tạo đã fail?)",
+          "ok": false
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/voices",
+          "status": 405,
+          "snippet": "{\"detail\":\"Method Not Allowed\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 405 (Method Not Allowed)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 1136
+    },
+    {
+      "name": "f-tts-generate",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "flow",
+          "detail": "TypeError: page.$x is not a function",
+          "ok": false
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/voices",
+          "status": 405,
+          "snippet": "{\"detail\":\"Method Not Allowed\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 405 (Method Not Allowed)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "error": "TypeError: page.$x is not a function",
+      "durationMs": 1655
+    },
+    {
+      "name": "f-api-keys-create-revoke",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "mở trang",
+          "detail": "render bình thường",
+          "ok": true
+        },
+        {
+          "action": "flow",
+          "detail": "TimeoutError: Waiting failed: 5000ms exceeded",
+          "ok": false
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "TypeError: t.map is not a function"
+        },
+        {
+          "type": "error",
+          "text": "React Router caught the following error during render TypeError: t.map is not a function [object Object]"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "error": "TimeoutError: Waiting failed: 5000ms exceeded",
+      "durationMs": 6276
+    },
+    {
+      "name": "f-admin-users",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "cấp credit 1500",
+          "detail": "không thấy cập nhật",
+          "ok": false
+        },
+        {
+          "action": "flow",
+          "detail": "TypeError: Cannot read properties of undefined (reading 'click')",
+          "ok": false
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/admin/users/198abb4a87da/credits",
+          "status": 403,
+          "snippet": "{\"detail\":\"cross-origin request blocked\"}"
+        },
+        {
+          "url": "http://127.0.0.1:18080/v1/admin/users/198abb4a87da/deactivate",
+          "status": 403,
+          "snippet": "{\"detail\":\"cross-origin request blocked\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [
+        {
+          "type": "prompt",
+          "message": "Nhập mật khẩu mới cho user này:"
+        },
+        {
+          "type": "alert",
+          "message": "Lỗi khi cập nhật credits: HTTP 403"
+        },
+        {
+          "type": "alert",
+          "message": "Lỗi khi thay đổi trạng thái: HTTP 403"
+        }
+      ],
+      "screenshots": [],
+      "error": "TypeError: Cannot read properties of undefined (reading 'click')",
+      "durationMs": 3828
+    },
+    {
+      "name": "f-admin-modelhub",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "flow",
+          "detail": "TypeError: page.$x is not a function",
+          "ok": false
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "error": "TypeError: page.$x is not a function",
+      "durationMs": 1478
+    },
+    {
+      "name": "f-admin-settings",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "flow",
+          "detail": "TypeError: page.$x is not a function",
+          "ok": false
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "error": "TypeError: page.$x is not a function",
+      "durationMs": 1504
+    },
+    {
+      "name": "f-theme-toggle",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "flow",
+          "detail": "TimeoutError: Waiting failed: 5000ms exceeded",
+          "ok": false
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "error": "TimeoutError: Waiting failed: 5000ms exceeded",
+      "durationMs": 6191
+    },
+    {
+      "name": "f-logout",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "flow",
+          "detail": "TypeError: page.$x is not a function",
+          "ok": false
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "error": "TypeError: page.$x is not a function",
+      "durationMs": 1502
+    }
+  ],
+  "summary": {
+    "pagesChecked": 0,
+    "pageErrors": 0,
+    "consoleErrors": 7,
+    "domFindings": 0,
+    "unexpectedHttp": 0,
+    "duplicateShots": 0,
+    "dialogs": 3,
+    "flowsRun": 12,
+    "failedFlows": 11,
+    "failedExpected": [
+      "f-login-wrong-password",
+      "f-login",
+      "f-voice-create",
+      "f-voice-delete",
+      "f-tts-generate",
+      "f-api-keys-create-revoke",
+      "f-admin-users",
+      "f-admin-modelhub",
+      "f-admin-settings",
+      "f-theme-toggle",
+      "f-logout"
+    ]
+  },
+  "unexpectedHttpDetail": []
+}

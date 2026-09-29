@@ -1,0 +1,258 @@
+{
+  "startedAt": "2026-09-29T18:56:09.762Z",
+  "base": "http://127.0.0.1:18081",
+  "api": "http://127.0.0.1:18081",
+  "mode": "nav",
+  "fast": false,
+  "pages": [
+    {
+      "route": "/login",
+      "theme": "light",
+      "authed": false,
+      "http": [
+        {
+          "url": "http://127.0.0.1:18081/v1/auth/me",
+          "status": 401,
+          "snippet": "{\"detail\":\"chưa đăng nhập\"}"
+        },
+        {
+          "url": "http://127.0.0.1:18081/v1/auth/me",
+          "status": 401,
+          "snippet": "{\"detail\":\"chưa đăng nhập\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "docs/screenshots-spa/00-login.png",
+      "ok": true,
+      "durationMs": 9268
+    },
+    {
+      "route": "/",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "docs/screenshots-spa/01-dashboard.png",
+      "ok": true,
+      "durationMs": 6260
+    },
+    {
+      "route": "/dub",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "docs/screenshots-spa/02-dub.png",
+      "ok": true,
+      "durationMs": 6509
+    },
+    {
+      "route": "/tts",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "docs/screenshots-spa/03-tts.png",
+      "ok": true,
+      "durationMs": 6850
+    },
+    {
+      "route": "/voices",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "docs/screenshots-spa/04-voices.png",
+      "ok": true,
+      "durationMs": 6709
+    },
+    {
+      "route": "/stt",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "docs/screenshots-spa/05-stt.png",
+      "ok": true,
+      "durationMs": 6209
+    },
+    {
+      "route": "/subtitle",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "docs/screenshots-spa/06-subtitle.png",
+      "ok": true,
+      "durationMs": 6198
+    },
+    {
+      "route": "/jobs",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "docs/screenshots-spa/07-jobs.png",
+      "ok": true,
+      "durationMs": 6542
+    },
+    {
+      "route": "/api-keys",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "docs/screenshots-spa/08-api-keys.png",
+      "ok": true,
+      "durationMs": 6922
+    },
+    {
+      "route": "/pricing",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "docs/screenshots-spa/09-pricing.png",
+      "ok": true,
+      "durationMs": 6356
+    },
+    {
+      "route": "/admin/users",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "docs/screenshots-spa/10-admin-users.png",
+      "ok": true,
+      "durationMs": 6659
+    },
+    {
+      "route": "/admin/model-hub",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "docs/screenshots-spa/11-admin-model-hub.png",
+      "ok": true,
+      "durationMs": 8550
+    },
+    {
+      "route": "/admin/settings",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [
+        {
+          "check": "text",
+          "detail": "null …on\",\"is_secret\":false,\"value\":null,\"source\":\"unset\",\"set_in_…"
+        }
+      ],
+      "screenshot": "docs/screenshots-spa/12-admin-settings.png",
+      "ok": true,
+      "durationMs": 2731
+    },
+    {
+      "route": "/",
+      "theme": "dark",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "docs/screenshots-spa/13-dashboard-dark.png",
+      "ok": true,
+      "durationMs": 7611
+    },
+    {
+      "route": "/dub",
+      "theme": "dark",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "docs/screenshots-spa/14-dub-dark.png",
+      "ok": true,
+      "durationMs": 7223
+    }
+  ],
+  "flows": [],
+  "summary": {
+    "pagesChecked": 15,
+    "pageErrors": 0,
+    "consoleErrors": 0,
+    "domFindings": 1,
+    "unexpectedHttp": 0,
+    "duplicateShots": 0,
+    "dialogs": 0,
+    "flowsRun": 0,
+    "failedFlows": 0,
+    "failedExpected": []
+  },
+  "unexpectedHttpDetail": []
+}

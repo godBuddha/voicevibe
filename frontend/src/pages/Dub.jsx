@@ -58,6 +58,12 @@ export default function Dub() {
     })();
   }, [api]);
 
+  // Bảng giá về sau khi người dùng đã chọn file (mạng chậm) → tính lại ước
+  // tính, không để "0 credits" đứng đời (đã gặp thật qua tunnel).
+  useEffect(() => {
+    if (file && estimate && !estimate.credits) calcEstimate(file);
+  }, [pricing]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const cloneVoice = voices.find((v) => String(v.id) === String(cloneVoiceId));
 
   const handleFile = async (f) => {

@@ -1,0 +1,45 @@
+{
+  "startedAt": "2026-09-29T19:53:24.042Z",
+  "base": "http://127.0.0.1:18081",
+  "api": "http://127.0.0.1:18081",
+  "mode": "flows",
+  "fast": false,
+  "pages": [],
+  "flows": [
+    {
+      "name": "f-dub-job",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "flow",
+          "detail": "TimeoutError: Waiting failed: 5000ms exceeded",
+          "ok": false
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "error": "TimeoutError: Waiting failed: 5000ms exceeded",
+      "durationMs": 8623
+    }
+  ],
+  "summary": {
+    "pagesChecked": 0,
+    "pageErrors": 0,
+    "consoleErrors": 0,
+    "domFindings": 0,
+    "unexpectedHttp": 0,
+    "duplicateShots": 0,
+    "dialogs": 0,
+    "flowsRun": 1,
+    "failedFlows": 1,
+    "failedExpected": [
+      "f-dub-job"
+    ]
+  },
+  "unexpectedHttpDetail": []
+}

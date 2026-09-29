@@ -1,0 +1,353 @@
+{
+  "startedAt": "2026-09-29T16:43:24.939Z",
+  "base": "http://127.0.0.1:8080",
+  "api": "http://127.0.0.1:18080",
+  "mode": "nav",
+  "fast": false,
+  "pages": [
+    {
+      "route": "/login",
+      "theme": "light",
+      "authed": false,
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/auth/me",
+          "status": 401,
+          "snippet": "{\"detail\":\"chưa đăng nhập\"}"
+        },
+        {
+          "url": "http://127.0.0.1:18080/v1/auth/me",
+          "status": 401,
+          "snippet": "{\"detail\":\"chưa đăng nhập\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/00-login.png",
+      "ok": true,
+      "durationMs": 2887
+    },
+    {
+      "route": "/",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/01-dashboard.png",
+      "ok": true,
+      "durationMs": 3030
+    },
+    {
+      "route": "/dub",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/02-dub.png",
+      "ok": true,
+      "durationMs": 2624
+    },
+    {
+      "route": "/tts",
+      "theme": "light",
+      "authed": true,
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/voices",
+          "status": 405,
+          "snippet": "{\"detail\":\"Method Not Allowed\"}"
+        },
+        {
+          "url": "http://127.0.0.1:18080/v1/voices",
+          "status": 405,
+          "snippet": "{\"detail\":\"Method Not Allowed\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 405 (Method Not Allowed)"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 405 (Method Not Allowed)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/03-tts.png",
+      "ok": true,
+      "durationMs": 2184
+    },
+    {
+      "route": "/voices",
+      "theme": "light",
+      "authed": true,
+      "http": [
+        {
+          "url": "http://127.0.0.1:18080/v1/voices",
+          "status": 405,
+          "snippet": "{\"detail\":\"Method Not Allowed\"}"
+        },
+        {
+          "url": "http://127.0.0.1:18080/v1/voices",
+          "status": 405,
+          "snippet": "{\"detail\":\"Method Not Allowed\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 405 (Method Not Allowed)"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 405 (Method Not Allowed)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/04-voices.png",
+      "ok": true,
+      "durationMs": 3473
+    },
+    {
+      "route": "/stt",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [
+        {
+          "url": "http://127.0.0.1:18080/v1/auth/me",
+          "error": "net::ERR_FAILED"
+        }
+      ],
+      "console": [
+        {
+          "type": "error",
+          "text": "Access to fetch at 'http://127.0.0.1:18080/v1/auth/me' from origin 'http://127.0.0.1:8080' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource."
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_FAILED"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/05-stt.png",
+      "ok": true,
+      "durationMs": 2216
+    },
+    {
+      "route": "/subtitle",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/06-subtitle.png",
+      "ok": true,
+      "durationMs": 2691
+    },
+    {
+      "route": "/jobs",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/07-jobs.png",
+      "ok": true,
+      "durationMs": 2242
+    },
+    {
+      "route": "/api-keys",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "TypeError: t.map is not a function"
+        },
+        {
+          "type": "error",
+          "text": "React Router caught the following error during render TypeError: t.map is not a function [object Object]"
+        },
+        {
+          "type": "error",
+          "text": "TypeError: t.map is not a function"
+        },
+        {
+          "type": "error",
+          "text": "React Router caught the following error during render TypeError: t.map is not a function [object Object]"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/08-api-keys.png",
+      "ok": true,
+      "durationMs": 3411
+    },
+    {
+      "route": "/pricing",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/09-pricing.png",
+      "ok": true,
+      "durationMs": 3320
+    },
+    {
+      "route": "/admin/users",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/10-admin-users.png",
+      "ok": true,
+      "durationMs": 2258
+    },
+    {
+      "route": "/admin/model-hub",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/11-admin-model-hub.png",
+      "ok": true,
+      "durationMs": 2669
+    },
+    {
+      "route": "/admin/settings",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/12-admin-settings.png",
+      "ok": true,
+      "durationMs": 2617
+    },
+    {
+      "route": "/",
+      "theme": "dark",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/13-dashboard-dark.png",
+      "ok": true,
+      "durationMs": 2968
+    },
+    {
+      "route": "/dub",
+      "theme": "dark",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/14-dub-dark.png",
+      "ok": true,
+      "durationMs": 3014
+    }
+  ],
+  "flows": [],
+  "summary": {
+    "pagesChecked": 15,
+    "pageErrors": 0,
+    "consoleErrors": 14,
+    "domFindings": 0,
+    "unexpectedHttp": 4,
+    "duplicateShots": 0,
+    "dialogs": 0,
+    "flowsRun": 0,
+    "failedFlows": 0,
+    "failedExpected": []
+  },
+  "unexpectedHttpDetail": [
+    {
+      "url": "http://127.0.0.1:18080/v1/voices",
+      "status": 405,
+      "snippet": "{\"detail\":\"Method Not Allowed\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18080/v1/voices",
+      "status": 405,
+      "snippet": "{\"detail\":\"Method Not Allowed\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18080/v1/voices",
+      "status": 405,
+      "snippet": "{\"detail\":\"Method Not Allowed\"}"
+    },
+    {
+      "url": "http://127.0.0.1:18080/v1/voices",
+      "status": 405,
+      "snippet": "{\"detail\":\"Method Not Allowed\"}"
+    }
+  ]
+}

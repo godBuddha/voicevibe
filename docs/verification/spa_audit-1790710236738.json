@@ -1,0 +1,433 @@
+{
+  "startedAt": "2026-09-29T19:30:38.047Z",
+  "base": "http://127.0.0.1:18081",
+  "api": "http://127.0.0.1:18081",
+  "mode": "flows",
+  "fast": false,
+  "pages": [],
+  "flows": [
+    {
+      "name": "f-login-wrong-password",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "sai mật khẩu",
+          "detail": "ở lại /login: true, lỗi hiện: có",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 6801
+    },
+    {
+      "name": "f-login",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "đăng nhập",
+          "detail": "hạ cánh ở /admin/users (admin kỳ vọng /admin: RỒI)",
+          "ok": true
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18081/v1/auth/login",
+          "status": 401,
+          "snippet": "{\"detail\":\"Email hoặc mật khẩu không đúng\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 7813
+    },
+    {
+      "name": "f-permissions",
+      "expect": false,
+      "ok": true,
+      "steps": [
+        {
+          "action": "tạo/reuse user auditor",
+          "detail": "vv-auditor@local (status 409)",
+          "ok": true
+        },
+        {
+          "action": "user thường vào /admin/users",
+          "detail": "hạ cánh: /; sidebar có QUẢN TRỊ: false; bảng trống lặng lẽ: true",
+          "ok": true
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18081/v1/auth/me",
+          "status": 401,
+          "snippet": "{\"detail\":\"chưa đăng nhập\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 13754
+    },
+    {
+      "name": "f-voice-create",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "upload giọng mẫu",
+          "detail": "không có alert",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 8431
+    },
+    {
+      "name": "f-voice-delete",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "xoá giọng + tải lại",
+          "detail": "đã mất thật sau reload",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [
+        {
+          "type": "confirm",
+          "message": "Bạn có chắc muốn xoá giọng này?"
+        }
+      ],
+      "screenshots": [],
+      "durationMs": 9615
+    },
+    {
+      "name": "f-tts-generate",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "chờ job tts",
+          "detail": "status=failed",
+          "ok": false
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 157973
+    },
+    {
+      "name": "f-stt-job",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "chờ job stt",
+          "detail": "status=failed",
+          "ok": false
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 141600
+    },
+    {
+      "name": "f-subtitle-job",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "chờ job subtitle",
+          "detail": "status=failed",
+          "ok": false
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 142104
+    },
+    {
+      "name": "f-dub-job",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "flow",
+          "detail": "TimeoutError: Waiting failed: 5000ms exceeded",
+          "ok": false
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "error": "TimeoutError: Waiting failed: 5000ms exceeded",
+      "durationMs": 9952
+    },
+    {
+      "name": "f-api-keys-create-revoke",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "mở trang",
+          "detail": "render bình thường",
+          "ok": true
+        },
+        {
+          "action": "tạo key",
+          "detail": "raw=vv_dce10…",
+          "ok": true
+        },
+        {
+          "action": "thu hồi key qua UI",
+          "detail": "key VẪN còn trong danh sách API",
+          "ok": false
+        },
+        {
+          "action": "xoá key qua API (raw)",
+          "detail": "status 200",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 7538
+    },
+    {
+      "name": "f-admin-users",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "tìm user auditor",
+          "detail": "không thấy hàng — chạy f-permissions trước",
+          "ok": false
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 2942
+    },
+    {
+      "name": "f-admin-modelhub",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "tạo provider (4 prompt)",
+          "detail": "card xuất hiện",
+          "ok": true
+        },
+        {
+          "action": "Test kết nối",
+          "detail": "alert: Kết nối LỖI — không kết nối được: ConnectError",
+          "ok": true
+        },
+        {
+          "action": "Pull models",
+          "detail": "alert: Lỗi lấy model: không lấy được danh sách model: ConnectError",
+          "ok": true
+        },
+        {
+          "action": "xoá provider (UI)",
+          "detail": "đã mất khỏi danh sách",
+          "ok": true
+        },
+        {
+          "action": "tab Stages/Prompts",
+          "detail": "stages=true, prompts=true",
+          "ok": true
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:18081/v1/admin/providers/99b042359868/models",
+          "status": 502,
+          "snippet": "{\"detail\":\"không lấy được danh sách model: ConnectError\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [
+        {
+          "type": "prompt",
+          "message": "Tên provider (ví dụ: OpenRouter):"
+        },
+        {
+          "type": "prompt",
+          "message": "Base URL (ví dụ: https://openrouter.ai/api/v1):"
+        },
+        {
+          "type": "prompt",
+          "message": "Loại — openai | ollama:"
+        },
+        {
+          "type": "prompt",
+          "message": "API key (để trống nếu không cần):"
+        },
+        {
+          "type": "alert",
+          "message": "Kết nối LỖI — không kết nối được: ConnectError"
+        },
+        {
+          "type": "alert",
+          "message": "Lỗi lấy model: không lấy được danh sách model: ConnectError"
+        },
+        {
+          "type": "confirm",
+          "message": "Xoá provider?"
+        }
+      ],
+      "screenshots": [],
+      "durationMs": 16795
+    },
+    {
+      "name": "f-admin-settings",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "thêm setting",
+          "detail": "hàng xuất hiện",
+          "ok": true
+        },
+        {
+          "action": "xoá setting",
+          "detail": "đã mất",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [
+        {
+          "type": "confirm",
+          "message": "Xoá setting \"audit.1790710236738\" (quay về giá trị mặc định)?"
+        }
+      ],
+      "screenshots": [],
+      "durationMs": 6800
+    },
+    {
+      "name": "f-theme-toggle",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "đổi theme",
+          "detail": "light → dark",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 3904
+    },
+    {
+      "name": "f-logout",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "đăng xuất",
+          "detail": "về /login: đúng, cờ localStorage dọn: true",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 4599
+    }
+  ],
+  "summary": {
+    "pagesChecked": 0,
+    "pageErrors": 0,
+    "consoleErrors": 1,
+    "domFindings": 0,
+    "unexpectedHttp": 0,
+    "duplicateShots": 0,
+    "dialogs": 9,
+    "flowsRun": 15,
+    "failedFlows": 6,
+    "failedExpected": [
+      "f-tts-generate",
+      "f-stt-job",
+      "f-subtitle-job",
+      "f-dub-job",
+      "f-api-keys-create-revoke",
+      "f-admin-users"
+    ]
+  },
+  "unexpectedHttpDetail": []
+}

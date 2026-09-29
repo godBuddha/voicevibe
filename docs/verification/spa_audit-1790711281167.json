@@ -1,0 +1,49 @@
+{
+  "startedAt": "2026-09-29T19:48:02.132Z",
+  "base": "http://127.0.0.1:18081",
+  "api": "http://127.0.0.1:18081",
+  "mode": "flows",
+  "fast": false,
+  "pages": [],
+  "flows": [
+    {
+      "name": "f-tts-generate",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "chờ job tts",
+          "detail": "status=done",
+          "ok": true
+        },
+        {
+          "action": "trình phát audio",
+          "detail": "thẻ <audio> xuất hiện",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [
+        "/home/jewking/Documents/voicevibe/docs/screenshots-spa/flow-tts-player.png"
+      ],
+      "durationMs": 61622
+    }
+  ],
+  "summary": {
+    "pagesChecked": 0,
+    "pageErrors": 0,
+    "consoleErrors": 0,
+    "domFindings": 0,
+    "unexpectedHttp": 0,
+    "duplicateShots": 0,
+    "dialogs": 0,
+    "flowsRun": 1,
+    "failedFlows": 0,
+    "failedExpected": []
+  },
+  "unexpectedHttpDetail": []
+}

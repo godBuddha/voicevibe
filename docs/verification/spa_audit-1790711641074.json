@@ -1,0 +1,52 @@
+{
+  "startedAt": "2026-09-29T19:54:02.200Z",
+  "base": "http://127.0.0.1:18081",
+  "api": "http://127.0.0.1:18081",
+  "mode": "flows",
+  "fast": false,
+  "pages": [],
+  "flows": [
+    {
+      "name": "f-admin-users",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "cấp credit 1500",
+          "detail": "hiển thị 1.500",
+          "ok": true
+        },
+        {
+          "action": "chặn user",
+          "detail": "chuyển Chặn",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [
+        {
+          "type": "prompt",
+          "message": "Nhập mật khẩu mới cho user này:"
+        }
+      ],
+      "screenshots": [],
+      "durationMs": 6359
+    }
+  ],
+  "summary": {
+    "pagesChecked": 0,
+    "pageErrors": 0,
+    "consoleErrors": 0,
+    "domFindings": 0,
+    "unexpectedHttp": 0,
+    "duplicateShots": 0,
+    "dialogs": 1,
+    "flowsRun": 1,
+    "failedFlows": 0,
+    "failedExpected": []
+  },
+  "unexpectedHttpDetail": []
+}

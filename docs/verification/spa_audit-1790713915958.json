@@ -1,0 +1,49 @@
+{
+  "startedAt": "2026-09-29T20:31:56.948Z",
+  "base": "http://127.0.0.1:18081",
+  "api": "http://127.0.0.1:18081",
+  "mode": "flows",
+  "fast": false,
+  "pages": [],
+  "flows": [
+    {
+      "name": "f-stt-job",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "chờ job stt",
+          "detail": "status=done",
+          "ok": true
+        },
+        {
+          "action": "transcript hiện trên UI",
+          "detail": "có",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [
+        "/home/jewking/Documents/voicevibe/docs/screenshots-spa/flow-stt-transcript.png"
+      ],
+      "durationMs": 26625
+    }
+  ],
+  "summary": {
+    "pagesChecked": 0,
+    "pageErrors": 0,
+    "consoleErrors": 0,
+    "domFindings": 0,
+    "unexpectedHttp": 0,
+    "duplicateShots": 0,
+    "dialogs": 0,
+    "flowsRun": 1,
+    "failedFlows": 0,
+    "failedExpected": []
+  },
+  "unexpectedHttpDetail": []
+}

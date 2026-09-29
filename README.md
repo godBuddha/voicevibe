@@ -155,6 +155,27 @@ Nhật ký thô: `docs/verification/*.log`. Bằng chứng hình ảnh lấy **t
 đếm của `testsrc`, tức luồng video sống sót qua bước lồng tiếng. Ảnh dạng sóng nguồn và bản
 đã lồng tiếng xếp đoạn khớp nhau, cho thấy timing-fit đặt đúng vị trí.
 
+### Video demo thật — lồng tiếng Trung → Việt (2 phút 13 giây)
+
+Video phim ngắn tiên hiệp AI từ YouTube (nguồn ghi dưới đây) chạy qua pipeline đầy đủ —
+không phải sample tổng hợp. Kết quả tải được ngay trong repo:
+
+| File | Nội dung |
+|---|---|
+| [`docs/samples/dub-demo-zh-original.mp4`](docs/samples/dub-demo-zh-original.mp4) | bản gốc — tiếng Trung, H.264/AAC 608×1080, 28 MB |
+| [`docs/samples/dub-demo-vietnamese.mp4`](docs/samples/dub-demo-vietnamese.mp4) | **bản lồng tiếng Việt** — 33 câu, 6 nhân vật 6 giọng, nhạc nền giữ nguyên (Demucs), 27 MB |
+
+Số liệu kiểm chứng (chạy trên RTX 3060, script `scripts/dub_video_a.py` + `dub_video_b.py`):
+
+- STT nhận diện tiếng Trung `p=0.99`, 33 câu; diarization **6 người nói**
+- Dịch qua DeepSeek v3.1 (OpenRouter): *"Thưa công tử, để thiếp hầu tắm. Mời công tử thay phục..."*
+- Thời lượng ra 133,08s / gốc 133,12s (lệch 0,04s) — timing-fit giữ nhịp
+- Kiểm chứng vòng: STT lại bản lồng → tiếng Việt `p=1.00`, 193 từ khớp nội dung
+- Chạy **tái lập được trên 2 máy khác nhau** (2×3090 và RTX 3060) cho kết quả nhất quán
+
+> Nguồn video test: [YouTube Shorts `ddrIihy7NRc`](https://youtube.com/shorts/ddrIihy7NRc)
+> (kênh CineAIVideo, phim ngắn AI) — dùng làm sample demo, bản quyền thuộc tác giả gốc.
+
 ### Đoạn dịch dài quá thời lượng — không còn đọc méo
 
 Khi bản dịch dài hơn slot, cách cũ là ép `atempo` tới `max_speed` (1.35) — nghe rõ méo.

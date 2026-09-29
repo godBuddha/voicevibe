@@ -17,16 +17,21 @@ export default function AdminSettings() {
 
   const loadSettings = async () => {
     try {
-      const data = await api.get('/v1/admin/settings');
-      setSettings(data || {});
+      // Endpoint thật: GET /admin/settings → {settings: [{key, label, category,
+      // is_secret, value, source, set_in_db}]}. Trang render object {key: value}
+      // — chuyển tại đây; giá trị secret về sau bị mask, chỉ ghi đè khi đổi.
+      const data = await api.get('/admin/settings');
+      const map = {};
+      for (const s of (data.settings || [])) map[s.key] = s.value ?? '';
+      setSettings(map);
     } catch {}
   };
 
   const updateSetting = async (key, value) => {
     setLoading(true);
     try {
-      // Note: This would require an endpoint to update a single setting
-      // For now we'll simulate by updating locally
+      // PUT /admin/settings/{key} {value} — upsert (tạo mới nếu chưa có).
+      await api.put(`/admin/settings/${key}`, { body: { value } });
       setSettings({ ...settings, [key]: value });
       setEditing(null);
       setEditValue('');
@@ -46,6 +51,7 @@ export default function AdminSettings() {
     }
     setLoading(true);
     try {
+      await api.put(`/admin/settings/${key}`, { body: { value: val } });
       setSettings({ ...settings, [key]: val });
       setNewKey('');
       setNewValue('');
@@ -60,8 +66,7 @@ export default function AdminSettings() {
   const deleteSetting = async (key) => {
     if (!confirm(`Xoá setting "${key}"?`)) return;
     try {
-      // Note: This would require an endpoint to delete a setting
-      // For now we'll simulate by updating locally
+      await api.del(`/admin/settings/${key}`);
       const newSettings = { ...settings };
       delete newSettings[key];
       setSettings(newSettings);

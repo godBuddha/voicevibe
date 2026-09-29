@@ -9,6 +9,7 @@ export default function AdminModelHub() {
   const [prompts, setPrompts] = useState([]);
   const [selectedProvider, setSelectedProvider] = useState(null);
   const [editingPrompt, setEditingPrompt] = useState(null);
+  const [editingStage, setEditingStage] = useState(null); // {stage, provider_id, model}
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -17,24 +18,47 @@ export default function AdminModelHub() {
 
   const loadData = async () => {
     try {
-      const providersData = await api.get('/v1/admin/providers');
-      const stagesData = await api.get('/v1/admin/stages');
-      const promptsData = await api.get('/v1/admin/prompts');
-      setProviders(providersData);
-      setStages(stagesData);
-      setPrompts(promptsData);
+      const [providersData, stagesData, promptsData] = await Promise.all([
+        api.get('/v1/admin/providers'),
+        api.get('/v1/admin/stages'),
+        api.get('/v1/admin/prompts'),
+      ]);
+      // Backend: {providers:[...]}, {stages:{stt:[...],...}, summary:{...}}, {prompts:[...]}
+      setProviders(providersData.providers || []);
+      // Trang render mảng {stage, models[], fallback[]}; backend trả object
+      // {stage: [{provider_id, model, order, provider_name}...]}. order=0 là
+      // chính, các order>0 chính là chuỗi fallback.
+      const stageRows = Object.entries(stagesData.stages || {}).map(([stage, items]) => ({
+        stage,
+        summary: (stagesData.summary || {})[stage],
+        models: items.filter(x => x.order === 0).map(x => x.model || '(mặc định)'),
+        fallback: items.filter(x => x.order > 0).map(x => `${x.model || '(mặc định)'}${x.provider_name ? ` @ ${x.provider_name}` : ''}`),
+        items,
+      }));
+      setStages(stageRows);
+      setPrompts(promptsData.prompts || []);
     } catch {}
   };
 
   const addProvider = async () => {
-    const name = prompt('Tên provider:');
+    const name = prompt('Tên provider (ví dụ: OpenRouter):');
     if (!name) return;
-    const type = prompt('Loại (openai/ollama):') || 'openai';
+    const base = prompt('Base URL (ví dụ: https://openrouter.ai/api/v1):');
+    if (!base) return;
+    const kind = (prompt('Loại — openai | ollama:', 'openai') || 'openai').trim();
+    const apiKey = prompt('API key (để trống nếu không cần):') || '';
+    setLoading(true);
     try {
-      const newProvider = { id: Date.now(), name, base_url: '', type, status: 'inactive', models: [] };
-      setProviders([...providers, newProvider]);
-      setSelectedProvider(newProvider);
-    } catch {}
+      // Backend ProviderIn: {name, kind, base_url, api_key, prefix_id, enabled}
+      await api.post('/v1/admin/providers', {
+        body: { name, kind, base_url: base, api_key: apiKey || undefined, enabled: true },
+      });
+      await loadData();
+    } catch (err) {
+      alert('Lỗi khi tạo provider: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const deleteProvider = async (id) => {
@@ -43,16 +67,27 @@ export default function AdminModelHub() {
       await api.del(`/v1/admin/providers/${id}`);
       setProviders(providers.filter(p => p.id !== id));
       if (selectedProvider?.id === id) setSelectedProvider(null);
-    } catch {}
+    } catch (err) {
+      alert('Lỗi khi xoá provider: ' + err.message);
+    }
   };
 
   const saveProvider = async () => {
     if (!selectedProvider) return;
     setLoading(true);
     try {
-      await api.put(`/v1/admin/providers/${selectedProvider.id}`, { body: selectedProvider });
-      setProviders(providers.map(p => p.id === selectedProvider.id ? selectedProvider : p));
+      // PATCH semantics: api_key rỗng/vắng = giữ nguyên key cũ — chỉ gửi khi
+      // người dùng nhập mới. `type` (mock) đã đổi thành `kind` (backend).
+      const body = {
+        name: selectedProvider.name,
+        kind: selectedProvider.kind,
+        base_url: selectedProvider.base_url,
+        enabled: selectedProvider.enabled !== false,
+      };
+      if (selectedProvider.api_key) body.api_key = selectedProvider.api_key;
+      await api.patch(`/v1/admin/providers/${selectedProvider.id}`, { body });
       setSelectedProvider(null);
+      await loadData();
     } catch (err) {
       alert('Lỗi khi lưu provider: ' + err.message);
     } finally {
@@ -63,8 +98,9 @@ export default function AdminModelHub() {
   const testProvider = async (id) => {
     setLoading(true);
     try {
+      // _probe trả {id, ok, detail} — thông báo con người, không phải số models.
       const res = await api.post(`/v1/admin/providers/${id}/test`);
-      alert(res.models?.length ? `Đã kết nối, có ${res.models.length} models` : 'Kết nối thành công nhưng không có model');
+      alert(res.ok ? `Kết nối OK — ${res.detail}` : `Kết nối LỖI — ${res.detail}`);
     } catch (err) {
       alert('Lỗi kết nối: ' + err.message);
     } finally {
@@ -72,24 +108,33 @@ export default function AdminModelHub() {
     }
   };
 
-  const pullModels = async (id) => {
+  const fetchModels = async (id) => {
     setLoading(true);
     try {
-      const res = await api.post(`/v1/admin/providers/${id}/pull`);
-      setProviders(providers.map(p => p.id === id ? { ...p, models: res.models || [] } : p));
+      // GET /providers/{id}/models: {provider_id, kind, models: [{name, ...}]}
+      // (Ollama đi qua /api/tags; OpenAI-compat đi qua /models.)
+      const res = await api.get(`/v1/admin/providers/${id}/models`);
+      const names = (res.models || []).map(m => m.name);
+      setProviders(providers.map(p => p.id === id ? { ...p, models: names } : p));
+      alert(`Đã lấy ${names.length} model.`);
     } catch (err) {
-      alert('Lỗi khi pull models: ' + err.message);
+      alert('Lỗi lấy model: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const updateStage = async (stage, models, fallback) => {
+  const updateStage = async (stage, providerId, model) => {
     try {
-      await api.put(`/v1/admin/stages/${stage}`, { body: { models, fallback } });
-      setStages(stages.map(s => s.stage === stage ? { ...s, models, fallback } : s));
+      // Backend StageIn: {provider_id, model, params, order} — order=0 ghi đè
+      // lựa chọn chính. Chuỗi fallback đọc từ các order>0 (GET /stages).
+      await api.put(`/v1/admin/stages/${stage}`, {
+        body: { provider_id: providerId || undefined, model: model || '', params: {}, order: 0 },
+      });
+      setEditingStage(null);
+      await loadData();
     } catch (err) {
-      alert('Lỗi khi save stage: ' + err.message);
+      alert('Lỗi khi lưu stage: ' + err.message);
     }
   };
 
@@ -99,24 +144,24 @@ export default function AdminModelHub() {
 
   const savePrompt = async () => {
     try {
-      await api.put(`/v1/admin/prompts/${editingPrompt.task_key}`, { body: editingPrompt });
-      setPrompts(prompts.map(p => p.task_key === editingPrompt.task_key ? editingPrompt : p));
+      // Backend PromptIn: {content} — bản mock dùng `template`, đã đổi.
+      await api.put(`/v1/admin/prompts/${editingPrompt.task_key}`, {
+        body: { content: editingPrompt.content ?? editingPrompt.template ?? '' },
+      });
       setEditingPrompt(null);
+      await loadData();
     } catch (err) {
-      alert('Lỗi khi save prompt: ' + err.message);
+      alert('Lỗi khi lưu prompt: ' + err.message);
     }
   };
 
   const resetPrompt = async (taskKey) => {
     if (!confirm('Reset về prompt mặc định?')) return;
     try {
-      const defaultPrompts = {
-        translate: 'Dịch chính xác đoạn sau sang {target_lang}: {text}',
-        transcript: 'Chuyển ngữ đoạn audio sau thành văn bản tiếng {lang}:',
-      };
-      const resetTo = defaultPrompts[taskKey];
-      await api.put(`/v1/admin/prompts/${taskKey}`, { body: { template: resetTo } });
-      setPrompts(prompts.map(p => p.task_key === taskKey ? { ...p, template: resetTo } : p));
+      // Backend có endpoint reset riêng (đích của nút là seed mặc định) —
+      // bản mock tự bịa chuỗi mặc định trong client, sai hoàn toàn.
+      await api.post(`/v1/admin/prompts/${taskKey}/reset`);
+      await loadData();
     } catch (err) {
       alert('Lỗi khi reset prompt: ' + err.message);
     }
@@ -274,7 +319,7 @@ export default function AdminModelHub() {
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 'var(--text-lg)', marginBottom: '8px' }}>{provider.name}</div>
                   <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '4px' }}>
-                    Type: <span style={{ fontWeight: 600 }}>{provider.type}</span>
+                    Type: <span style={{ fontWeight: 600 }}>{provider.kind}</span>
                   </div>
                   <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '8px' }}>
                     URL: <span style={{ fontFamily: 'monospace', background: 'var(--bg)', padding: '2px 6px', borderRadius: '2px' }}>{provider.base_url || 'N/A'}</span>
@@ -302,7 +347,7 @@ export default function AdminModelHub() {
                       Test kết nối
                     </button>
                     <button
-                      onClick={() => pullModels(provider.id)}
+                      onClick={() => fetchModels(provider.id)}
                       disabled={loading}
                       style={{
                         background: 'var(--warning-light)',
@@ -362,6 +407,46 @@ export default function AdminModelHub() {
       {activeTab === 'stages' && (
         <div>
           <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: '24px' }}>Các công đoạn xử lý</h3>
+          {/* Trình soạn stage: gán (provider, model) chính cho từng công đoạn —
+              đúng nghĩa PUT /stages/{stage} order=0 của backend. */}
+          {editingStage && (
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '24px', marginBottom: '24px' }}>
+              <h4 style={{ fontSize: 'var(--text-lg)', fontWeight: 600, marginBottom: '16px' }}>
+                Gán model cho công đoạn: {editingStage.stage}
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '8px' }}>Provider</label>
+                  <select
+                    value={editingStage.provider_id || ''}
+                    onChange={(e) => setEditingStage({ ...editingStage, provider_id: e.target.value })}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: 'var(--text-sm)', background: 'var(--bg)', color: 'var(--text)' }}
+                  >
+                    <option value="">(engine local mặc định)</option>
+                    {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '8px' }}>Model</label>
+                  <input
+                    type="text"
+                    value={editingStage.model || ''}
+                    onChange={(e) => setEditingStage({ ...editingStage, model: e.target.value })}
+                    placeholder="tên model, để trống = mặc định"
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: 'var(--text-sm)', background: 'var(--bg)', color: 'var(--text)' }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button onClick={() => setEditingStage(null)} style={{ background: 'var(--bg)', color: 'var(--text-dim)', border: '1px solid var(--border)', padding: '8px 16px', borderRadius: 'var(--radius)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+                  Huỷ
+                </button>
+                <button onClick={() => updateStage(editingStage.stage, editingStage.provider_id, editingStage.model)} disabled={loading} style={{ background: 'var(--gradient)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 'var(--radius)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1 }}>
+                  Lưu
+                </button>
+              </div>
+            </div>
+          )}
           <div style={{ display: 'grid', gap: '24px' }}>
             {stages.map(sg => (
               <div
@@ -416,6 +501,11 @@ export default function AdminModelHub() {
                 </div>
                 <div style={{ marginTop: '20px', fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
                   <button
+                    onClick={() => setEditingStage({
+                      stage: sg.stage,
+                      provider_id: (sg.items.find(x => x.order === 0) || {}).provider_id || '',
+                      model: (sg.items.find(x => x.order === 0) || {}).model || '',
+                    })}
                     style={{
                       background: 'var(--primary-light)',
                       color: 'var(--primary)',
@@ -490,8 +580,8 @@ export default function AdminModelHub() {
                 {editingPrompt?.task_key === p.task_key ? (
                   <div>
                     <textarea
-                      value={editingPrompt.template}
-                      onChange={(e) => setEditingPrompt({ ...editingPrompt, template: e.target.value })}
+                      value={editingPrompt.content ?? ''}
+                      onChange={(e) => setEditingPrompt({ ...editingPrompt, content: e.target.value })}
                       rows={4}
                       style={{
                         width: '100%',
@@ -547,7 +637,7 @@ export default function AdminModelHub() {
                     lineHeight: 1.6,
                     overflowX: 'auto',
                   }}>
-                    {p.template}
+                    {p.content}
                   </pre>
                 )}
               </div>

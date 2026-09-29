@@ -5,7 +5,7 @@ export default function AdminUsers() {
   const { api } = useApi();
   const [users, setUsers] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newUser, setNewUser] = useState({ email: '', role: 'user', credits: 0 });
+  const [newUser, setNewUser] = useState({ email: '', password: '', role: 'user', credits: 0 });
   const [selectedUser, setSelectedUser] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -15,19 +15,37 @@ export default function AdminUsers() {
 
   const fetchUsers = async () => {
     try {
+      // Backend trả {users: [{user_id, email, role, is_active, credits, ...}]} —
+      // trang đọc {id, status}. Chuyển tại đây, một điểm duy nhất.
       const data = await api.get('/v1/admin/users');
-      setUsers(data);
+      setUsers((data.users || []).map(u => ({
+        ...u,
+        id: u.user_id,
+        status: u.is_active ? 'active' : 'suspended',
+      })));
     } catch {}
   };
 
   const createUser = async () => {
-    if (!newUser.email) return;
+    if (!newUser.email || !newUser.password) return;
     setLoading(true);
     try {
-      const res = await api.post('/v1/admin/users', { body: newUser });
-      setUsers([...users, { ...res, ...newUser }]);
+      // Backend CreateUserIn bắt buộc password (tối thiểu theo chính sách) —
+      // bản mock không cần nên form đầu tiên thiếu ô này, đã thêm.
+      const res = await api.post('/v1/admin/users', {
+        body: {
+          email: newUser.email,
+          password: newUser.password,
+          role: newUser.role,
+          credits: newUser.credits || undefined,
+        },
+      });
+      const data = await api.get('/v1/admin/users');
+      setUsers((data.users || []).map(u => ({
+        ...u, id: u.user_id, status: u.is_active ? 'active' : 'suspended',
+      })));
       setShowCreateModal(false);
-      setNewUser({ email: '', role: 'user', credits: 0 });
+      setNewUser({ email: '', password: '', role: 'user', credits: 0 });
     } catch (err) {
       alert('Lỗi khi tạo user: ' + err.message);
     } finally {
@@ -36,18 +54,27 @@ export default function AdminUsers() {
   };
 
   const resetPassword = async (id) => {
+    // Backend ResetPasswordIn nhận mật khẩu MỚI do admin cung cấp (trả về số
+    // phiên bị đá), không sinh "mật khẩu tạm" như bản mock tưởng.
+    const pw = prompt('Nhập mật khẩu mới cho user này:');
+    if (!pw) return;
     try {
-      const res = await api.post(`/v1/admin/users/${id}/reset-password`);
-      alert(`Mật khẩu tạm cho user: ${res.tempPassword}`);
+      const res = await api.post(`/v1/admin/users/${id}/reset-password`, { body: { password: pw } });
+      alert(`Đã đổi mật khẩu — ${res.sessions_revoked} phiên cũ bị đá ra.`);
     } catch (err) {
       alert('Lỗi khi reset mật khẩu: ' + err.message);
     }
   };
 
-  const updateCredits = async (id, credits) => {
+  const updateCredits = async (user, newCredits) => {
     try {
-      await api.post(`/v1/admin/users/${id}/credits`, { body: { credits } });
-      setUsers(users.map(u => u.id === id ? { ...u, credits } : u));
+      // Backend nhận CHÊNH LỆCH {delta, reason}, không nhận giá trị tuyệt đối.
+      const delta = Number(newCredits) - Number(user.credits || 0);
+      if (!delta) return;
+      await api.post(`/v1/admin/users/${user.id}/credits`, {
+        body: { delta, reason: 'admin_grant' },
+      });
+      setUsers(users.map(u => u.id === user.id ? { ...u, credits: newCredits } : u));
     } catch (err) {
       alert('Lỗi khi cập nhật credits: ' + err.message);
     }
@@ -68,7 +95,7 @@ export default function AdminUsers() {
 
   const saveEdit = () => {
     if (selectedUser.tempCredits !== selectedUser.credits) {
-      updateCredits(selectedUser.id, selectedUser.tempCredits);
+      updateCredits(selectedUser, selectedUser.tempCredits);
     }
     setSelectedUser(null);
   };
@@ -153,6 +180,27 @@ export default function AdminUsers() {
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '8px', fontWeight: 600 }}>
+                  Mật khẩu
+                </label>
+                <input
+                  type="password"
+                  value={newUser.password}
+                  onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                  placeholder="Tối thiểu 8 ký tự"
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: 'var(--radius)',
+                    border: '1px solid var(--border)',
+                    fontSize: 'var(--text-base)',
+                    background: 'var(--bg)',
+                    color: 'var(--text)',
+                  }}
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '8px', fontWeight: 600 }}>
                   Vai trò
                 </label>
                 <select
@@ -196,7 +244,7 @@ export default function AdminUsers() {
             <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
               <button
                 onClick={createUser}
-                disabled={!newUser.email || loading}
+                disabled={!newUser.email || !newUser.password || loading}
                 style={{
                   flex: 1,
                   background: 'var(--gradient)',

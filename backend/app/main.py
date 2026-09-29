@@ -17,6 +17,7 @@ import secrets as _secrets
 import time
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
@@ -76,6 +77,38 @@ app = FastAPI(
     redoc_url="/redoc" if _DOCS else None,
     openapi_url="/openapi.json" if _DOCS else None,
 )
+
+
+def parse_cors_origins(raw: str) -> list[str]:
+    """Danh sách origin được phép gọi API từ BẤT KỲ nguồn nào khác (tách frontend).
+
+    Đầu vào: nội dung env `YUPVOX_CORS_ORIGINS` — phân tách bằng dấu phẩy, ví dụ
+    `http://localhost:5173,https://app.example.com`. Chuỗi rỗng → rỗng (không bật
+    CORS — trạng thái mặc định, web UI inline cùng origin không cần nó).
+
+    `/` cuối bị cắt: `https://x.com/` và `https://x.com` phải là một origin, nếu
+    không cấu hình tưởng đúng mà browser chặn.
+    """
+    return [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
+
+
+def add_cors(app: FastAPI, origins: list[str]) -> None:
+    # `allow_credentials=True` kết hợp wildcard là cặp BẤT HỢP LỆ theo spec CORS:
+    # browser sẽ BỎ QUA allow-credentials khi danh sách là `*`, cookie phiên không
+    # bao giờ được gửi — lỗi im lặng khó truy vết. Nên danh sách origin phải tường
+    # minh, không bao giờ wildcard.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+
+_CORS_ORIGINS = parse_cors_origins(os.getenv("YUPVOX_CORS_ORIGINS", ""))
+if _CORS_ORIGINS:
+    add_cors(app, _CORS_ORIGINS)
 
 # Auto-migration: tạo bảng thiếu + THÊM CỘT thiếu vào bảng đã tồn tại (create_all một
 # mình không làm được việc sau). Idempotent — xem app/migrations.py.

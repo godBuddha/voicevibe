@@ -147,8 +147,16 @@ services:
   #   docker compose --profile proxy up -d
   # Không đặt trong profile mặc định vì phần lớn bản self-host chạy sau tunnel
   # hoặc reverse proxy sẵn có — dựng thêm Caddy ở đó chỉ tổ vướng.
-  caddy:
-    image: caddy:2-alpine
+  #
+  # Từ khi tách frontend: image này BUILD SPA (React) bên trong Docker
+  # (docker/web.Dockerfile) rồi serve static + proxy API — người self-host không
+  # cần Node. Caddyfile được nướng vào image (không mount) để dist + cấu hình
+  # luôn đi cùng nhau; dữ liệu TLS vẫn nằm trong volume riêng.
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    image: yupvox-clone-web:latest
     profiles: [proxy]
     environment:
       # KHÔNG dùng `${APP_DOMAIN:?...}` ở đây. Compose nội suy biến của MỌI service
@@ -166,7 +174,6 @@ services:
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddydata:/data
       - caddyconfig:/config
     depends_on:

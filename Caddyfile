@@ -1,8 +1,21 @@
-# Caddy reverse proxy — TLS tự động (Let's Encrypt) khi APP_DOMAIN là tên miền thật.
+# Caddy — SPA frontend + reverse proxy API trong MỘT entry point.
+# TLS tự động (Let's Encrypt) khi APP_DOMAIN là tên miền thật.
 # Bật bằng:  docker compose --profile proxy up -d
+#
+# Kiến trúc tách frontend (React SPA):
+#   - /v1/*, /media/*, /healthz, /admin/settings*  → api:8000 (JSON + cookie phiên)
+#   - mọi đường khác                               → file static của SPA; không khớp
+#     file thật thì trả index.html (react-router tự vẽ route).
+#
+# Prod chạy same-origin qua Caddy nên cookie SameSite=Lax hoạt động nguyên trạng,
+# KHÔNG cần CORS. CORS chỉ cần khi SPA dev server (Vite, khác origin) gọi thẳng
+# vào api — bật bằng env YUPVOX_CORS_ORIGINS bên api (xem app/main.py).
 #
 # `api:8000` là tên service trong mạng nội bộ của compose; Caddy là chỗ DUY NHẤT
 # phơi ra ngoài, còn api đã bind vào loopback.
+#
+# LƯU Ý: bản UI inline (HTML trong Python) vẫn nằm trong api — những bản self-host
+# KHÔNG bật profile proxy (tunnel trỏ thẳng api) vẫn dùng được nguyên trạng.
 
 # Compose luôn truyền giá trị KHÁC RỖNG (mặc định `localhost`) — xem ghi chú trong
 # docker-compose.yml: chuỗi rỗng làm Caddy hiểu nhầm khối này là global option.
@@ -10,12 +23,33 @@
 {$APP_DOMAIN} {
 	encode zstd gzip
 
+	# --- API: JSON, cookie, file media — đi thẳng vào api:8000 ---
+	handle /v1/* {
+		reverse_proxy api:8000
+	}
+	handle /media/* {
+		reverse_proxy api:8000
+	}
+	handle /healthz {
+		reverse_proxy api:8000
+	}
+	# Settings hệ thống nằm dưới /admin (backend), các endpoint AI khác của admin
+	# đã sống trong /v1/admin/* — SPA có route /admin/* riêng của nó.
+	handle /admin/settings* {
+		reverse_proxy api:8000
+	}
+
+	# --- SPA: static + fallback index.html cho client-side router ---
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
 	# Caddy tự đặt X-Forwarded-Proto / X-Forwarded-For. `auth.py` đọc
 	# X-Forwarded-Proto để quyết định cờ `Secure` cho cookie phiên, nên header này
 	# là bắt buộc chứ không phải tuỳ chọn — thiếu nó thì cookie đi qua HTTP thường.
-	reverse_proxy api:8000
-
-	# TLS mặc định của Caddy (HSTS chỉ bật khi đã có chứng chỉ thật).
+	# (Áp cho CẢ API lẫn static — header khai ở server level, không trong location.)
 	header {
 		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options "nosniff"

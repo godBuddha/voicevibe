@@ -33,14 +33,17 @@ const MIME = {
 };
 
 function proxyApi(req, res) {
-  // Giữ nguyên method/headers/body (cookie + Content-Type multipart) — chỉ
-  // đổi đích. Phản hồi chuyển thẳng (stream) kèm Set-Cookie của API.
+  // Giữ nguyên method/headers/body (cookie + Content-Type multipart) — chỉ đổi
+  // đích. HOST PHẢI GIỮ NGUYÊN: auth.py so CSRF `Origin` với `Host` — ghi đè
+  // host thành đích nội bộ (127.0.0.1:8000) làm mọi POST từ tunnel/proxy bị
+  // 403 "cross-origin request blocked" (Caddy prod giữ Host gốc nên không mắc;
+  // đã gặp thật trên GPU box: tạo giọng/TTS/alert 403 toàn bộ qua SSH tunnel).
   const opts = {
     hostname: API_TARGET.hostname,
     port: API_TARGET.port,
     path: req.url,
     method: req.method,
-    headers: { ...req.headers, host: `${API_TARGET.hostname}:${API_TARGET.port}` },
+    headers: req.headers,
   };
   const upstream = httpRequest(opts, (api) => {
     res.writeHead(api.statusCode, api.headers);

@@ -21,7 +21,7 @@ export default function AdminSettings() {
       // Giữ NGUYÊN metadata của từng setting. Trước đây gộp thành {key: value}
       // làm mất `is_secret` → người sửa secret nhận giá trị MẶT-NẠ ("••••1234")
       // prefilled và bấm Lưu là ghi đè token thật bằng rác (đã gặp thật).
-      const data = await api.get('/admin/settings');
+      const data = await api.get('/v1/admin/settings');
       setRows(data.settings || []);
     } catch (e) {
       console.error('tải cài đặt thất bại', e);
@@ -40,7 +40,7 @@ export default function AdminSettings() {
     setLoading(true);
     setError(null);
     try {
-      await api.put(`/admin/settings/${row.key}`, { body: { value } });
+      await api.put(`/v1/admin/settings/${row.key}`, { body: { value } });
       setEditing(null);
       setEditValue('');
       await loadSettings();
@@ -61,7 +61,7 @@ export default function AdminSettings() {
     setLoading(true);
     setError(null);
     try {
-      await api.put(`/admin/settings/${key}`, { body: { value: val } });
+      await api.put(`/v1/admin/settings/${key}`, { body: { value: val } });
       setNewKey('');
       setNewValue('');
       setShowAddForm(false);
@@ -76,7 +76,7 @@ export default function AdminSettings() {
   const deleteSetting = async (row) => {
     if (!confirm(`Xoá setting "${row.key}" (quay về giá trị mặc định)?`)) return;
     try {
-      await api.del(`/admin/settings/${row.key}`);
+      await api.del(`/v1/admin/settings/${row.key}`);
       await loadSettings();
     } catch (err) {
       setError('Lỗi khi xoá setting: ' + err.message);

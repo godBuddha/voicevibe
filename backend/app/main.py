@@ -631,12 +631,15 @@ def usage(user: User = Depends(auth), db: Session = Depends(get_db)) -> dict:
             "total": user.credits + used, "by_type": by_type}
 
 
-@app.get("/admin/settings")
+# Settings nằm trong gia đình /v1/admin/* — KHÔNG nằm ở /admin/settings:
+# đường đó là route của SPA (gõ thẳng/F5 phải mở ứng dụng, không phải trả JSON
+# qua proxy — đã gặp thật: trình duyệt hiển thị JSON thô thay vì app).
+@app.get("/v1/admin/settings")
 def admin_list(_: None = Depends(admin_auth)) -> dict:
     return {"settings": list_settings()}
 
 
-@app.put("/admin/settings/{key}")
+@app.put("/v1/admin/settings/{key}")
 def admin_set(key: str, body: dict, _: None = Depends(admin_auth)) -> dict:
     value = body.get("value")
     if value is None or not isinstance(value, (str, int, float, bool)):
@@ -649,7 +652,7 @@ def admin_set(key: str, body: dict, _: None = Depends(admin_auth)) -> dict:
     return {"key": key, "ok": True}
 
 
-@app.delete("/admin/settings/{key}")
+@app.delete("/v1/admin/settings/{key}")
 def admin_delete(key: str, _: None = Depends(admin_auth)) -> dict:
     return {"key": key, "deleted": delete_setting(key)}
 

@@ -3,7 +3,7 @@
 # Bật bằng:  docker compose --profile proxy up -d
 #
 # Kiến trúc tách frontend (React SPA):
-#   - /v1/*, /media/*, /healthz, /admin/settings*  → api:8000 (JSON + cookie phiên)
+#   - /v1/*, /media/*, /healthz                     → api:8000 (JSON + cookie phiên)
 #   - mọi đường khác                               → file static của SPA; không khớp
 #     file thật thì trả index.html (react-router tự vẽ route).
 #
@@ -24,6 +24,9 @@
 	encode zstd gzip
 
 	# --- API: JSON, cookie, file media — đi thẳng vào api:8000 ---
+	# Settings API nằm trong gia đình /v1/admin/* (đã dời khỏi /admin/settings):
+	# đường /admin/settings là ROUTE của SPA — nếu proxy nó vào api thì gõ thẳng
+	# URL hoặc F5 sẽ thấy JSON thô thay vì ứng dụng (đã gặp thật).
 	handle /v1/* {
 		reverse_proxy api:8000
 	}
@@ -31,11 +34,6 @@
 		reverse_proxy api:8000
 	}
 	handle /healthz {
-		reverse_proxy api:8000
-	}
-	# Settings hệ thống nằm dưới /admin (backend), các endpoint AI khác của admin
-	# đã sống trong /v1/admin/* — SPA có route /admin/* riêng của nó.
-	handle /admin/settings* {
 		reverse_proxy api:8000
 	}
 

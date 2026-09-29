@@ -6,7 +6,7 @@
 // KHÔNG dùng cho production — prod dùng Caddy (docker/web.Dockerfile).
 //
 // Proxy API (--api): Caddy trên prod proxy `/v1/*`, `/media/*`, `/healthz`,
-// `/admin/settings*` vào api:8000 — chế độ này nhại đúng hành vi đó để chạy
+// vào api:8000 — chế độ này nhại đúng hành vi đó để chạy
 // SPA + API same-origin KHÔNG cần Node/Docker (bản self-host qua SSH tunnel
 // trên GPU box): UI gọi path tương đối → cookie SameSite=Lax hoạt động, CORS
 // không cần (đã gặp thật: tách cổng 8080→18080 phải bật CORS + CSRF allow-list).
@@ -21,8 +21,10 @@ const ROOT = path.resolve(args[0] || 'dist');
 const PORT = Number(args[1] || 8801);
 const API_FLAG = args.indexOf('--api');
 // Cụm đường dẫn prod-Caddy proxy vào api (Caddyfile: /v1/*, /media/*,
-// /healthz, /admin/settings*).
-const API_PATTERNS = [/^\/v1\//, /^\/media\//, /^\/healthz$/, /^\/admin\/settings/];
+// /healthz). CHÚ Ý: /admin/settings KHÔNG được proxy — đó là ROUTE của SPA
+// (gõ thẳng URL/F5 phải mở ứng dụng; JSON settings đã dời sang /v1/admin/settings
+// — trùng đường thì trình duyệt hiện JSON thô thay vì app, đã gặp thật).
+const API_PATTERNS = [/^\/v1\//, /^\/media\//, /^\/healthz$/];
 const API_TARGET = API_FLAG >= 0 ? new URL(args[API_FLAG + 1] || 'http://127.0.0.1:8000') : null;
 const MIME = {
   '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',

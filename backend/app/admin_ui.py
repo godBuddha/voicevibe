@@ -142,7 +142,7 @@ function showTab(name) {
 
 async function load() {
   try {
-    const r = await api("/admin/settings");
+    const r = await api("/v1/admin/settings");
     render((await r.json()).settings);
   } catch (e) { /* api() đã điều hướng khi 401/403 */ }
 }
@@ -174,21 +174,21 @@ function render(settings) {
 
 async function save(key, isSecret) {
   const value = $("in-" + key).value;
-  const r = await api("/admin/settings/" + encodeURIComponent(key),
+  const r = await api("/v1/admin/settings/" + encodeURIComponent(key),
                       { method: "PUT", body: JSON.stringify({ value, is_secret: isSecret }) });
   flash(r.ok ? "✔ đã lưu " + key : "✗ lỗi " + r.status);
   if (r.ok) load();
 }
 async function del(key) {
   if (!confirm("Xóa " + key + "? (sẽ fallback về env/default)")) return;
-  const r = await api("/admin/settings/" + encodeURIComponent(key), { method: "DELETE" });
+  const r = await api("/v1/admin/settings/" + encodeURIComponent(key), { method: "DELETE" });
   flash(r.ok ? "✔ đã xóa" : "✗ lỗi");
   load();
 }
 async function addCustom() {
   const k = $("new-key").value.trim(), v = $("new-val").value;
   if (!k) return;
-  const r = await api("/admin/settings/" + encodeURIComponent(k),
+  const r = await api("/v1/admin/settings/" + encodeURIComponent(k),
                       { method: "PUT", body: JSON.stringify({ value: v, is_secret: false }) });
   flash(r.ok ? "✔ thêm " + k : "✗ lỗi");
   load();

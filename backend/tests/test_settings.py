@@ -75,8 +75,8 @@ from app.main import app  # noqa: E402
 
 c = TestClient(app)
 AH = {"X-Admin-Key": "adm-key-123"}
-assert c.get("/admin/settings", headers={"X-Admin-Key": "wrong"}).status_code == 401
-r = c.get("/admin/settings", headers=AH)
+assert c.get("/v1/admin/settings", headers={"X-Admin-Key": "wrong"}).status_code == 401
+r = c.get("/v1/admin/settings", headers=AH)
 assert r.status_code == 200
 items = {s["key"]: s for s in r.json()["settings"]}
 assert items["hf_token"]["value"].startswith("••••")
@@ -84,10 +84,10 @@ assert items["hf_token"]["is_secret"] is True
 assert items["hf_token"]["set_in_db"] is True
 assert items["pricing.dub"]["value"] == 60
 
-r = c.put("/admin/settings/translate.model", headers=AH, json={"value": "deepseek-chat"})
+r = c.put("/v1/admin/settings/translate.model", headers=AH, json={"value": "deepseek-chat"})
 assert r.status_code == 200
 assert get_setting("translate.model") == "deepseek-chat"
-r = c.delete("/admin/settings/translate.model", headers=AH)
+r = c.delete("/v1/admin/settings/translate.model", headers=AH)
 assert r.status_code == 200 and r.json()["deleted"] is True
 assert get_setting("translate.model") is None
 print("admin API CRUD ............ OK")

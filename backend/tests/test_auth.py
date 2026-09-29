@@ -116,7 +116,7 @@ anon = TestClient(app)
 assert anon.get("/", follow_redirects=False).headers["location"].startswith("/login")
 assert anon.get("/admin", follow_redirects=False).headers["location"] == "/login?next=/admin"
 assert anon.get("/login").status_code == 200
-assert anon.get("/admin/settings").status_code == 401  # không cookie, không key
+assert anon.get("/v1/admin/settings").status_code == 401  # không cookie, không key
 print("chưa đăng nhập -> về /login ............. OK")
 
 # ------------------------------------------------------- 4. đăng nhập/sai/xuất
@@ -193,7 +193,7 @@ RL.reset()
 assert uc.post("/v1/auth/login",
                json={"email": "user@local", "password": "matkhau456"}).status_code == 200
 assert uc.get("/admin", follow_redirects=False).status_code == 302, "user thường không vào /admin"
-assert uc.get("/admin/settings").status_code == 403
+assert uc.get("/v1/admin/settings").status_code == 403
 assert uc.get("/v1/admin/users").status_code == 403
 assert uc.get("/v1/me").status_code == 200
 print("phân quyền: user thường bị chặn ......... OK")
@@ -216,17 +216,17 @@ print("dev key chết sau setup .................. OK")
 
 # ------------------------------------------- 8. X-Admin-Key chỉ khi cấu hình
 RL.reset()
-assert c.get("/admin/settings", headers={"X-Admin-Key": "admin-dev-key"}).status_code == 401, (
+assert c.get("/v1/admin/settings", headers={"X-Admin-Key": "admin-dev-key"}).status_code == 401, (
     "admin-dev-key mặc định vẫn vào được — backdoor còn sống!"
 )
 from app.settings_service import delete_setting, get_setting, set_setting  # noqa: E402
 
 assert get_setting("admin.api_key") in (None, ""), "admin.api_key phải KHÔNG có default"
 set_setting("admin.api_key", "adm-key-that", is_secret=True)
-assert c.get("/admin/settings", headers={"X-Admin-Key": "adm-key-that"}).status_code == 200
-assert c.get("/admin/settings", headers={"X-Admin-Key": "sai"}).status_code == 401
+assert c.get("/v1/admin/settings", headers={"X-Admin-Key": "adm-key-that"}).status_code == 200
+assert c.get("/v1/admin/settings", headers={"X-Admin-Key": "sai"}).status_code == 401
 delete_setting("admin.api_key")
-assert c.get("/admin/settings", headers={"X-Admin-Key": "adm-key-that"}).status_code == 401
+assert c.get("/v1/admin/settings", headers={"X-Admin-Key": "adm-key-that"}).status_code == 401
 print("X-Admin-Key chỉ chạy khi được đặt ...... OK")
 
 # --------------------------------------------------------- 9. công tắc signup

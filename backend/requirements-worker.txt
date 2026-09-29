@@ -12,6 +12,12 @@ psycopg[binary]>=3.2
 # torch/torchaudio: cu128 wheels chạy trên driver >= CUDA 12.0 (verified RTX 3060, driver 550):
 #   pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu128
 faster-whisper>=1.1          # STT (MIT) — large-v3 ~4-5GB VRAM fp16 (estimate)
+                             #   faster-whisper.decode_audio gọi av.open(...,
+                             #   metadata_errors="ignore") — PyAV 16 ĐÃ BỎ kwarg này
+                             #   (TypeError: open() got an unexpected keyword argument
+                             #   'metadata_errors', gặp thật trên GPU box 29/09/2026).
+                             #   Ghim PyAV <16 đến khi faster-whisper sửa.
+av<16                        # xem ghi chú faster-whisper phía trên
 demucs>=4.0                  # tách stem (MIT) — bed lồng tiếng là NHẠC KHÔNG LỜI
                              #   thay vì nguồn giảm âm lượng (giọng gốc vẫn còn 12%
                              #   và đè lên giọng dịch). htdemucs ~80MB, tự tải từ HF.

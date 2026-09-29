@@ -49,6 +49,9 @@ export default function STT() {
         setSpeakers(cues.map((c, i) => ({
           id: i + 1, speaker: c.speaker || '', start: c.start, end: c.end, text: c.text,
         })));
+        if (!cues.length) {
+          setError('Không nhận dạng được lời nói nào trong file (chỉ có nhạc/tiếng ồn?) — job đã chạy xong, credit không bị mất.');
+        }
       }
     } catch (err) {
       setError(err.message);

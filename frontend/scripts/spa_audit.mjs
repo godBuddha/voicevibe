@@ -229,7 +229,9 @@ function makeFixtures() {
   const fx = { voice: path.join(TMP, 'voice-ref.wav'), stt: path.join(TMP, 'audit-10s.wav'), dub: path.join(TMP, 'audit-15s.mp4') };
   run(['-f', 'lavfi', '-i', 'sine=frequency=440:duration=6', '-ac', '1', '-ar', '16000', fx.voice, '-y']);
   if (existsSync(sample)) {
-    run(['-ss', '0', '-t', '10', '-i', sample, '-vn', '-ac', '1', '-ar', '16000', fx.stt, '-y']);
+    // STT/đều cắt 15 GIÂY có tiếng: 10 giây đầu của video mẫu là nhạc dạo
+    // (đã gặp thật: job "done" đúng nghĩa — transcript trống vì KHÔNG CÓ LỜI).
+    run(['-ss', '0', '-t', '15', '-i', sample, '-vn', '-ac', '1', '-ar', '16000', fx.stt, '-y']);
     run(['-ss', '0', '-t', '15', '-i', sample, '-c', 'copy', fx.dub, '-y']);
   } else {
     // không có sample trong repo: tự dựng video test + tiếng chuông
@@ -494,7 +496,8 @@ const FLOWS = [
     await sleep(300);
     // chọn ngôn ngữ: select thứ nhất = nguồn (zh), thứ hai = đích (vi)
     await page.select('select', 'zh');
-    await clickText(page, 'Bắt đầu dịch', { exact: true });
+    // KHÔNG exact: nút mang giá credit ("Bắt đầu dịch (60 credits)").
+    await clickText(page, 'Bắt đầu dịch');
     await sleep(1500);
     const d = await lastDialog(rec);
     if (d) { rec.steps.push({ action: 'tạo dub', detail: `alert: ${d.message}`, ok: false }); rec.ok = !rec.expect; return; }
@@ -529,6 +532,11 @@ const FLOWS = [
     // đầu tiên đã từng xoá nhầm key của hàng khác. UI hiển thị mask(PREFIX) =
     // "••••" + 4 ký tự cuối của prefix (= raw[8:12]), KHÔNG phải cuối raw.
     const masked = `••••${raw.slice(8, 12)}`;
+    // Chờ hàng key xuất hiện (fetchKeys sau modal; tunnel chậm).
+    await page.waitForFunction(
+      (n) => document.body.innerText.includes(n),
+      { timeout: 10000 }, masked,
+    ).catch(() => {});
     await page.evaluate((m) => {
       const divs = [...document.querySelectorAll('div')].filter((d) => d.innerText && d.innerText.includes(m)
         && [...d.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Thu hồi'));
@@ -537,6 +545,12 @@ const FLOWS = [
       if (btn) btn.click();
     }, masked);
     await sleep(1500);
+    // Chờ key BIẾN MẤT khỏi DOM (refetch sau thu hồi; tunnel chậm — sleep đơn
+    // thuần từng kết luận sai "VẪN còn").
+    await page.waitForFunction(
+      (n) => !document.body.innerText.includes(n),
+      { timeout: 10000 }, masked,
+    ).catch(() => {});
     // Xác minh bằng nguồn sự thật: key phải biến mất khỏi danh sách API.
     const list = (await apiFetch(ADMIN.cookie, 'GET', '/v1/keys')).json.keys || [];
     const still = raw && list.some((k) => k.prefix === raw.slice(0, 12));
@@ -556,7 +570,9 @@ const FLOWS = [
   // ---- 11. Admin users: sửa credit, chặn/mở user auditor.
   flow('f-admin-users', { expect: true }, async (page, rec) => {
     await page.goto(`${BASE}/admin/users`, { waitUntil: 'networkidle2', timeout: 30000 });
-    await sleep(600);
+    // Chờ CÓ DỮ LIỆU qua network (tunnel ~1s/lượt request — sleep 600ms từng
+    // bỏ lỡ bảng, flow tưởng "không thấy hàng").
+    try { await waitText(page, AUDITOR_EMAIL, 30000); } catch {}
     const empty = await page.evaluate(() => document.body.innerText.trim().length < 10);
     if (empty) { rec.steps.push({ action: 'mở trang', detail: 'trống lặng lẽ (403 bị nuốt / bug #8)', ok: false }); rec.ok = !rec.expect; return; }
     const rowHas = await page.evaluate((e) => document.body.innerText.includes(e), AUDITOR_EMAIL);

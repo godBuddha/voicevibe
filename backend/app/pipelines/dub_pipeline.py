@@ -52,6 +52,42 @@ def _silence_bed(duration: float, path: str, sr: int = 48000) -> None:
                    check=True, capture_output=True)
 
 
+def _separate_vocals(source_path: str, stem_path: str,
+                     device: str = "auto") -> str | None:
+    """Tách giọng hát khỏi nhạc bằng Demucs (MIT) — ghi accompaniment vào stem_path.
+
+    `background_mode=source_low` cũ chỉ giảm âm lượng NGUỒN: giọng gốc vẫn còn
+    trong bed ở mức 12%, đè lên giọng dịch → hai giọng rên xen nhau ("echo").
+    Tách stem thật thì bed là **nhạc không lời**, không còn giọng gốc để đè.
+
+    Trả về tên model nếu thành công, None nếu không tách được (thiếu gói /
+    model chưa tải / không có torch). Tách là NÂNG CHẤT, không phải điều kiện để
+    job chạy — rơi về đường giảm âm lượng cũ, job vẫn hoàn thành. Nhưng fallback
+    cần được NHÌN THẤY: caller ghi vào kế hoạch.
+
+    `htdemucs` (2 stem đủ dùng cho bed): `separate_audio_file()` trả
+    `(wav, {stem_name: tensor})`; stem **`no_vocals`** chính là nhạc không lời.
+    Ghi qua `demucs.api.save_audio` thay vì tự viết WAV — nó lo đúng
+    samplerate/channels của model.
+    """
+    try:
+        from demucs import api
+    except ImportError:
+        return None
+    try:
+        separator = api.Separator(model="htdemucs", device=device, shifts=0,
+                                  progress=False)
+        _orig, stems = separator.separate_audio_file(source_path)
+        no_vocals = stems.get("no_vocals")
+        if no_vocals is None:  # model 4 stem (drums/bass/other/vocals) không có
+            return None
+        api.save_audio(stem_path, no_vocals,
+                       samplerate=separator.samplerate, clip="clamp")
+        return "htdemucs"
+    except Exception:  # noqa: BLE001 — mọi lỗi tách đều rơi về đường cũ
+        return None
+
+
 def _has_video(path: str) -> bool:
     """True only for REAL video streams (ignore mp3 cover art etc.)."""
     out = subprocess.run(
@@ -134,14 +170,31 @@ def _retranslate_pass(tr, plan, texts, gen_durations, seg_wavs, seg_voices,
 
 
 def _make_bed(source_path: str, duration: float, mode: str, path: str,
-              sr: int = 48000) -> None:
-    """background_mode: silence (clean dub) | source_low (karaoke-style backing)."""
+              sr: int = 48000, separate: bool = True) -> str | None:
+    """background_mode: silence (lồng tiếng sạch) | source_low (nhạc nền kiểu karaoke).
+
+    Khi `separate` bật (mặc định) và Demucs khả dụng, `source_low` dùng
+    **nhạc không lời tách được** thay vì nguồn giảm âm lượng → không còn giọng
+    gốc đè lên giọng dịch. Trả về `"htdemucs"` (đã tách), `"fallback"` (đã dùng
+    đường giảm âm lượng cũ) hoặc None (bed im lặng).
+    """
     if mode == "source_low":
+        if separate:
+            got = _separate_vocals(source_path, path)
+            if got:
+                # stem trả ở samplerate/channels của model; quy về mono @sr của mix
+                subprocess.run(
+                    ["ffmpeg", "-y", "-i", path, "-ac", "1", "-ar", str(sr),
+                     "-t", f"{duration:.3f}", path + ".n.wav"],
+                    check=True, capture_output=True)
+                os.replace(path + ".n.wav", path)
+                return got
         subprocess.run(["ffmpeg", "-y", "-i", source_path, "-ac", "1", "-ar", str(sr),
                         "-af", "volume=0.12", "-t", f"{duration:.3f}", path],
                        check=True, capture_output=True)
-    else:
-        _silence_bed(duration, path, sr)
+        return "fallback"
+    _silence_bed(duration, path, sr)
+    return None
 
 
 def build_plan(attributed, texts, gen_durations, max_speed: float = 1.35):
@@ -224,7 +277,12 @@ def dub_audio(source_path: str, source_lang: str, target_lang: str,
         # 5) mix over the background bed
         src_dur = _ffprobe_duration(source_path)
         bed = os.path.join(tmpdir, "bed.wav")
-        _make_bed(source_path, src_dur + 0.5, background_mode, bed)
+        # bed_mode cho biết bed được tách thật ("htdemucs"), rơi về giảm âm
+        # lượng ("fallback") hay là im lặng (None). Giá trị trả về có trong
+        # kế hoạch để người dùng thấy bed là loại nào — không im lặng.
+        bed_mode = _make_bed(source_path, src_dur + 0.5, background_mode, bed)
+        for s in plan_segs:
+            s.background = bed_mode
         mixed_wav = os.path.join(tmpdir, "dubbed.wav")
         cmd = build_mix_cmd(bed, plan_segs, seg_wavs, mixed_wav)
         subprocess.run(cmd, check=True, capture_output=True)

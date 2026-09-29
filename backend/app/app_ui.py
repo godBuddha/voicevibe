@@ -243,7 +243,7 @@ __THEME_CSS__
         <div class="row">
           <div><label>Ngôn ngữ nguồn</label><select id="srclang"><option value="vi">Tiếng Việt</option><option value="en">English</option></select></div>
           <div><label>Ngôn ngữ đích</label><select id="tgtlang"><option value="en">English</option><option value="vi">Tiếng Việt</option></select></div>
-          <div><label>Nền</label><select id="bgmode"><option value="silence">Chỉ giọng dub</option><option value="source_low">Giữ nền gốc nhỏ (karaoke)</option></select></div>
+          <div><label>Nền</label><select id="bgmode"><option value="silence">Chỉ giọng dub</option><option value="source_low">Nhạc nền (tách lời bằng AI)</option></select></div>
         </div>
         <div class="mut" style="margin-top:10px">Giọng từng nhân vật tự gán theo speaker (Hải Đăng, Mai Anh, Quang Sơn…). Muốn giọng riêng? Tạo ở tab "Giọng của tôi".</div>
         <button class="go" onclick="submitDub()">🚀 Dịch &amp; Lồng tiếng</button>

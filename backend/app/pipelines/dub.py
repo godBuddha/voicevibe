@@ -38,6 +38,10 @@ class Segment:
     delay_ms: int = 0
     placed: float = 0.0         # actual occupied duration after tempo change
     needs_shorter_text: bool = False
+    # bed thực tế đã dùng: "htdemucs" (tách nhạc không lời), "fallback" (nguồn
+    # giảm âm lượng — giọng gốc vẫn còn 12%), hoặc None (im lặng). Ghi vào kế
+    # hoạch để người dùng thấy chất lượng bed, không phải phán đoán ngầm.
+    background: str | None = None
 
 
 def plan_timing(segments: list[Segment], max_speed: float = MAX_SPEED,

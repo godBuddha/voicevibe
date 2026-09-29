@@ -12,6 +12,10 @@ psycopg[binary]>=3.2
 # torch/torchaudio: cu128 wheels chạy trên driver >= CUDA 12.0 (verified RTX 3060, driver 550):
 #   pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu128
 faster-whisper>=1.1          # STT (MIT) — large-v3 ~4-5GB VRAM fp16 (estimate)
+demucs>=4.0                  # tách stem (MIT) — bed lồng tiếng là NHẠC KHÔNG LỜI
+                             #   thay vì nguồn giảm âm lượng (giọng gốc vẫn còn 12%
+                             #   và đè lên giọng dịch). htdemucs ~80MB, tự tải từ HF.
+                             #   Không cài được / GPU yếu -> pipeline tự rơi về đường cũ.
 pyannote.audio>=4.0,<5       # diarization (MIT code; gated -> accept 4 repo HF, xem README)
                              #   YÊU CẦU torch>=2.8 — KHÔNG downgrade torch cho engine khác
 vieneu                       # Vietnamese TTS + instant cloning (Apache-2.0), v3 Turbo

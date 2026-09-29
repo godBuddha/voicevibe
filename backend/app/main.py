@@ -118,6 +118,12 @@ class JobIn(BaseModel):
     voice_id: str | None = None
     max_speed: float = 1.35
     webhook_url: str | None = None
+    # --- riêng cho type=dub
+    # UI GỬI field này, nhưng JobIn trước đây không khai báo → pydantic ÂM THẦM
+    # bỏ nó đi và pipeline luôn chạy background_mode="silence", bất kể người dùng
+    # chọn gì trên dropdown. Đã phát hiện khi đi qua tham số cho Demucs.
+    background_mode: str = Field(
+        "silence", description="silence | source_low (nhạc nền kiểu karaoke)")
     # --- riêng cho type=subtitle
     format: str = Field("srt", description="srt | vtt | ass (chỉ dùng cho subtitle)")
     bilingual: bool = Field(

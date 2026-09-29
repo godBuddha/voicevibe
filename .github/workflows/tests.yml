@@ -45,6 +45,7 @@ jobs:
             "tests/test_settings.py"
             "tests/test_ui_js.py"
             "tests/test_theme.py"
+            "tests/test_cors.py"
             "tests/test_license_compliance.py"
             "tests/test_auth.py"
             "tests/test_migrations.py"

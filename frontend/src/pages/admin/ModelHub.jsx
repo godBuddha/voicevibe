@@ -319,7 +319,7 @@ export default function AdminModelHub() {
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 'var(--text-lg)', marginBottom: '8px' }}>{provider.name}</div>
                   <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '4px' }}>
-                    Type: <span style={{ fontWeight: 600 }}>{provider.kind}</span>
+                    Loại: <span style={{ fontWeight: 600 }}>{provider.kind}</span>
                   </div>
                   <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '8px' }}>
                     URL: <span style={{ fontFamily: 'monospace', background: 'var(--bg)', padding: '2px 6px', borderRadius: '2px' }}>{provider.base_url || 'N/A'}</span>
@@ -393,8 +393,10 @@ export default function AdminModelHub() {
                       Xoá
                     </button>
                   </div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: provider.status === 'active' ? 'var(--success)' : 'var(--danger)', textAlign: 'right' }}>
-                    {provider.status === 'active' ? '🟢 Connected' : '🔴 Inactive'}
+                  {/* Backend không có "status" — chỉ có enabled (bật/tắt) và
+                      kết quả probe mới nhất. Đổi hiển thị theo enabled. */}
+                  <div style={{ fontSize: 'var(--text-xs)', color: provider.enabled ? 'var(--success)' : 'var(--danger)', textAlign: 'right' }}>
+                    {provider.enabled ? '🟢 Đã bật' : '🔴 Đang tắt'}
                   </div>
                 </div>
               </div>

@@ -27,6 +27,33 @@ tách & clone nhiều người nói, API developer) — dựng bằng stack open
 |---|
 | ![subtitle](docs/screenshots/12-subtitle.png) |
 
+### SPA React — `frontend/` (bản UI tách riêng, cùng API)
+
+Từ v0.4: giao diện React + Vite nằm ở `frontend/`, gọi đúng API `/v1/*` (cookie
+phiên, CORS cấu hình qua `YUPVOX_CORS_ORIGINS` khi chạy khác origin). Prod qua
+Caddy là **same-origin** — không cần CORS; image `web` (profile `proxy`) build
+SPA ngay trong Docker rồi phục vụ cùng một domain với API:
+
+```bash
+docker compose --profile proxy build web
+docker compose --profile proxy up -d
+```
+
+Dev: `cd frontend && npm install && YV_API_TARGET=http://127.0.0.1:8000 npm run dev`
+(Vite proxy `/v1` + `/media` về backend — same-origin, không cần CORS).
+Mock thuần UI (không cần backend): `VITE_USE_MOCK=1 npm run dev`.
+
+| Dashboard | Dub (flagship) | AI Model Hub |
+|---|---|---|
+| ![spa-dashboard](docs/screenshots-spa/01-dashboard.png) | ![spa-dub](docs/screenshots-spa/02-dub.png) | ![spa-modelhub](docs/screenshots-spa/11-admin-model-hub.png) |
+
+| Jobs | Admin Users | Dashboard dark |
+|---|---|---|
+| ![spa-jobs](docs/screenshots-spa/07-jobs.png) | ![spa-users](docs/screenshots-spa/10-admin-users.png) | ![spa-dark](docs/screenshots-spa/13-dashboard-dark.png) |
+
+UI inline (HTML trong Python) **vẫn giữ nguyên** — bản self-host trỏ tunnel
+thẳng vào `api:8000` không cần build gì vẫn dùng được toàn bộ tính năng.
+
 ### Phụ đề — SRT / VTT / ASS, kể cả song ngữ
 
 Job `type=subtitle` nghe file audio/video rồi xuất phụ đề: STT + tách người nói,

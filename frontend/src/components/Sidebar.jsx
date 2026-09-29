@@ -8,13 +8,17 @@ const navigation = [
     items: [
       { label: 'Chuyển văn bản thành giọng nói', to: '/tts' },
       { label: 'TTS Studio', to: '/tts' },
-      { label: 'Chuyển phụ đề thành giọng nói', to: '/dub' },
+      // Chưa có pipeline phụ-đề→giọng-nói: để '#' (hạng mục bị khoá) thay vì
+      // trỏ /dub — bản mock trỏ bừa khiến highlight nhầm trên /dub.
+      { label: 'Chuyển phụ đề thành giọng nói', to: '#' },
       { label: 'Tạo giọng nói của riêng bạn', to: '/voices' },
     ],
   },
   {
     heading: 'DỊCH THUẬT',
     items: [
+      // Dịch văn bản/âm thanh có trong API (type=translate) nhưng chưa có trang
+      // riêng — giữ '#' thay vì trỏ nhầm.
       { label: 'Dịch văn bản', to: '#' },
       { label: 'Dịch phụ đề', to: '/subtitle' },
       { label: 'Dịch âm thanh', to: '#' },
@@ -26,7 +30,7 @@ const navigation = [
     items: [
       { label: 'Chuyển giọng nói thành văn bản', to: '/stt' },
       { label: 'Tạo video bằng AI', to: '#' },
-      { label: 'Thay đổi giọng nói', to: '/dub' },
+      { label: 'Thay đổi giọng nói', to: '#' },
     ],
   },
 ];

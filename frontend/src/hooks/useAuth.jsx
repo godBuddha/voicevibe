@@ -41,6 +41,8 @@ export function AuthProvider({ children }) {
     } catch {
       setUser(adaptUser(res));
     }
+    // Trả nguyên JSON cho trang Login dùng `redirect` (admin → /admin).
+    return res;
   };
 
   const logout = async () => {

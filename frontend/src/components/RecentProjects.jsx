@@ -28,6 +28,7 @@ export function RecentProjects({ jobs, navigate }) {
   };
 
   const mapStatus = {
+    done: { color: 'var(--success)', label: 'Hoàn thành' },
     completed: { color: 'var(--success)', label: 'Hoàn thành' },
     running: { color: 'var(--warning)', label: 'Đang chạy' },
     queued: { color: 'var(--text-dim)', label: 'Hàng đợi' },

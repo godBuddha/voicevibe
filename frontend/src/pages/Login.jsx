@@ -18,11 +18,12 @@ export default function Login() {
     }
     try {
       setLoading(true);
-      await login(email, password);
+      // Backend trả `redirect` ("/admin" cho admin) — trước đây luôn về "/".
+      const res = await login(email, password);
       localStorage.setItem('authenticated', 'true');
-      navigate('/');
+      navigate(res?.redirect || '/');
     } catch (err) {
-      setError('Email hoặc mật khẩu không đúng');
+      setError(err.message || 'Email hoặc mật khẩu không đúng');
     } finally {
       setLoading(false);
     }

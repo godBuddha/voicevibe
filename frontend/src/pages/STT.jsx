@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useApi } from '../hooks/useApi.jsx';
+import { uploadMedia, createJob, pollJob, getResult, parseSrt } from '../api/jobs.js';
 
 export default function STT() {
   const { api } = useApi();
@@ -8,54 +9,58 @@ export default function STT() {
   const [transcript, setTranscript] = useState(null);
   const [speakers, setSpeakers] = useState([]);
   const [job, setJob] = useState(null);
+  const [error, setError] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleFile = (f) => {
-    if (f && f.type.startsWith('audio/')) {
+    if (f && (f.type.startsWith('audio/') || f.type.startsWith('video/'))) {
       setFile(f);
       setTranscript(null);
       setSpeakers([]);
       setJob(null);
+      setError(null);
     } else {
-      alert('Chỉ hỗ trợ file audio');
+      alert('Chỉ hỗ trợ file audio hoặc video');
     }
   };
 
   const startSTT = async () => {
     if (!file) return;
     setIsProcessing(true);
+    setError(null);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await api.post('/v1/jobs', { body: formData, isMultipart: true });
-      setJob({ ...res, status: 'queued', progress: { percent: 0, step: 'Nhận dạng giọng nói', message: 'Đang xử lý audio...' } });
-      pollJob(res.id);
+      // Chuẩn thật: file → /v1/media/upload → media_url; job JSON có `type`.
+      // (Trước đây nộp multipart không `type` → 422, nút bấm thành cờ mờ.)
+      const media_url = await uploadMedia(file);
+      const created = await createJob({ type: 'stt', media_url });
+      // Lần đầu chạy sẽ tải model nhận dạng (~3GB) — hẹn giờ rộng.
+      const done = await pollJob(created.jobId, {
+        onUpdate: setJob,
+        timeoutMs: 30 * 60 * 1000,
+      });
+      if (done.status === 'failed') {
+        setError(done.error || 'Nhận dạng thất bại (credit đã hoàn lại).');
+      } else {
+        const res = await getResult(created.jobId);
+        // Kết quả là file SRT thật — phân tích để có transcript + người nói
+        // (trước đây đọc j.result.transcript — field không tồn tại bao giờ).
+        const cues = parseSrt(res.content || '');
+        setTranscript(cues.map((c) => c.text).join('\n'));
+        setSpeakers(cues.map((c, i) => ({
+          id: i + 1, speaker: c.speaker || '', start: c.start, end: c.end, text: c.text,
+        })));
+      }
     } catch (err) {
-      alert('Lỗi khi bắt đầu nhận dạng: ' + err.message);
+      setError(err.message);
+    } finally {
       setIsProcessing(false);
     }
   };
 
-  const pollJob = async (jobId) => {
-    const interval = setInterval(async () => {
-      try {
-        const j = await api.get(`/v1/jobs/${jobId}`);
-        setJob(j);
-        if (j.status === 'completed') {
-          setIsProcessing(false);
-          if (j.result?.transcript) setTranscript(j.result.transcript);
-          if (j.result?.speakers) setSpeakers(j.result.speakers);
-          clearInterval(interval);
-        } else if (j.status === 'failed') {
-          setIsProcessing(false);
-          alert('Nhận dạng thất bại');
-          clearInterval(interval);
-        }
-      } catch {
-        clearInterval(interval);
-        setIsProcessing(false);
-      }
-    }, 2000);
+  const fmtClock = (s) => {
+    const mm = Math.floor(s / 60);
+    const ss = (s % 60).toFixed(1);
+    return `${mm}:${ss.padStart(4, '0')}s`;
   };
 
   const exportTranscript = (format) => {
@@ -68,7 +73,7 @@ export default function STT() {
       content = speakers.map((s) => {
         const start = `00:${Math.floor(s.start / 60).toString().padStart(2, '0')}:${(s.start % 60).toFixed(3).padStart(6, '0').replace('.', ',')}`;
         const end = `00:${Math.floor(s.end / 60).toString().padStart(2, '0')}:${(s.end % 60).toFixed(3).padStart(6, '0').replace('.', ',')}`;
-        return `${s.id}\n${start} --> ${end}\n${s.text}\n\n`;
+        return `${s.id}\n${start} --> ${end}\n${s.speaker ? `[${s.speaker}] ` : ''}${s.text}\n\n`;
       }).join('');
     }
     const blob = new Blob([content], { type: 'text/plain' });
@@ -121,7 +126,7 @@ export default function STT() {
                 type="file"
                 ref={fileInputRef}
                 onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-                accept="audio/*"
+                accept="audio/*,video/*"
                 style={{ display: 'none' }}
               />
               <div style={{ fontSize: '64px' }}>🎙️</div>
@@ -134,7 +139,7 @@ export default function STT() {
                 </div>
               ) : (
                 <div>
-                  <div style={{ fontWeight: 600, marginBottom: '8px' }}>Kéo và thả file audio vào đây</div>
+                  <div style={{ fontWeight: 600, marginBottom: '8px' }}>Kéo và thả file audio/video vào đây</div>
                   <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
                     Hoặc nhấn để chọn file (MP3, WAV, M4A, AAC)
                   </div>
@@ -166,8 +171,18 @@ export default function STT() {
             </button>
           )}
 
+          {/* Error */}
+          {error && (
+            <div style={{
+              padding: '16px', borderRadius: 'var(--radius)',
+              background: 'var(--danger-light)', color: 'var(--danger)', whiteSpace: 'pre-wrap',
+            }}>
+              {error}
+            </div>
+          )}
+
           {/* Progress */}
-          {job && job.status !== 'completed' && (
+          {job && job.status !== 'done' && !error && (
             <div style={{ padding: '20px', borderRadius: 'var(--radius)', background: 'var(--info-light)', color: 'var(--info)' }}>
               <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '8px' }}>
                 {job.status === 'queued' ? 'Hàng đợi' : job.status === 'running' ? 'Đang xử lý' : job.status}
@@ -272,7 +287,7 @@ export default function STT() {
           {/* Speakers */}
           {speakers.length > 0 && (
             <div>
-              <h3 style={{ fontSize: 'var(--text-xl)', marginBottom: '16px', fontWeight: 700 }}>Nhã dọn người nói</h3>
+              <h3 style={{ fontSize: 'var(--text-xl)', marginBottom: '16px', fontWeight: 700 }}>Nhãn người nói</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 {speakers.map((s) => (
                   <div key={s.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
@@ -295,7 +310,7 @@ export default function STT() {
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dim)', marginBottom: '4px' }}>
-                        {Math.floor(s.start / 60)}:{(s.start % 60).toFixed(1)}s - {Math.floor(s.end / 60)}:{(s.end % 60).toFixed(1)}s
+                        {fmtClock(s.start)} - {fmtClock(s.end)}
                       </div>
                       <div style={{ fontSize: 'var(--text-base)', lineHeight: 1.6 }}>{s.text}</div>
                     </div>

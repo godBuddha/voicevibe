@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_API_BASE || '';
+export const BASE = import.meta.env.VITE_API_BASE || '';
 
 let onUnauthorized = null;
 
@@ -33,18 +33,28 @@ async function request(method, path, options = {}) {
     credentials: 'include',
   });
 
+  // Đọc body MỘT lần. 401 cũng mang detail tiếng Việt ("Email hoặc mật khẩu
+  // không đúng") — trước đây nhánh 401 ném 'Unauthorized' TRƯỚC khi kịp đọc
+  // body, trang đăng nhập hiện chữ không liên quan thay vì lý do thật.
+  let payload = {};
+  try {
+    payload = await res.json();
+  } catch { /* 204/không body */ }
+
   if (res.status === 401) {
     if (onUnauthorized) onUnauthorized();
-    throw new Error('Unauthorized');
+    throw new Error(payload.detail || 'Unauthorized');
   }
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(err.message || `HTTP ${res.status}`);
+    // Backend trả lý do tiếng Việt trong `detail` ({detail: "bilingual cần
+    // target_lang…"}). Trước đây chỉ đọc `message` → người dùng thấy vô nghĩa
+    // "HTTP 422" thay vì lý do thật (đã gặp thật khi dò UI).
+    throw new Error(payload.detail || payload.message || `HTTP ${res.status}`);
   }
 
   if (res.status === 204) return null;
-  return res.json();
+  return payload;
 }
 
 export const api = {

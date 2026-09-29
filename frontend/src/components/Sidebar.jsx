@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme.jsx';
+import { useAuth } from '../hooks/useAuth.jsx';
 
 const navigation = [
   {
@@ -50,7 +51,11 @@ const adminLinks = [
 export default function Sidebar() {
   const [expanded, setExpanded] = useState(true);
   const { theme } = useTheme();
+  const { user } = useAuth();
   const location = useLocation();
+  // Mục QUẢN TRỊ chỉ dành cho admin — trước đây hiện cho MỌI user, bấm vào thì
+  // API trả 403 và các trang nuốt lỗi lặng lẽ → bảng trống trơ (đã gặp thật).
+  const isAdmin = user?.role === 'admin';
 
   return (
     <aside
@@ -167,7 +172,7 @@ export default function Sidebar() {
           </Link>
         ))}
 
-        {expanded && (
+        {isAdmin && expanded && (
           <h4
             style={{
               fontSize: 'var(--text-xs)',
@@ -181,7 +186,7 @@ export default function Sidebar() {
             QUẢN TRỊ
           </h4>
         )}
-        {adminLinks.map((link) => (
+        {isAdmin && adminLinks.map((link) => (
           <Link
             key={link.to}
             to={link.to}

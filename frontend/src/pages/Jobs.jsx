@@ -1,23 +1,81 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApi } from '../hooks/useApi.jsx';
+import { getResult } from '../api/jobs.js';
+import { BASE } from '../api/client.js';
 
 export default function Jobs() {
   const { api } = useApi();
   const [jobs, setJobs] = useState([]);
   const [selectedJob, setSelectedJob] = useState(null);
+  const [result, setResult] = useState(null);
+  const [resultError, setResultError] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
+  const resultCache = useRef({});
+  const selectedIdRef = useRef(null);
+
+  const fetchJobs = async () => {
+    try {
+      const data = await api.get('/v1/jobs');
+      const items = data.items || [];
+      setJobs(items);
+      // Panel chi tiết theo kịp trạng thái mới (job đang chọn chạy tới done…).
+      if (selectedIdRef.current) {
+        const upd = items.find((x) => x.id === selectedIdRef.current);
+        if (upd) setSelectedJob(upd);
+      }
+      return items;
+    } catch (e) {
+      console.error('tải danh sách job thất bại', e);
+      return [];
+    }
+  };
 
   useEffect(() => {
     fetchJobs();
   }, [api]);
 
-  const fetchJobs = async () => {
-    try {
-      const data = await api.get('/v1/jobs');
-      setJobs(data.items || []);
-    } catch {}
+  // Tự refresh khi còn job đang chờ/chạy (trước đây phải bấm tay F5 mới thấy
+  // tiến độ). Dừng khi không còn job nào đang hoạt động.
+  const hasActive = jobs.some((j) => j.status === 'queued' || j.status === 'running');
+  useEffect(() => {
+    if (!hasActive) return undefined;
+    const t = setInterval(fetchJobs, 5000);
+    return () => clearInterval(t);
+  }, [hasActive]);
+
+  // Chọn job → nạp kết quả (đã cache). Effect cũng bắt được thời điểm job đang
+  // chọn vừa chuyển sang `done` sau một lượt refresh.
+  const selectJob = (job) => {
+    setResult(null);
+    setResultError(null);
+    if (!job || selectedJob?.id === job.id) {
+      selectedIdRef.current = null;
+      setSelectedJob(null);
+      return;
+    }
+    selectedIdRef.current = job.id;
+    setSelectedJob(job);
   };
+
+  useEffect(() => {
+    if (!selectedJob || selectedJob.status !== 'done') return undefined;
+    if (resultCache.current[selectedJob.id]) {
+      setResult(resultCache.current[selectedJob.id]);
+      return undefined;
+    }
+    let alive = true;
+    getResult(selectedJob.id)
+      .then((res) => {
+        if (!alive) return;
+        resultCache.current[selectedJob.id] = res;
+        setResult(res);
+      })
+      .catch((e) => {
+        if (alive) setResultError(e.message);
+      });
+    return () => { alive = false; };
+  }, [selectedJob?.id, selectedJob?.status]);
 
   const filteredJobs = jobs.filter((j) => {
     if (statusFilter !== 'all' && j.status !== statusFilter) return false;
@@ -36,6 +94,11 @@ export default function Jobs() {
       bg: 'var(--warning-light)',
       label: 'Đang chạy',
     },
+    done: {
+      color: 'var(--success)',
+      bg: 'var(--success-light)',
+      label: 'Hoàn thành',
+    },
     completed: {
       color: 'var(--success)',
       bg: 'var(--success-light)',
@@ -49,14 +112,19 @@ export default function Jobs() {
   };
 
   const mapType = {
-    dub: { label: 'Dịch', icon: '🎬' },
+    dub: { label: 'Lồng tiếng', icon: '🎬' },
     tts: { label: 'TTS', icon: '🗣️' },
     stt: { label: 'STT', icon: '🎙️' },
     subtitle: { label: 'Phụ đề', icon: '🎞️' },
+    translate: { label: 'Dịch', icon: '🌐' },
   };
 
+  // % hiển thị an toàn (trước đây toFixed trên giá trị lạ → NaN% trên UI).
+  const fmtPercent = (p) => (Number.isFinite(Number(p)) ? Number(p).toFixed(1) : '0.0');
+
   const formatDate = (date) => {
-    const d = new Date(date);
+    const d = date ? new Date(date) : null;
+    if (!d || Number.isNaN(d.getTime())) return '—';
     return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
@@ -88,7 +156,7 @@ export default function Jobs() {
             <option value="all">Tất cả</option>
             <option value="queued">Hàng đợi</option>
             <option value="running">Đang chạy</option>
-            <option value="completed">Hoàn thành</option>
+            <option value="done">Hoàn thành</option>
             <option value="failed">Thất bại</option>
           </select>
         </div>
@@ -107,10 +175,9 @@ export default function Jobs() {
             }}
           >
             <option value="all">Tất cả</option>
-            <option value="dub">Dịch</option>
-            <option value="tts">TTS</option>
-            <option value="stt">STT</option>
-            <option value="subtitle">Phụ đề</option>
+            {Object.entries(mapType).map(([k, v]) => (
+              <option key={k} value={k}>{v.label}</option>
+            ))}
           </select>
         </div>
       </div>
@@ -133,10 +200,11 @@ export default function Jobs() {
               {filteredJobs.map(job => {
                 const status = mapStatus[job.status] || { color: 'var(--text-dim)', bg: 'var(--bg)', label: job.status };
                 const type = mapType[job.type] || { label: job.type, icon: '📄' };
+                const isActive = job.status === 'queued' || job.status === 'running';
                 return (
                   <button
                     key={job.id}
-                    onClick={() => setSelectedJob(selectedJob?.id === job.id ? null : job)}
+                    onClick={() => selectJob(job)}
                     style={{
                       background: selectedJob?.id === job.id ? 'var(--primary-light)' : 'var(--surface)',
                       border: '1px solid var(--border)',
@@ -147,33 +215,33 @@ export default function Jobs() {
                       transition: 'all 0.2s',
                     }}
                     onMouseEnter={(e) => {
-                      e.target.style.transform = 'translateY(-2px)';
-                      e.target.style.boxShadow = 'var(--shadow)';
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = 'var(--shadow)';
                     }}
                     onMouseLeave={(e) => {
-                      e.target.style.transform = 'none';
-                      if (selectedJob?.id !== job.id) e.target.style.boxShadow = 'none';
+                      e.currentTarget.style.transform = 'none';
+                      if (selectedJob?.id !== job.id) e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
                     <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
                       <div style={{ fontSize: '24px' }}>{type.icon}</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, padding: '2px 8px', borderRadius: 'var(--radius-xs)', background: status.bg, color: status.color }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '8px' }}>
+                          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, padding: '2px 8px', borderRadius: 'var(--radius-xs)', background: status.bg, color: status.color, whiteSpace: 'nowrap' }}>
                             {status.label}
                           </span>
                           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dim)' }}>
-                            #{job.id}
+                            {job.credits ? `${job.credits.toLocaleString('vi-VN')} credits` : ''}
                           </span>
                         </div>
-                        <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, marginBottom: '8px' }}>
-                          {job.file?.name || (job.text?.substring(0, 60) + (job.text?.length > 60 ? '...' : ''))}
+                        <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {job.label}
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
                           <span>{type.label}</span>
                           <span>{formatDate(job.createdAt)}</span>
                         </div>
-                        {job.progress?.percent !== undefined && (
+                        {isActive && job.progress?.percent !== undefined && (
                           <div style={{ marginTop: '8px' }}>
                             <div
                               style={{
@@ -188,14 +256,19 @@ export default function Jobs() {
                                   height: '100%',
                                   borderRadius: '2px',
                                   background: 'var(--primary)',
-                                  width: `${job.progress.percent}%`,
+                                  width: `${Number(job.progress.percent) || 0}%`,
                                   transition: 'width 0.6s',
                                 }}
                               />
                             </div>
                             <div style={{ marginTop: '4px', fontSize: 'var(--text-xs)', color: 'var(--text-dim)' }}>
-                              {job.progress.percent.toFixed(1)}% • {job.progress?.message}
+                              {fmtPercent(job.progress.percent)}%
                             </div>
+                          </div>
+                        )}
+                        {job.status === 'failed' && job.error && (
+                          <div style={{ marginTop: '8px', fontSize: 'var(--text-xs)', color: 'var(--danger)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {job.error}
                           </div>
                         )}
                       </div>
@@ -234,33 +307,35 @@ export default function Jobs() {
                     </span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-dim)' }}>File</span>
-                    <span style={{ fontWeight: 600 }}>{selectedJob.file?.name || 'N/A'}</span>
+                    <span style={{ color: 'var(--text-dim)' }}>Đối tượng</span>
+                    <span style={{ fontWeight: 600, maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={selectedJob.label}>
+                      {selectedJob.label}
+                    </span>
                   </div>
-                  {selectedJob.file?.size && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--text-dim)' }}>Kích thước</span>
-                      <span style={{ fontWeight: 600 }}>{(selectedJob.file.size / 1024 / 1024).toFixed(2)} MB</span>
-                    </div>
-                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-dim)' }}>Ngày tạo</span>
                     <span style={{ fontWeight: 600 }}>{formatDate(selectedJob.createdAt)}</span>
                   </div>
-                  {selectedJob.completedAt && (
+                  {selectedJob.status === 'done' && selectedJob.updatedAt && (
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--text-dim)' }}>Hoàn thành</span>
-                      <span style={{ fontWeight: 600 }}>{formatDate(selectedJob.completedAt)}</span>
+                      <span style={{ fontWeight: 600 }}>{formatDate(selectedJob.updatedAt)}</span>
                     </div>
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-dim)' }}>Credits</span>
-                    <span style={{ fontWeight: 600 }}>{selectedJob.creditsUsed || 0}</span>
+                    <span style={{ fontWeight: 600 }}>{(selectedJob.credits || 0).toLocaleString('vi-VN')}</span>
                   </div>
+                  {selectedJob.status === 'failed' && selectedJob.error && (
+                    <div style={{ padding: '12px', borderRadius: 'var(--radius)', background: 'var(--danger-light)', color: 'var(--danger)', whiteSpace: 'pre-wrap' }}>
+                      {selectedJob.error}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {selectedJob.result && (
+              {/* Kết quả theo kind thật từ /v1/jobs/{id}/result */}
+              {selectedJob.status === 'done' && result && (
                 <div
                   style={{
                     background: 'var(--surface)',
@@ -272,27 +347,46 @@ export default function Jobs() {
                   <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 700, marginBottom: '20px' }}>
                     Kết quả
                   </h3>
-                  {selectedJob.result.url && (
-                    <div style={{ marginBottom: '16px' }}>
-                      <audio controls src={selectedJob.result.url} style={{ width: '100%' }} />
-                    </div>
+                  {result.kind === 'audio' && (
+                    <audio controls src={result.url} style={{ width: '100%' }} />
                   )}
-                  {selectedJob.result.transcript && (
+                  {result.kind === 'video' && (
+                    <video controls src={result.url} style={{ width: '100%', borderRadius: 'var(--radius)' }} />
+                  )}
+                  {result.kind === 'text' && (
                     <div
                       style={{
                         background: 'var(--bg)',
                         border: '1px solid var(--border)',
                         borderRadius: 'var(--radius)',
                         padding: '12px',
-                        fontSize: 'var(--text-sm)',
+                        fontSize: 'var(--text-xs)',
                         whiteSpace: 'pre-wrap',
                         maxHeight: '200px',
                         overflow: 'auto',
+                        fontFamily: 'monospace',
                       }}
                     >
-                      {selectedJob.result.transcript}
+                      {result.content || '(trống)'}
                     </div>
                   )}
+                  <a
+                    href={result.url || BASE + result.download_url}
+                    download={result.filename}
+                    style={{ display: 'inline-block', marginTop: '16px', color: 'var(--primary)', fontWeight: 600 }}
+                  >
+                    Tải về máy ({result.filename})
+                  </a>
+                </div>
+              )}
+              {selectedJob.status === 'done' && !result && resultError && (
+                <div style={{ padding: '16px', borderRadius: 'var(--radius)', background: 'var(--danger-light)', color: 'var(--danger)' }}>
+                  Không tải được kết quả: {resultError}
+                </div>
+              )}
+              {selectedJob.status === 'done' && !result && !resultError && (
+                <div style={{ padding: '16px', borderRadius: 'var(--radius)', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-dim)', fontSize: 'var(--text-sm)' }}>
+                  Đang tải kết quả...
                 </div>
               )}
             </div>

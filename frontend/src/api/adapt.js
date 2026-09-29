@@ -17,7 +17,8 @@ export function adaptUsage(u) {
   };
 }
 
-// GET /v1/jobs: {"jobs": [{job_id, type, status, progress, result_key, error, created_at}]}
+// GET /v1/jobs: {"jobs": [{job_id, type, status, progress, result_key, error,
+//   created_at, params, updated_at}]}
 //   → mảng {id, type, status, progress{percent,message}, createdAt, ...}
 export function adaptJob(j) {
   if (!j) return null;
@@ -27,6 +28,11 @@ export function adaptJob(j) {
   } else if (j.progress !== null && j.progress !== undefined) {
     progress = { percent: Number(j.progress) || 0, message: '' };
   }
+  const p = j.params || {};
+  // Nhãn hiển thị: tên file (media_url) → đầu đoạn text → fallback theo loại.
+  const mediaName = p.media_url ? decodeURIComponent(p.media_url.split('/').pop()) : '';
+  const typeLabel = TYPE_LABELS[j.type] || j.type;
+  const label = mediaName || (p.text ? p.text.slice(0, 60) : typeLabel);
   return {
     id: j.job_id,
     type: j.type,
@@ -35,6 +41,27 @@ export function adaptJob(j) {
     resultKey: j.result_key || null,
     error: j.error || null,
     createdAt: j.created_at ? new Date(j.created_at * 1000) : undefined,
+    // Mới: đủ dữ liệu thật cho panel chi tiết (file/credit/hoàn thành) —
+    // trước đây job.file/creditsUsed/completedAt không bao giờ có.
+    params: p,
+    label: label || typeLabel,
+    credits: j.credits_charged ?? 0,
+    updatedAt: j.updated_at ? new Date(j.updated_at * 1000) : undefined,
+  };
+}
+
+const TYPE_LABELS = { dub: 'Lồng tiếng', tts: 'Văn bản → giọng nói', stt: 'Giọng nói → văn bản', translate: 'Dịch văn bản', subtitle: 'Tạo phụ đề' };
+
+// GET /v1/voices: {voices: [{id, name, lang, engine, created_at}]}
+//   → {id, name, lang, engine, isClone} (engine vieneu = giọng clone/từ mẫu)
+export function adaptVoice(v) {
+  if (!v || typeof v !== 'object') return null;
+  return {
+    id: v.id,
+    name: v.name,
+    lang: v.lang,
+    engine: v.engine,
+    isClone: v.engine === 'vieneu',
   };
 }
 

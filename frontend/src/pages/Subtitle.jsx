@@ -1,5 +1,13 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useApi } from '../hooks/useApi.jsx';
+import { uploadMedia, createJob, pollJob, getResult, parseSrt } from '../api/jobs.js';
+import { BASE } from '../api/client.js';
+
+const LANGUAGES = {
+  vi: 'Tiếng Việt', en: 'Tiếng Anh', ja: 'Tiếng Nhật', zh: 'Tiếng Trung',
+  fr: 'Tiếng Pháp', de: 'Tiếng Đức', es: 'Tiếng Tây Ban Nha', ko: 'Tiếng Hàn',
+  ru: 'Tiếng Nga',
+};
 
 export default function Subtitle() {
   const { api } = useApi();
@@ -7,58 +15,58 @@ export default function Subtitle() {
   const [file, setFile] = useState(null);
   const [cues, setCues] = useState([]);
   const [job, setJob] = useState(null);
+  const [error, setError] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [exportFormat, setExportFormat] = useState('srt');
   const [isBilingual, setIsBilingual] = useState(false);
+  const [targetLang, setTargetLang] = useState('vi');
   const [editingIndex, setEditingIndex] = useState(null);
   const [editText, setEditText] = useState('');
   const [timeRange, setTimeRange] = useState({ start: '', end: '' });
+  const [resultKey, setResultKey] = useState(null);
 
   const handleFile = (f) => {
-    if (f && f.type.startsWith('video/')) {
+    if (f && (f.type.startsWith('video/') || f.type.startsWith('audio/'))) {
       setFile(f);
       setCues([]);
       setJob(null);
+      setError(null);
     } else {
-      alert('Chỉ hỗ trợ file video');
+      alert('Chỉ hỗ trợ file video hoặc audio');
     }
   };
 
   const startSubtitle = async () => {
     if (!file) return;
     setIsProcessing(true);
+    setError(null);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('isBilingual', isBilingual);
-      const res = await api.post('/v1/jobs', { body: formData, isMultipart: true });
-      setJob({ ...res, status: 'queued', progress: { percent: 0, step: 'Tạo phụ đề', message: 'Đang xử lý video...' } });
-      pollJob(res.id);
+      // Chuẩn thật: file → media_url, job JSON có `type` + format + song ngữ.
+      // Song ngữ BẮT BUỘC có target_lang (backend 422 khi thiếu — đã gặp thật).
+      const media_url = await uploadMedia(file);
+      const payload = {
+        type: 'subtitle', media_url, format: exportFormat,
+        bilingual: isBilingual, show_speaker: true,
+      };
+      if (isBilingual) payload.target_lang = targetLang;
+      const created = await createJob(payload);
+      const done = await pollJob(created.jobId, {
+        onUpdate: setJob, timeoutMs: 30 * 60 * 1000,
+      });
+      if (done.status === 'failed') {
+        setError(done.error || 'Tạo phụ đề thất bại (credit đã hoàn lại).');
+      } else {
+        const res = await getResult(created.jobId);
+        setResultKey(res);
+        // Cue thật phân tích từ file SRT server trả kèm `content` (trước đây
+        // đọc j.result.cues — field không tồn tại bao giờ).
+        setCues(parseSrt(res.content || ''));
+      }
     } catch (err) {
-      alert('Lỗi khi tạo phụ đề: ' + err.message);
+      setError(err.message);
+    } finally {
       setIsProcessing(false);
     }
-  };
-
-  const pollJob = async (jobId) => {
-    const interval = setInterval(async () => {
-      try {
-        const j = await api.get(`/v1/jobs/${jobId}`);
-        setJob(j);
-        if (j.status === 'completed') {
-          setIsProcessing(false);
-          if (j.result?.cues) setCues(j.result.cues);
-          clearInterval(interval);
-        } else if (j.status === 'failed') {
-          setIsProcessing(false);
-          alert('Tạo phụ đề thất bại');
-          clearInterval(interval);
-        }
-      } catch {
-        clearInterval(interval);
-        setIsProcessing(false);
-      }
-    }, 2000);
   };
 
   const prettifyTime = (seconds) => {
@@ -160,7 +168,7 @@ export default function Subtitle() {
                 type="file"
                 ref={fileInputRef}
                 onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-                accept="video/*"
+                accept="video/*,audio/*"
                 style={{ display: 'none' }}
               />
               <div style={{ fontSize: '64px' }}>🎬</div>
@@ -173,7 +181,7 @@ export default function Subtitle() {
                 </div>
               ) : (
                 <div>
-                  <div style={{ fontWeight: 600, marginBottom: '8px' }}>Kéo và thả file video vào đây</div>
+                  <div style={{ fontWeight: 600, marginBottom: '8px' }}>Kéo và thả file video/audio vào đây</div>
                   <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
                     Hoặc nhấn để chọn file (MP4, MOV, AVI, MKV)
                   </div>
@@ -195,7 +203,39 @@ export default function Subtitle() {
                   />
                   <span style={{ fontSize: 'var(--text-base)' }}>Phụ đề song ngữ (nguồn + dịch)</span>
                 </label>
+                {isBilingual && (
+                  <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <label style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
+                      Dịch ra:
+                    </label>
+                    <select
+                      value={targetLang}
+                      onChange={(e) => setTargetLang(e.target.value)}
+                      style={{
+                        padding: '8px 12px',
+                        borderRadius: 'var(--radius)',
+                        border: '1px solid var(--border)',
+                        fontSize: 'var(--text-sm)',
+                        background: 'var(--bg)',
+                        color: 'var(--text)',
+                      }}
+                    >
+                      {Object.entries(LANGUAGES).map(([code, name]) => (
+                        <option key={code} value={code}>{name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
               </div>
+              {/* Error */}
+              {error && (
+                <div style={{
+                  padding: '16px', borderRadius: 'var(--radius)',
+                  background: 'var(--danger-light)', color: 'var(--danger)', whiteSpace: 'pre-wrap',
+                }}>
+                  {error}
+                </div>
+              )}
               <button
                 disabled={isProcessing}
                 onClick={startSubtitle}
@@ -218,7 +258,7 @@ export default function Subtitle() {
           )}
 
           {/* Progress */}
-          {job && job.status !== 'completed' && (
+          {job && job.status !== 'done' && !error && (
             <div style={{ padding: '20px', borderRadius: 'var(--radius)', background: 'var(--info-light)', color: 'var(--info)' }}>
               <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '8px' }}>
                 {job.status === 'queued' ? 'Hàng đợi' : job.status === 'running' ? 'Đang xử lý' : job.status}
@@ -284,11 +324,32 @@ export default function Subtitle() {
                   >
                     Xuất
                   </button>
+                  {resultKey?.download_url && (
+                    <a
+                      href={BASE + resultKey.download_url}
+                      download={resultKey.filename}
+                      style={{
+                        background: 'var(--success-light)',
+                        color: 'var(--success)',
+                        border: 'none',
+                        padding: '8px 16px',
+                        borderRadius: 'var(--radius)',
+                        fontSize: 'var(--text-sm)',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        textDecoration: 'none',
+                      }}
+                    >
+                      Tải file gốc
+                    </a>
+                  )}
                   <button
                     onClick={() => {
                       setCues([]);
                       setFile(null);
                       setJob(null);
+                      setResultKey(null);
+                      setError(null);
                     }}
                     style={{
                       background: 'var(--bg)',

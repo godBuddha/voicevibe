@@ -1,5 +1,6 @@
-import { createBrowserRouter, redirect, Navigate } from 'react-router-dom';
+import { createBrowserRouter, redirect, Navigate, Outlet } from 'react-router-dom';
 import Layout from './components/Layout.jsx';
+import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import Login from './pages/Login.jsx';
 import Setup from './pages/Setup.jsx';
 import Dashboard from './pages/Dashboard.jsx';
@@ -23,6 +24,16 @@ function protectedLoader() {
     return redirect('/login');
   }
   return null;
+}
+
+// Router guard là CỬA SÁU: ẩn link ở Sidebar không đủ — gõ thẳng /admin/* vẫn
+// vào được và nhận 403 lặng lẽ (các trang nuốt lỗi → bảng trống). Chờ
+// /v1/auth/me trả role rồi mới render; user thường về "/".
+function RequireAdmin({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return null; // chờ profile — không nhấp nháy redirect
+  if (user?.role !== 'admin') return <Navigate to="/" replace />;
+  return children;
 }
 
 export default createBrowserRouter([
@@ -62,6 +73,7 @@ export default createBrowserRouter([
       { path: 'pricing', element: <Pricing /> },
       {
         path: 'admin',
+        element: <RequireAdmin><Outlet /></RequireAdmin>,
         children: [
           { index: true, element: <Navigate to="/admin/users" replace /> },
           { path: 'users', element: <AdminUsers /> },

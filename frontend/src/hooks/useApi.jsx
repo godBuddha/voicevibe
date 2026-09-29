@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react';
 import { mockRequest } from '../api/mock.js';
 import api, { setOnUnauthorized } from '../api/client.js';
-import { adaptUsage, adaptJob } from '../api/adapt.js';
+import { adaptUsage, adaptJob, adaptVoice } from '../api/adapt.js';
 
 // Mock chỉ bật khi RÕ RÀNG yêu cầu (VITE_USE_MOCK=1) — mặc định là API thật.
 // Bản build trong Docker (docker/web.Dockerfile) không set biến này nên luôn
@@ -15,6 +15,11 @@ const ApiContext = createContext();
 const REAL_ADAPTERS = {
   '/v1/usage': (d) => adaptUsage(d),
   '/v1/jobs': (d) => ({ items: (d.jobs || []).map(adaptJob) }),
+  // /v1/voices & /v1/keys: backend bọc {voices|keys: [...]}, trang đọc mảng.
+  // (Trước đây ApiKeys setKeys({keys: []}) rồi keys.map → TypeError trắng trang.)
+  '/v1/voices': (d) => (d.voices || []).map(adaptVoice),
+  '/v1/keys': (d) => d.keys || [],
+  '/v1/pricing': (d) => d.pricing || {},
 };
 
 export function ApiProvider({ children }) {

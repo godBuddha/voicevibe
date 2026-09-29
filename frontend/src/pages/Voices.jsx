@@ -1,56 +1,56 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useApi } from '../hooks/useApi.jsx';
 
 export default function Voices() {
   const { api } = useApi();
+  const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const [voices, setVoices] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
   const [newVoiceName, setNewVoiceName] = useState('');
-  const [newVoiceFiles, setNewVoiceFiles] = useState([]);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [newVoiceFile, setNewVoiceFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = await api.get('/v1/voices');
-        setVoices(data);
-      } catch {}
-    })();
-  }, [api]);
-
-  const handleFileSelect = (e) => {
-    const files = Array.from(e.target.files || []);
-    setNewVoiceFiles(files.slice(0, 3));
+  // Danh sách thật từ GET /v1/voices (trước đây gọi 405 → luôn trống; sau đó
+  // còn tự bịa giọng {id: Date.now()} gắn vào UI để "trông như tạo được").
+  const loadVoices = async () => {
+    try {
+      setVoices(await api.get('/v1/voices'));
+      return true;
+    } catch (e) {
+      console.error('tải danh sách giọng thất bại', e);
+      return false;
+    }
   };
 
+  useEffect(() => {
+    loadVoices();
+  }, [api]);
+
   const createVoice = async () => {
-    if (!newVoiceName.trim() || newVoiceFiles.length === 0) {
-      alert('Vui lòng nhập tên và chọn ít nhất 1 file mẫu');
+    if (!newVoiceName.trim() || !newVoiceFile) {
+      setError('Vui lòng nhập tên và chọn 1 file mẫu');
       return;
     }
     setIsUploading(true);
-    setUploadProgress(0);
+    setError(null);
     try {
+      // Backend nhận Form `name`, `lang`, MỘT file `file` — trước đây SPA gửi
+      // `sample_0..2` (không field nào khớp) → 422.
       const formData = new FormData();
       formData.append('name', newVoiceName);
-      newVoiceFiles.forEach((f, i) => formData.append(`sample_${i}`, f));
+      formData.append('lang', 'auto');
+      formData.append('file', newVoiceFile);
       await api.post('/v1/voices/upload', { body: formData, isMultipart: true });
-      const newVoice = {
-        id: Date.now(),
-        name: newVoiceName,
-        type: 'clone',
-        gender: 'unknown',
-        accent: 'custom',
-      };
-      setVoices((prev) => [...prev, newVoice]);
+      // Tải lại danh sách thật — giọng mới xuất hiện như mọi người dùng khác thấy.
+      await loadVoices();
       setShowCreate(false);
       setNewVoiceName('');
-      setNewVoiceFiles([]);
-      setUploadProgress(100);
+      setNewVoiceFile(null);
     } catch (err) {
-      alert('Lỗi khi tạo giọng: ' + err.message);
+      setError('Lỗi khi tạo giọng: ' + err.message);
     } finally {
       setIsUploading(false);
     }
@@ -58,7 +58,14 @@ export default function Voices() {
 
   const deleteVoice = async (id) => {
     if (!confirm('Bạn có chắc muốn xoá giọng này?')) return;
-    setVoices((prev) => prev.filter((v) => v.id !== id));
+    try {
+      // Xoá THẬT trên server (trước đây chỉ lọc mảng UI — tải lại trang giọng
+      // quay lại như chưa xoá).
+      await api.del(`/v1/voices/${id}`);
+      await loadVoices();
+    } catch (err) {
+      alert('Lỗi khi xoá giọng: ' + err.message);
+    }
   };
 
   return (
@@ -88,6 +95,16 @@ export default function Voices() {
           + Tạo giọng mới
         </button>
       </div>
+
+      {/* Error */}
+      {error && (
+        <div style={{
+          padding: '16px', borderRadius: 'var(--radius)', marginBottom: '24px',
+          background: 'var(--danger-light)', color: 'var(--danger)',
+        }}>
+          {error}
+        </div>
+      )}
 
       {/* Create voice form */}
       {showCreate && (
@@ -126,30 +143,22 @@ export default function Voices() {
             </div>
             <div>
               <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '8px', fontWeight: 600 }}>
-                Mẫu âm thanh (1-3 file, mỗi file 5-8 giây)
+                Mẫu âm thanh (1 file, 5-10 giây, giọng rõ)
               </label>
               <input
                 type="file"
                 ref={fileInputRef}
-                onChange={handleFileSelect}
+                onChange={(e) => setNewVoiceFile(e.target.files?.[0] || null)}
                 accept="audio/*"
-                multiple
                 style={{ width: '100%' }}
               />
-              {newVoiceFiles.length > 0 && (
+              {newVoiceFile && (
                 <div style={{ marginTop: '8px', fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
-                  {newVoiceFiles.length} file đã chọn: {newVoiceFiles.map(f => f.name).join(', ')}
+                  Đã chọn: {newVoiceFile.name}
                 </div>
               )}
             </div>
           </div>
-          {isUploading && (
-            <div style={{ marginTop: '16px' }}>
-              <div style={{ height: '4px', borderRadius: '2px', background: 'var(--border)', overflow: 'hidden' }}>
-                <div style={{ height: '100%', borderRadius: '2px', background: 'var(--primary)', width: `${uploadProgress}%`, transition: 'width 0.3s' }} />
-              </div>
-            </div>
-          )}
           <div style={{ display: 'flex', gap: '16px', marginTop: '24px' }}>
             <button
               onClick={createVoice}
@@ -171,7 +180,8 @@ export default function Voices() {
               onClick={() => {
                 setShowCreate(false);
                 setNewVoiceName('');
-                setNewVoiceFiles([]);
+                setNewVoiceFile(null);
+                setError(null);
               }}
               style={{
                 background: 'var(--bg)',
@@ -210,26 +220,27 @@ export default function Voices() {
                   width: '48px',
                   height: '48px',
                   borderRadius: 'var(--radius-full)',
-                  background: voice.type === 'clone' ? 'var(--accent-light)' : 'var(--primary-light)',
+                  background: 'var(--primary-light)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontSize: '24px',
                 }}
               >
-                {voice.gender === 'female' ? '👩' : voice.gender === 'male' ? '👨' : '🎤'}
+                🎤
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, fontSize: 'var(--text-base)', marginBottom: '4px' }}>
                   {voice.name}
                 </div>
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dim)' }}>
-                  {voice.type === 'clone' ? 'Giọng clone' : 'Giọng có sẵn'} • {voice.accent}
+                  Giọng clone • {voice.lang} • {voice.engine}
                 </div>
               </div>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button
+                onClick={() => navigate('/tts')}
                 style={{
                   flex: 1,
                   padding: '8px',
@@ -244,27 +255,31 @@ export default function Voices() {
               >
                 Dùng ngay
               </button>
-              {voice.type === 'clone' && (
-                <button
-                  onClick={() => deleteVoice(voice.id)}
-                  style={{
-                    padding: '8px 12px',
-                    borderRadius: 'var(--radius)',
-                    background: 'var(--danger-light)',
-                    color: 'var(--danger)',
-                    fontWeight: 600,
-                    fontSize: 'var(--text-sm)',
-                    border: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  Xoá
-                </button>
-              )}
+              <button
+                onClick={() => deleteVoice(voice.id)}
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 'var(--radius)',
+                  background: 'var(--danger-light)',
+                  color: 'var(--danger)',
+                  fontWeight: 600,
+                  fontSize: 'var(--text-sm)',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                Xoá
+              </button>
             </div>
           </div>
         ))}
       </div>
+      {!voices.length && !showCreate && (
+        <div style={{ textAlign: 'center', padding: '64px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
+          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎤</div>
+          <div style={{ color: 'var(--text-dim)' }}>Chưa có giọng nào. Tạo giọng đầu tiên từ một mẫu 5-10 giây.</div>
+        </div>
+      )}
     </div>
   );
 }

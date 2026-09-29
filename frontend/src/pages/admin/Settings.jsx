@@ -3,10 +3,11 @@ import { useApi } from '../../hooks/useApi.jsx';
 
 export default function AdminSettings() {
   const { api } = useApi();
-  const [settings, setSettings] = useState({});
+  const [rows, setRows] = useState([]); // object gốc: {key,label,category,is_secret,value,source,set_in_db}
   const [editing, setEditing] = useState(null);
   const [editValue, setEditValue] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -17,26 +18,34 @@ export default function AdminSettings() {
 
   const loadSettings = async () => {
     try {
-      // Endpoint thật: GET /admin/settings → {settings: [{key, label, category,
-      // is_secret, value, source, set_in_db}]}. Trang render object {key: value}
-      // — chuyển tại đây; giá trị secret về sau bị mask, chỉ ghi đè khi đổi.
+      // Giữ NGUYÊN metadata của từng setting. Trước đây gộp thành {key: value}
+      // làm mất `is_secret` → người sửa secret nhận giá trị MẶT-NẠ ("••••1234")
+      // prefilled và bấm Lưu là ghi đè token thật bằng rác (đã gặp thật).
       const data = await api.get('/admin/settings');
-      const map = {};
-      for (const s of (data.settings || [])) map[s.key] = s.value ?? '';
-      setSettings(map);
-    } catch {}
+      setRows(data.settings || []);
+    } catch (e) {
+      console.error('tải cài đặt thất bại', e);
+    }
   };
 
-  const updateSetting = async (key, value) => {
-    setLoading(true);
-    try {
-      // PUT /admin/settings/{key} {value} — upsert (tạo mới nếu chưa có).
-      await api.put(`/admin/settings/${key}`, { body: { value } });
-      setSettings({ ...settings, [key]: value });
+  const updateSetting = async (row, value) => {
+    // SECRET: ô sửa luôn rỗng. Để trống = "giữ nguyên" — KHÔNG gọi PUT.
+    // (Gửi chính chuỗi mặt-nạ về là hủy hoại token — bug nghiêm trọng nhất
+    // của trang này trước khi sửa.)
+    if (row.is_secret && !value.trim()) {
       setEditing(null);
       setEditValue('');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      await api.put(`/admin/settings/${row.key}`, { body: { value } });
+      setEditing(null);
+      setEditValue('');
+      await loadSettings();
     } catch (err) {
-      alert('Lỗi khi lưu setting: ' + err.message);
+      setError('Lỗi khi lưu setting: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -46,48 +55,53 @@ export default function AdminSettings() {
     const key = newKey.trim();
     const val = newValue.trim();
     if (!key || !val) {
-      alert('Vui lòng nhập cả key và value');
+      setError('Vui lòng nhập cả key và value');
       return;
     }
     setLoading(true);
+    setError(null);
     try {
       await api.put(`/admin/settings/${key}`, { body: { value: val } });
-      setSettings({ ...settings, [key]: val });
       setNewKey('');
       setNewValue('');
       setShowAddForm(false);
+      await loadSettings();
     } catch (err) {
-      alert('Lỗi khi thêm setting: ' + err.message);
+      setError('Lỗi khi thêm setting: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const deleteSetting = async (key) => {
-    if (!confirm(`Xoá setting "${key}"?`)) return;
+  const deleteSetting = async (row) => {
+    if (!confirm(`Xoá setting "${row.key}" (quay về giá trị mặc định)?`)) return;
     try {
-      await api.del(`/admin/settings/${key}`);
-      const newSettings = { ...settings };
-      delete newSettings[key];
-      setSettings(newSettings);
+      await api.del(`/admin/settings/${row.key}`);
+      await loadSettings();
     } catch (err) {
-      alert('Lỗi khi xoá setting: ' + err.message);
+      setError('Lỗi khi xoá setting: ' + err.message);
     }
   };
 
-  const groupedSettings = Object.keys(settings).reduce((acc, key) => {
-    const category = key.split('_')[0];
-    if (!acc[category]) acc[category] = [];
-    acc[category].push({ key, value: settings[key] });
+  // Nhóm theo ĐOẠN TRƯỚC DẤU CHẤM (`pricing.tts` → nhóm `pricing`) — trước đây
+  // tách theo `_` nên từng key thành một nhóm riêng lẻ, trang dài lê thê.
+  const grouped = rows.reduce((acc, row) => {
+    const category = row.key.split('.')[0] || 'khác';
+    (acc[category] = acc[category] || []).push(row);
     return acc;
   }, {});
 
-  const getValueDisplay = (value) => {
-    if (typeof value === 'boolean') return value ? 'true' : 'false';
-    if (typeof value === 'number') return value.toString();
-    if (typeof value === 'object') return JSON.stringify(value, null, 2);
-    return value;
+  const displayValue = (row) => {
+    const v = row.value;
+    if (v === null || v === undefined || v === '') return <em style={{ opacity: 0.5 }}>chưa đặt</em>;
+    if (typeof v === 'boolean') return v ? 'true' : 'false';
+    return String(v);
   };
+
+  const sourceBadge = (src) => ({
+    db: { text: 'DB', bg: 'var(--primary-light)', color: 'var(--primary)' },
+    env: { text: 'env', bg: 'var(--info-light)', color: 'var(--info)' },
+  }[src] || { text: 'mặc định', bg: 'var(--bg)', color: 'var(--text-dim)' });
 
   return (
     <div style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto' }}>
@@ -95,8 +109,19 @@ export default function AdminSettings() {
         Cài đặt hệ thống
       </h1>
       <p style={{ color: 'var(--text-dim)', marginBottom: '48px' }}>
-        Quản lý các cấu hình và tham số hệ thống
+        Quản lý các cấu hình và tham số hệ thống. Giá trị secret hiển thị dạng mặt-nạ;
+        muốn đổi thì nhập giá trị MỚI, để trống là giữ nguyên.
       </p>
+
+      {/* Error */}
+      {error && (
+        <div style={{
+          padding: '16px', borderRadius: 'var(--radius)', marginBottom: '24px',
+          background: 'var(--danger-light)', color: 'var(--danger)',
+        }}>
+          {error}
+        </div>
+      )}
 
       {/* Add new setting form */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '24px', marginBottom: '32px' }}>
@@ -128,7 +153,7 @@ export default function AdminSettings() {
                 type="text"
                 value={newKey}
                 onChange={(e) => setNewKey(e.target.value)}
-                placeholder="category subsection name"
+                placeholder="ví dụ: translate.model"
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -181,14 +206,14 @@ export default function AdminSettings() {
       </div>
 
       {/* Settings by category */}
-      {Object.keys(groupedSettings).length === 0 && (
+      {Object.keys(grouped).length === 0 && (
         <div style={{ textAlign: 'center', padding: '64px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
           <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚙️</div>
           <div style={{ color: 'var(--text-dim)' }}>Chưa có cài đặt nào. Thêm cài đặt đầu tiên.</div>
         </div>
       )}
 
-      {Object.keys(groupedSettings).map(category => (
+      {Object.keys(grouped).map(category => (
         <div
           key={category}
           style={{
@@ -199,137 +224,156 @@ export default function AdminSettings() {
             marginBottom: '24px',
           }}
         >
-          <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: '20px', textTransform: 'capitalize' }}>
+          <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: '20px' }}>
             {category}
           </h3>
           <div style={{ display: 'grid', gap: '16px' }}>
-            {groupedSettings[category].map(({ key, value }) => (
-              <div
-                key={key}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '240px 1fr auto',
-                  gap: '16px',
-                  alignItems: 'center',
-                  padding: '12px',
-                  background: 'var(--bg)',
-                  borderRadius: 'var(--radius)',
-                }}
-              >
-                <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-dim)' }}>
-                  {key.replace(category + '_', '')}
-                </div>
-                <div>
-                  {editing === key ? (
-                    <input
-                      type="text"
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      style={{
-                        width: '100%',
-                        padding: '6px 10px',
-                        borderRadius: 'var(--radius-xs)',
-                        border: '1px solid var(--primary)',
-                        fontSize: 'var(--text-sm)',
-                        background: 'var(--surface)',
-                        color: 'var(--text)',
-                      }}
-                      autoFocus
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        padding: '6px 10px',
-                        borderRadius: 'var(--radius-xs)',
-                        background: 'var(--surface)',
-                        fontSize: 'var(--text-sm)',
-                        color: 'var(--text)',
-                        wordWrap: 'break-word',
-                        minHeight: '20px',
-                      }}
-                    >
-                      {typeof value === 'object' ? (
-                        <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{getValueDisplay(value)}</pre>
-                      ) : (
-                        getValueDisplay(value)
-                      )}
+            {grouped[category].map((row) => {
+              const badge = sourceBadge(row.source);
+              return (
+                <div
+                  key={row.key}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '240px 1fr auto',
+                    gap: '16px',
+                    alignItems: 'center',
+                    padding: '12px',
+                    background: 'var(--bg)',
+                    borderRadius: 'var(--radius)',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>
+                      {row.label || row.key}
                     </div>
-                  )}
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dim)', fontFamily: 'monospace' }}>
+                      {row.key}
+                    </div>
+                  </div>
+                  <div>
+                    {editing === row.key ? (
+                      <div>
+                        <input
+                          type={row.is_secret ? 'password' : 'text'}
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          placeholder={row.is_secret ? 'Nhập giá trị MỚI (để trống = giữ nguyên)' : ''}
+                          autoFocus
+                          style={{
+                            width: '100%',
+                            padding: '6px 10px',
+                            borderRadius: 'var(--radius-xs)',
+                            border: '1px solid var(--primary)',
+                            fontSize: 'var(--text-sm)',
+                            background: 'var(--surface)',
+                            color: 'var(--text)',
+                          }}
+                        />
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                          <button
+                            onClick={() => updateSetting(row, editValue)}
+                            disabled={loading}
+                            style={{
+                              background: 'var(--primary)',
+                              color: '#fff',
+                              border: 'none',
+                              padding: '4px 10px',
+                              borderRadius: '4px',
+                              fontSize: 'var(--text-xs)',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Lưu
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditing(null);
+                              setEditValue('');
+                            }}
+                            style={{
+                              background: 'var(--bg)',
+                              color: 'var(--text-dim)',
+                              border: '1px solid var(--border)',
+                              padding: '4px 10px',
+                              borderRadius: '4px',
+                              fontSize: 'var(--text-xs)',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Huỷ
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          padding: '6px 10px',
+                          borderRadius: 'var(--radius-xs)',
+                          background: 'var(--surface)',
+                          fontSize: 'var(--text-sm)',
+                          color: 'var(--text)',
+                          wordWrap: 'break-word',
+                          minHeight: '20px',
+                        }}
+                      >
+                        {displayValue(row)}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    {editing !== row.key && (
+                      <>
+                        <span
+                          title={`nguồn giá trị: ${row.source}`}
+                          style={{
+                            fontSize: '10px', padding: '2px 6px', borderRadius: '4px',
+                            background: badge.bg, color: badge.color, fontWeight: 700,
+                          }}
+                        >
+                          {badge.text}
+                        </span>
+                        <button
+                          onClick={() => {
+                            setEditing(row.key);
+                            // SECRET: ô sửa luôn RỖNG — không prefilled mặt-nạ.
+                            setEditValue(row.is_secret ? '' : (typeof row.value === 'string' || typeof row.value === 'number' || typeof row.value === 'boolean' ? String(row.value) : ''));
+                          }}
+                          style={{
+                            background: 'var(--primary-light)',
+                            color: 'var(--primary)',
+                            border: 'none',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            fontSize: 'var(--text-xs)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Sửa
+                        </button>
+                        {row.set_in_db && (
+                          <button
+                            onClick={() => deleteSetting(row)}
+                            style={{
+                              background: 'var(--danger-light)',
+                              color: 'var(--danger)',
+                              border: 'none',
+                              padding: '4px 8px',
+                              borderRadius: '4px',
+                              fontSize: 'var(--text-xs)',
+                              cursor: 'pointer',
+                            }}
+                            title="Chỉ xóa được giá trị đặt trong DB (mặc định/env chỉ đọc)"
+                          >
+                            Xoá
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  {editing === key ? (
-                    <>
-                      <button
-                        onClick={() => updateSetting(key, editValue)}
-                        disabled={loading}
-                        style={{
-                          background: 'var(--primary)',
-                          color: '#fff',
-                          border: 'none',
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          fontSize: 'var(--text-xs)',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Lưu
-                      </button>
-                      <button
-                        onClick={() => {
-                          setEditing(null);
-                          setEditValue('');
-                        }}
-                        style={{
-                          background: 'var(--bg)',
-                          color: 'var(--text-dim)',
-                          border: '1px solid var(--border)',
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          fontSize: 'var(--text-xs)',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Huỷ
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => {
-                          setEditing(key);
-                          setEditValue(getValueDisplay(value));
-                        }}
-                        style={{
-                          background: 'var(--primary-light)',
-                          color: 'var(--primary)',
-                          border: 'none',
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          fontSize: 'var(--text-xs)',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Sửa
-                      </button>
-                      <button
-                        onClick={() => deleteSetting(key)}
-                        style={{
-                          background: 'var(--danger-light)',
-                          color: 'var(--danger)',
-                          border: 'none',
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          fontSize: 'var(--text-xs)',
-                          cursor: 'pointer',
-                        }}
-                      >
-                        Xoá
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ))}

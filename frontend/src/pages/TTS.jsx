@@ -1,93 +1,70 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi.jsx';
 import { useAuth } from '../hooks/useAuth.jsx';
+import { createJob, pollJob, getResult } from '../api/jobs.js';
 
 export default function TTS() {
   const { user } = useAuth();
   const { api } = useApi();
-  const audioRef = useRef(null);
   const [text, setText] = useState('');
-  const [selectedVoice, setSelectedVoice] = useState(1);
+  const [selectedVoice, setSelectedVoice] = useState(null);
   const [voices, setVoices] = useState([]);
-  const [speed, setSpeed] = useState(1.0);
-  const [pitch, setPitch] = useState(0);
+  const [pricing, setPricing] = useState({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [audioUrl, setAudioUrl] = useState(null);
+  const [result, setResult] = useState(null);
   const [job, setJob] = useState(null);
-  const [credits, setCredits] = useState(null);
+  const [error, setError] = useState(null);
 
+  // Giọng thật từ GET /v1/voices + bảng giá thật — trước đây gọi 405 nên grid
+  // giọng trống trơn, và "Dùng tới ~N credits" là phép chia bịa.
   useEffect(() => {
     (async () => {
       try {
-        const data = await api.get('/v1/voices');
-        setVoices(data);
-        if (data.length > 0) setSelectedVoice(data[0].id);
-      } catch {}
+        const list = await api.get('/v1/voices');
+        setVoices(list);
+        if (list.length > 0) setSelectedVoice(list[0].id);
+      } catch (e) {
+        console.error('tải danh sách giọng thất bại', e);
+      }
+      try {
+        setPricing(await api.get('/v1/pricing'));
+      } catch (e) {
+        console.error('tải bảng giá thất bại', e);
+      }
     })();
   }, [api]);
 
   const generateSpeech = async () => {
     if (!text.trim()) {
-      alert('Vui lòng nhập văn bản để tạo giọng nói');
+      setError('Vui lòng nhập văn bản để tạo giọng nói');
       return;
     }
     setIsGenerating(true);
     setAudioUrl(null);
+    setResult(null);
+    setJob(null);
+    setError(null);
     try {
-      const body = {
+      const created = await createJob({
+        type: 'tts',
         text,
-        voiceId: selectedVoice,
-        speed,
-        pitch,
-        creditsEstimated: Math.ceil(text.length / 10),
-      };
-      const res = await api.post('/v1/jobs', { body });
-      setJob({ ...res, status: 'queued', progress: { percent: 0, step: 'TTS', message: 'Đang tạo giọng nói...' } });
-      pollJob(res.id);
+        voice_id: selectedVoice || undefined,
+      });
+      const done = await pollJob(created.jobId, { onUpdate: setJob, timeoutMs: 10 * 60 * 1000 });
+      if (done.status === 'failed') {
+        setError(done.error || 'Tạo giọng nói thất bại (credit đã hoàn lại).');
+      } else {
+        const res = await getResult(created.jobId);
+        setResult(res);
+        setAudioUrl(res.url);
+      }
     } catch (err) {
-      alert('Lỗi khi tạo giọng nói: ' + err.message);
+      setError(err.message);
+    } finally {
       setIsGenerating(false);
     }
   };
-
-  const pollJob = async (jobId) => {
-    const interval = setInterval(async () => {
-      try {
-        const j = await api.get(`/v1/jobs/${jobId}`);
-        setJob(j);
-        if (j.status === 'completed') {
-          setIsGenerating(false);
-          if (j.result?.url) {
-            setAudioUrl(j.result.url);
-          }
-          clearInterval(interval);
-        } else if (j.status === 'failed') {
-          setIsGenerating(false);
-          alert('Tạo giọng nói thất bại');
-          clearInterval(interval);
-        }
-      } catch {
-        clearInterval(interval);
-        setIsGenerating(false);
-      }
-    }, 2000);
-  };
-
-  const previewVoice = async (voice) => {
-    if (audioRef.current) {
-      try {
-        audioRef.current.volume = 0.8;
-        audioRef.current.play();
-        setTimeout(() => {
-          if (audioRef.current) audioRef.current.pause();
-          audioRef.current.currentTime = 0;
-        }, 4000);
-      } catch {}
-    }
-  };
-
-  const formattedSpeed = speed.toFixed(1);
-  const formattedPitch = pitch > 0 ? `+${pitch}` : pitch.toString();
 
   return (
     <div style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto' }}>
@@ -95,7 +72,7 @@ export default function TTS() {
         TTS Studio
       </h1>
       <p style={{ color: 'var(--text-dim)', marginBottom: '48px' }}>
-        Chuyển văn bản thành giọng nói tự nhiên với hơn 10 giọng đọc tiếng Việt
+        Chuyển văn bản thành giọng nói tự nhiên với giọng đọc tiếng Việt của bạn
       </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '40px' }}>
@@ -134,89 +111,39 @@ export default function TTS() {
             <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '12px', fontWeight: 600 }}>
               Chọn giọng đọc
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '16px' }}>
-              {voices.map((v) => (
-                <button
-                  key={v.id}
-                  onClick={() => setSelectedVoice(v.id)}
-                  style={{
-                    background: selectedVoice === v.id ? 'var(--primary-light)' : 'var(--surface)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius)',
-                    padding: '12px 16px',
-                    textAlign: 'center',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '8px',
-                  }}
-                >
-                  <div style={{ fontSize: '20px' }}>{v.gender === 'female' ? '👩' : '👨'}</div>
-                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>
-                    {v.name}
-                  </div>
+            {voices.length === 0 ? (
+              <div style={{ padding: '20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text-dim)', fontSize: 'var(--text-sm)' }}>
+                Chưa có giọng nào — tạo giọng ở trang “Giọng Clone”, hoặc cứ tạo giọng nói với giọng mặc định của hệ thống.
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '16px' }}>
+                {voices.map((v) => (
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      previewVoice(v);
-                    }}
+                    key={v.id}
+                    onClick={() => setSelectedVoice(v.id)}
                     style={{
-                      fontSize: '12px',
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      background: 'var(--info-light)',
-                      color: 'var(--info)',
-                      border: 'none',
+                      background: selectedVoice === v.id ? 'var(--primary-light)' : 'var(--surface)',
+                      border: selectedVoice === v.id ? '1px solid var(--primary)' : '1px solid var(--border)',
+                      borderRadius: 'var(--radius)',
+                      padding: '12px 16px',
+                      textAlign: 'center',
                       cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '8px',
                     }}
                   >
-                    🎧 Nghe thử
+                    <div style={{ fontSize: '20px' }}>🎤</div>
+                    <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>
+                      {v.name}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{v.lang}</div>
                   </button>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Voice settings */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '12px', fontWeight: 600 }}>
-                Tốc độ: {formattedSpeed}x
-              </label>
-              <input
-                type="range"
-                min={0.5}
-                max={2.0}
-                step={0.1}
-                value={speed}
-                onChange={(e) => setSpeed(parseFloat(e.target.value))}
-                style={{ width: '100%' }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--text-dim)', marginTop: '4px' }}>
-                <span>0.5x</span>
-                <span>2.0x</span>
+                ))}
               </div>
-            </div>
-            <div>
-              <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '12px', fontWeight: 600 }}>
-                Cao độ: {formattedPitch}
-              </label>
-              <input
-                type="range"
-                min={-10}
-                max={10}
-                step={1}
-                value={pitch}
-                onChange={(e) => setPitch(parseInt(e.target.value))}
-                style={{ width: '100%' }}
-              />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--text-dim)', marginTop: '4px' }}>
-                <span>-10</span>
-                <span>+10</span>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* Generate button */}
@@ -236,8 +163,18 @@ export default function TTS() {
               maxWidth: '240px',
             }}
           >
-            {isGenerating ? 'Đang tạo giọng nói...' : 'Tạo giọng nói'}
+            {isGenerating ? 'Đang tạo giọng nói...' : `Tạo giọng nói (${(Number(pricing.tts) || 10).toLocaleString('vi-VN')} credits)`}
           </button>
+
+          {/* Error */}
+          {error && (
+            <div style={{
+              padding: '16px', borderRadius: 'var(--radius)',
+              background: 'var(--danger-light)', color: 'var(--danger)', whiteSpace: 'pre-wrap',
+            }}>
+              {error}
+            </div>
+          )}
 
           {/* Audio player */}
           {audioUrl && (
@@ -246,23 +183,22 @@ export default function TTS() {
                 Kết quả
               </label>
               <audio
-                ref={audioRef}
                 controls
                 src={audioUrl}
                 style={{ width: '100%', outline: 'none' }}
               />
+              <a href={result?.url} download={result?.filename} style={{ display: 'inline-block', marginTop: '12px', color: 'var(--primary)', fontWeight: 600 }}>
+                Tải về máy ({result?.filename})
+              </a>
             </div>
           )}
 
           {/* Status */}
-          {job && job.status !== 'completed' && (
+          {job && job.status !== 'done' && !error && (
             <div style={{ padding: '16px', borderRadius: 'var(--radius)', background: 'var(--info-light)', color: 'var(--info)' }}>
               <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '8px' }}>
                 {job.status === 'queued' ? 'Hàng đợi' : job.status === 'running' ? 'Đang xử lý' : job.status}
               </div>
-              {job.progress?.message && (
-                <div style={{ fontSize: 'var(--text-sm)', marginBottom: '8px' }}>{job.progress.message}</div>
-              )}
               {job.progress?.percent !== undefined && (
                 <div>
                   <div
@@ -301,7 +237,7 @@ export default function TTS() {
               Số dư: <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{(user?.credits || 0).toLocaleString('vi-VN')}</span>
             </div>
             <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
-              Dùng tới:~{Math.ceil(text.length / 10)} credits
+              Giá tạo giọng nói: {(Number(pricing.tts) || 10).toLocaleString('vi-VN')} credits/job (đọc từ server)
             </div>
           </div>
 
@@ -338,8 +274,8 @@ export default function TTS() {
             </h4>
             <ul style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', listStyle: 'none', padding: 0, margin: 0 }}>
               <li style={{ marginBottom: '8px' }}>• Dùng dấu phẩy và dấu chấm để tạo pause tự nhiên</li>
-              <li style={{ marginBottom: '8px' }}>• Tăng/giảm tốc độ để học ngoại ngữ</li>
-              <li>• Nghe thử giọng đọc trước khi tạo file</li>
+              <li style={{ marginBottom: '8px' }}>• Tạo giọng riêng ở trang “Giọng Clone” từ 5-10 giây mẫu</li>
+              <li>• Nghe kết quả ngay tại đây sau khi tạo xong</li>
             </ul>
           </div>
         </div>

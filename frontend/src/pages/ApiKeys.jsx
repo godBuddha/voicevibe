@@ -5,10 +5,9 @@ export default function ApiKeys() {
   const { api } = useApi();
   const [keys, setKeys] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newKeyName, setNewKeyName] = useState('');
-  const [newPermissions, setNewPermissions] = useState('full');
   const [wasCreated, setWasCreated] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchKeys();
@@ -16,43 +15,49 @@ export default function ApiKeys() {
 
   const fetchKeys = async () => {
     try {
-      const data = await api.get('/v1/keys');
-      setKeys(data);
-    } catch {}
+      // useApi đã adapter '/v1/keys' → mảng (trước đây setKeys({keys: []}) rồi
+      // keys.map → TypeError, trang trắng — đã gặp thật khi dò UI).
+      setKeys(await api.get('/v1/keys'));
+    } catch (e) {
+      console.error('tải danh sách key thất bại', e);
+    }
   };
 
   const createKey = async () => {
-    if (!newKeyName.trim()) return;
     setLoading(true);
+    setError(null);
     try {
-      const res = await api.post('/v1/keys', {
-        body: { name: newKeyName, permissions: newPermissions },
-      });
-      setKeys([{ ...res, name: newKeyName, permissions: newPermissions, created: new Date() }, ...keys]);
+      // Backend KHÔNG nhận tên/quyền hạn — mỗi lần gọi là 1 key full-quyền 60
+      // req/phút. Form "Tên key / Quyền hạn" của bản mock đã bịa, giờ bỏ để
+      // không hứa hẹn thứ server không lưu.
+      const res = await api.post('/v1/keys', { body: {} });
       setWasCreated(res.key);
       setShowCreateModal(false);
-      setNewKeyName('');
-      setNewPermissions('full');
+      await fetchKeys();
     } catch (err) {
-      alert('Lỗi khi tạo API key: ' + err.message);
+      setError('Lỗi khi tạo API key: ' + err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const deleteKey = async (id) => {
-    if (!confirm('Bạn có chắc muốn xoá API key này?')) return;
+  const deleteKey = async (prefix) => {
+    if (!confirm('Bạn có chắc muốn thu hồi API key này?')) return;
     try {
-      await api.del(`/v1/keys/${id}`);
-      setKeys(keys.filter(k => k.id !== id));
+      // Thu hồi theo PREFIX (12 ký tự đầu) — backend chấp nhận cả raw key lẫn
+      // prefix. Trước đây gọi DELETE /v1/keys/undefined (list không có id).
+      await api.del(`/v1/keys/${prefix}`);
+      await fetchKeys();
     } catch (err) {
-      alert('Lỗi khi xoá key: ' + err.message);
+      setError('Lỗi khi thu hồi key: ' + err.message);
     }
   };
 
-  const formatDate = (date) => {
-    const d = new Date(date);
-    return d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const formatDate = (sec) => {
+    if (!sec) return '—';
+    return new Date(sec * 1000).toLocaleString('vi-VN', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
   };
 
   const hideCreated = () => setWasCreated(null);
@@ -65,7 +70,7 @@ export default function ApiKeys() {
             API Keys
           </h1>
           <p style={{ color: 'var(--text-dim)' }}>
-            Quản lý khóa API để truy cập các dịch vụ VoiceVibe
+            Quản lý khóa API để truy cập các dịch vụ VoiceVibe (60 req/phút mỗi key)
           </p>
         </div>
         <button
@@ -84,6 +89,16 @@ export default function ApiKeys() {
           + Tạo API Key
         </button>
       </div>
+
+      {/* Error */}
+      {error && (
+        <div style={{
+          padding: '16px', borderRadius: 'var(--radius)', marginBottom: '24px',
+          background: 'var(--danger-light)', color: 'var(--danger)',
+        }}>
+          {error}
+        </div>
+      )}
 
       {/* Display new key modal */}
       {wasCreated && (
@@ -176,58 +191,16 @@ export default function ApiKeys() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: '24px' }}>
+            <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: '16px' }}>
               Tạo API Key mới
             </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '8px', fontWeight: 600 }}>
-                  Tên key
-                </label>
-                <input
-                  type="text"
-                  value={newKeyName}
-                  onChange={(e) => setNewKeyName(e.target.value)}
-                  placeholder="Ví dụ: Production API"
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: 'var(--radius)',
-                    border: '1px solid var(--border)',
-                    fontSize: 'var(--text-base)',
-                    background: 'var(--bg)',
-                    color: 'var(--text)',
-                  }}
-                  required
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '8px', fontWeight: 600 }}>
-                  Quyền hạn
-                </label>
-                <select
-                  value={newPermissions}
-                  onChange={(e) => setNewPermissions(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: 'var(--radius)',
-                    border: '1px solid var(--border)',
-                    fontSize: 'var(--text-base)',
-                    background: 'var(--bg)',
-                    color: 'var(--text)',
-                  }}
-                >
-                  <option value="full">Toàn quyền</option>
-                  <option value="limited">Giới hạn (chỉ đọc)</option>
-                  <option value="micropayment">Micropayment</option>
-                </select>
-              </div>
-            </div>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '24px' }}>
+              Key có toàn quyền truy cập API bằng tài khoản của bạn. Máy gọi gửi header <code>X-API-Key</code>.
+            </p>
             <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
               <button
                 onClick={createKey}
-                disabled={!newKeyName.trim() || loading}
+                disabled={loading}
                 style={{
                   flex: 1,
                   background: 'var(--gradient)',
@@ -244,11 +217,7 @@ export default function ApiKeys() {
               </button>
               <button
                 onClick={() => {
-                  if (!loading) {
-                    setShowCreateModal(false);
-                    setNewKeyName('');
-                    setNewPermissions('full');
-                  }
+                  if (!loading) setShowCreateModal(false);
                 }}
                 style={{
                   background: 'var(--bg)',
@@ -275,9 +244,9 @@ export default function ApiKeys() {
             <div style={{ color: 'var(--text-dim)' }}>Chưa có API key nào. Tạo key đầu tiên để bắt đầu.</div>
           </div>
         ) : (
-          keys.map(key => (
+          keys.map((k, i) => (
             <div
-              key={key.id}
+              key={`${k.prefix}-${i}`}
               style={{
                 background: 'var(--surface)',
                 border: '1px solid var(--border)',
@@ -288,37 +257,18 @@ export default function ApiKeys() {
                 alignItems: 'center',
               }}
             >
-              <div style={{ cursor: 'pointer' }} onClick={() => navigator.clipboard.writeText(key.key)}>
+              <div>
                 <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, marginBottom: '8px' }}>
-                  {key.name}
-                </div>
-                <div
-                  style={{
-                    fontSize: 'var(--text-xs)',
-                    color: 'var(--text-dim)',
-                    fontFamily: 'monospace',
-                    background: 'var(--bg)',
-                    padding: '4px 8px',
-                    borderRadius: 'var(--radius-xs)',
-                    border: '1px solid var(--border)',
-                    marginBottom: '8px',
-                    maxWidth: '500px',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                  title={key.key}
-                >
-                  {key.key}
+                  {k.key}
                 </div>
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dim)' }}>
-                  Tạo: {formatDate(key.created)} • Quyền: {key.permissions === 'full' ? 'Toàn quyền' : key.permissions === 'limited' ? 'Giới hạn' : 'Micropayment'}
-                  {key.lastUsed && ` • Lần dùng cuối: ${formatDate(key.lastUsed)}`}
+                  Tạo: {formatDate(k.created_at)} • Hạn mức: {k.rate_limit_per_min} req/phút • {k.active ? 'Đang hoạt động' : 'Đã thu hồi'}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <button
-                  onClick={() => navigator.clipboard.writeText(key.key)}
+                  onClick={() => navigator.clipboard.writeText(k.prefix).catch(() => {})}
+                  title="Sao chép tiền tố (dùng để nhận diện, KHÔNG dùng để gọi API)"
                   style={{
                     background: 'var(--info-light)',
                     color: 'var(--info)',
@@ -330,10 +280,11 @@ export default function ApiKeys() {
                     cursor: 'pointer',
                   }}
                 >
-                  📋 Sao chép
+                  📋 Sao chép tiền tố
                 </button>
                 <button
-                  onClick={() => deleteKey(key.id)}
+                  onClick={() => deleteKey(k.prefix)}
+                  disabled={!k.active}
                   style={{
                     background: 'var(--danger-light)',
                     color: 'var(--danger)',
@@ -342,10 +293,11 @@ export default function ApiKeys() {
                     borderRadius: 'var(--radius)',
                     fontWeight: 600,
                     fontSize: 'var(--text-sm)',
-                    cursor: 'pointer',
+                    cursor: k.active ? 'pointer' : 'not-allowed',
+                    opacity: k.active ? 1 : 0.5,
                   }}
                 >
-                  Xoá
+                  Thu hồi
                 </button>
               </div>
             </div>

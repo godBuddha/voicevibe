@@ -7,10 +7,15 @@ export function DonutChart({ usage }) {
   const percent = total > 0 ? (used / total) * 100 : 0;
 
   const breakdown = usage?.breakdown || {};
+  // Đủ màu cho MỌI loại job (trước đây thiếu stt/dub/subtitle → vẽ không màu
+  // + chấm màu undefined ở chú giải).
   const colors = {
     tts: '#7c3aed',
     translate: '#ec4899',
     video: '#10b981',
+    stt: '#3b82f6',
+    dub: '#8b5cf6',
+    subtitle: '#14b8a6',
     other: '#f59e0b',
   };
 
@@ -36,8 +41,7 @@ export function DonutChart({ usage }) {
 
     // Draw segments
     let currentAngle = -Math.PI / 2;
-    const arr = ['tts', 'translate', 'video', 'other'];
-    for (const key of arr) {
+    for (const key of Object.keys(breakdown)) {
       const val = breakdown[key] || 0;
       if (val === 0) continue;
       const segAngle = (val / used) * (Math.PI * 2 * (used / total));
@@ -78,11 +82,11 @@ export function DonutChart({ usage }) {
                 width: '12px',
                 height: '12px',
                 borderRadius: '2px',
-                backgroundColor: colors[key],
+                backgroundColor: colors[key] || '#94a3b8',
               }}
             />
             <div style={{ flex: 1, fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
-              {key === 'tts' ? 'TTS' : key === 'translate' ? 'Dịch thuật' : key === 'video' ? 'Video AI' : 'Khác'}
+              { {tts: 'TTS', translate: 'Dịch thuật', video: 'Video AI', stt: 'STT', dub: 'Lồng tiếng', subtitle: 'Phụ đề'}[key] || 'Khác' }
             </div>
             <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
               {val.toLocaleString('vi-VN')}

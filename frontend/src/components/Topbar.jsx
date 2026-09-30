@@ -1,9 +1,25 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { PanelLeftClose, PanelLeftOpen, Search, Sun, Moon, Bell, LogOut } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme.jsx';
 import { useAuth } from '../hooks/useAuth.jsx';
 
-export default function Topbar() {
+// Nút icon vuông nhỏ 28px — chuẩn compact: đủ vùng bấm, không chiếm chỗ.
+const iconBtn = {
+  width: '28px',
+  height: '28px',
+  borderRadius: 'var(--radius-sm)',
+  background: 'transparent',
+  border: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  color: 'var(--text-dim)',
+  cursor: 'pointer',
+  flexShrink: 0,
+};
+
+export default function Topbar({ sidebarHidden, onToggleSidebar }) {
   const { theme, toggle } = useTheme();
   const { user, logout } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -17,111 +33,91 @@ export default function Topbar() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '0 24px',
+        padding: '0 12px',
+        gap: '12px',
+        flexShrink: 0,
       }}
     >
-      <div style={{ flex: 1, maxWidth: '500px' }}>
-        <div
-          style={{
-            position: 'relative',
-          }}
-          onClick={() => setSearchOpen(!searchOpen)}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, maxWidth: '420px' }}>
+        {/* Gập/mở sidebar: ẩn hoàn toàn -> nhường nguyên hàng ngang cho nội dung */}
+        <button
+          onClick={onToggleSidebar}
+          title={sidebarHidden ? 'Hiện thanh menu' : 'Ẩn thanh menu'}
+          style={iconBtn}
         >
+          {sidebarHidden ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+        </button>
+        <div style={{ position: 'relative', width: '100%' }} onClick={() => setSearchOpen(!searchOpen)}>
           <input
             type="text"
             placeholder="Tìm kiếm (⌘K)"
             style={{
               width: '100%',
-              padding: '8px 12px 8px 36px',
-              borderRadius: 'var(--radius)',
+              padding: '5px 10px 5px 28px',
+              borderRadius: 'var(--radius-sm)',
               border: '1px solid var(--border)',
               background: 'var(--bg)',
               color: 'var(--text)',
               fontSize: 'var(--text-sm)',
             }}
           />
-          <svg width="18" height="18" fill="none" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}>
-            <path d="M8.5 15C11.5376 15 14 12.5376 14 9.5C14 6.46243 11.5376 4 8.5 4C5.46243 4 3 6.46243 3 9.5C3 12.5376 5.46243 15 8.5 15Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M12.5 12.5L16 16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <Search
+            size={13}
+            style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }}
+          />
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
         <button
           onClick={toggle}
           title={theme === 'dark' ? 'Chuyển sang sáng' : 'Chuyển sang tối'}
-          style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: 'var(--radius)',
-            background: 'var(--bg)',
-            border: '1px solid var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-dim)',
-          }}
+          style={iconBtn}
         >
-          {theme === 'dark' ? '☀️' : '🌙'}
+          {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
         </button>
 
-        <button
-          title="Thông báo"
-          style={{
-            width: '40px',
-            height: '40px',
-            borderRadius: 'var(--radius)',
-            background: 'var(--bg)',
-            border: '1px solid var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-dim)',
-          }}
-        >
-          🔔
+        <button title="Thông báo" style={iconBtn}>
+          <Bell size={15} />
         </button>
 
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '12px',
+            gap: '8px',
+            marginLeft: '8px',
+            paddingLeft: '10px',
+            borderLeft: '1px solid var(--border)',
           }}
         >
           <div
             style={{
-              width: '40px',
-              height: '40px',
+              width: '26px',
+              height: '26px',
               borderRadius: 'var(--radius-full)',
               background: 'var(--gradient)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               color: '#fff',
+              fontSize: 'var(--text-xs)',
               fontWeight: 700,
+              flexShrink: 0,
             }}
           >
             {user?.name?.charAt(0)?.toUpperCase() ?? 'A'}
           </div>
-          <div>
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>
               {user?.name}
             </div>
             <button
               onClick={logout}
-              style={{
-                fontSize: 'var(--text-xs)',
-                color: 'var(--text-dim)',
-                textDecoration: 'none',
-                cursor: 'pointer',
-                background: 'none',
-                border: 'none',
-                padding: 0,
-              }}
+              title="Đăng xuất"
+              style={{ ...iconBtn, width: '24px', height: '24px' }}
             >
-              Đăng xuất
+              <LogOut size={13} />
             </button>
           </div>
         </div>

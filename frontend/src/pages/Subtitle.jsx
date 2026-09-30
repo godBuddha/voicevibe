@@ -128,17 +128,17 @@ export default function Subtitle() {
   };
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '24px', fontWeight: 700 }}>
+    <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
+      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '14px', fontWeight: 700 }}>
         Tạo phụ đề tự động
       </h1>
-      <p style={{ color: 'var(--text-dim)', marginBottom: '48px' }}>
+      <p style={{ color: 'var(--text-dim)', marginBottom: '20px' }}>
         Tạo phụ đề SRT, VTT, ASS từ video với công nghệ AI tiên tiến
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '40px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '20px' }}>
         {/* Left */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Upload */}
           {!cues.length && !job && (
             <div
@@ -161,7 +161,7 @@ export default function Subtitle() {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '16px',
+                gap: '12px',
               }}
             >
               <input
@@ -194,7 +194,7 @@ export default function Subtitle() {
           {!cues.length && file && (
             <>
               <div>
-                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     checked={isBilingual}
@@ -204,7 +204,7 @@ export default function Subtitle() {
                   <span style={{ fontSize: 'var(--text-base)' }}>Phụ đề song ngữ (nguồn + dịch)</span>
                 </label>
                 {isBilingual && (
-                  <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <label style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
                       Dịch ra:
                     </label>
@@ -212,7 +212,7 @@ export default function Subtitle() {
                       value={targetLang}
                       onChange={(e) => setTargetLang(e.target.value)}
                       style={{
-                        padding: '8px 12px',
+                        padding: '8px 10px',
                         borderRadius: 'var(--radius)',
                         border: '1px solid var(--border)',
                         fontSize: 'var(--text-sm)',
@@ -230,7 +230,7 @@ export default function Subtitle() {
               {/* Error */}
               {error && (
                 <div style={{
-                  padding: '16px', borderRadius: 'var(--radius)',
+                  padding: '12px', borderRadius: 'var(--radius)',
                   background: 'var(--danger-light)', color: 'var(--danger)', whiteSpace: 'pre-wrap',
                 }}>
                   {error}
@@ -243,7 +243,7 @@ export default function Subtitle() {
                   background: 'var(--gradient)',
                   color: '#fff',
                   border: 'none',
-                  padding: '16px 32px',
+                  padding: '12px 16px',
                   borderRadius: 'var(--radius)',
                   fontSize: 'var(--text-base)',
                   fontWeight: 600,
@@ -259,7 +259,7 @@ export default function Subtitle() {
 
           {/* Progress */}
           {job && job.status !== 'done' && !error && (
-            <div style={{ padding: '20px', borderRadius: 'var(--radius)', background: 'var(--info-light)', color: 'var(--info)' }}>
+            <div style={{ padding: '12px', borderRadius: 'var(--radius)', background: 'var(--info-light)', color: 'var(--info)' }}>
               <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '8px' }}>
                 {job.status === 'queued' ? 'Hàng đợi' : job.status === 'running' ? 'Đang xử lý' : job.status}
               </div>
@@ -288,7 +288,7 @@ export default function Subtitle() {
           {/* Cue editor */}
           {cues.length > 0 && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700 }} className="font-bold">
                   Phụ đề ({cues.length} đoạn)
                 </h3>
@@ -297,7 +297,7 @@ export default function Subtitle() {
                     value={exportFormat}
                     onChange={(e) => setExportFormat(e.target.value)}
                     style={{
-                      padding: '8px 12px',
+                      padding: '8px 10px',
                       borderRadius: 'var(--radius)',
                       border: '1px solid var(--border)',
                       fontSize: 'var(--text-sm)',
@@ -315,7 +315,7 @@ export default function Subtitle() {
                       background: 'var(--info-light)',
                       color: 'var(--info)',
                       border: 'none',
-                      padding: '8px 16px',
+                      padding: '8px 12px',
                       borderRadius: 'var(--radius)',
                       fontSize: 'var(--text-sm)',
                       fontWeight: 600,
@@ -332,7 +332,7 @@ export default function Subtitle() {
                         background: 'var(--success-light)',
                         color: 'var(--success)',
                         border: 'none',
-                        padding: '8px 16px',
+                        padding: '8px 12px',
                         borderRadius: 'var(--radius)',
                         fontSize: 'var(--text-sm)',
                         fontWeight: 600,
@@ -355,7 +355,7 @@ export default function Subtitle() {
                       background: 'var(--bg)',
                       color: 'var(--text-dim)',
                       border: '1px solid var(--border)',
-                      padding: '8px 16px',
+                      padding: '8px 12px',
                       borderRadius: 'var(--radius)',
                       fontSize: 'var(--text-sm)',
                       fontWeight: 600,
@@ -371,26 +371,26 @@ export default function Subtitle() {
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
                   borderRadius: 'var(--radius-lg)',
-                  padding: '24px',
+                  padding: '14px',
                   maxHeight: '500px',
                   overflow: 'auto',
                 }}
                 className="scrollbar-thin"
               >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {cues.map((c, i) => (
                     <div
                       key={i}
                       style={{
-                        padding: '12px',
+                        padding: '10px',
                         background: editingIndex === i ? 'var(--primary-light)' : 'var(--bg)',
                         borderRadius: 'var(--radius)',
                         border: editingIndex === i ? '1px solid var(--primary)' : '1px solid var(--border)',
                       }}
                     >
                       {editingIndex === i ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)', minWidth: '48px' }}>
                               Bắt đầu
                             </span>
@@ -408,7 +408,7 @@ export default function Subtitle() {
                               }}
                             />
                           </div>
-                          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)', minWidth: '48px' }}>
                               Kết thúc
                             </span>
@@ -446,7 +446,7 @@ export default function Subtitle() {
                                 background: 'var(--primary)',
                                 color: '#fff',
                                 border: 'none',
-                                padding: '6px 12px',
+                                padding: '6px 10px',
                                 borderRadius: 'var(--radius-xs)',
                                 fontWeight: 600,
                                 fontSize: 'var(--text-sm)',
@@ -465,7 +465,7 @@ export default function Subtitle() {
                                 background: 'var(--bg)',
                                 color: 'var(--text-dim)',
                                 border: '1px solid var(--border)',
-                                padding: '6px 12px',
+                                padding: '6px 10px',
                                 borderRadius: 'var(--radius-xs)',
                                 fontWeight: 600,
                                 fontSize: 'var(--text-sm)',
@@ -477,7 +477,7 @@ export default function Subtitle() {
                           </div>
                         </div>
                       ) : (
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
                           <div style={{ flex: 1 }}>
                             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dim)', marginBottom: '6px' }}>
                               {prettifyTime(c.start)} → {prettifyTime(c.end)}
@@ -510,10 +510,10 @@ export default function Subtitle() {
         </div>
 
         {/* Right sidebar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Tips */}
-          <div style={{ background: 'var(--info-light)', border: '1px solid var(--info)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
-            <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '12px', color: 'var(--info)' }}>
+          <div style={{ background: 'var(--info-light)', border: '1px solid var(--info)', borderRadius: 'var(--radius-lg)', padding: '12px' }}>
+            <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '10px', color: 'var(--info)' }}>
               💡 Mẹo
             </h4>
             <ul style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', listStyle: 'none', padding: 0, margin: 0 }}>
@@ -524,8 +524,8 @@ export default function Subtitle() {
           </div>
 
           {/* Features */}
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
-            <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '12px' }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px' }}>
+            <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '10px' }}>
               🎯 Tính năng
             </h4>
             <ul style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', listStyle: 'none', padding: 0, margin: 0 }}>

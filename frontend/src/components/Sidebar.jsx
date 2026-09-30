@@ -1,35 +1,50 @@
-import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useTheme } from '../hooks/useTheme.jsx';
+import {
+  Mic,
+  Speech,
+  Languages,
+  Captions,
+  AudioLines,
+  Clapperboard,
+  FileText,
+  History,
+  KeyRound,
+  UsersRound,
+  Boxes,
+  Settings,
+  AudioWaveform,
+} from 'lucide-react';
 import { useAuth } from '../hooks/useAuth.jsx';
 
+// COMPACT UI: mỗi mục menu có icon Lucide 14px + label 12.5px, khoảng đệm 6-7px
+// — mật độ cao như Open WebUI, nhìn một phát thấy được cả hệ tính năng.
 const navigation = [
   {
     heading: 'TẠO NỘI DUNG VỚI AI',
     items: [
-      { label: 'Chuyển văn bản thành giọng nói', to: '/tts' },
+      { label: 'Chuyển văn bản thành giọng nói', to: '/tts', Icon: Mic },
       // LƯU Ý: bản mock từng có thêm mục "TTS Studio" cũng trỏ /tts — hai mục
       // cùng một trang nên bấm vào đâu cũng sáng cả hai. Hệ thống chỉ có MỘT
       // tính năng TTS, mục thừa đã bỏ.
       // Mục "Chuyển phụ đề thành giọng nói" của mock cũng đã bỏ: backend chỉ
       // có 5 loại job (tts/stt/translate/dub/subtitle), KHÔNG có pipeline
       // phụ-đề→giọng-nói — giữ lại chỉ tạo link chết bấm không ăn.
-      { label: 'Tạo giọng nói của riêng bạn', to: '/voices' },
+      { label: 'Tạo giọng nói của riêng bạn', to: '/voices', Icon: Speech },
     ],
   },
   {
     heading: 'DỊCH THUẬT',
     items: [
-      { label: 'Dịch văn bản', to: '/translate-text' },
-      { label: 'Dịch phụ đề', to: '/subtitle' },
-      { label: 'Dịch âm thanh', to: '/translate-audio' },
-      { label: 'Dịch video', to: '/dub' },
+      { label: 'Dịch văn bản', to: '/translate-text', Icon: Languages },
+      { label: 'Dịch phụ đề', to: '/subtitle', Icon: Captions },
+      { label: 'Dịch âm thanh', to: '/translate-audio', Icon: AudioLines },
+      { label: 'Dịch video', to: '/dub', Icon: Clapperboard },
     ],
   },
   {
     heading: 'AI GIỌI NÓI & VIDEO',
     items: [
-      { label: 'Chuyển giọng nói thành văn bản', to: '/stt' },
+      { label: 'Chuyển giọng nói thành văn bản', to: '/stt', Icon: FileText },
       // Hai mục mock "Tạo video bằng AI" và "Thay đổi giọng nói" đã bỏ —
       // backend không có pipeline nào cho chúng, giữ lại chỉ tạo link chết
       // (đã gặp thật với "Chuyển phụ đề thành giọng nói").
@@ -38,19 +53,44 @@ const navigation = [
 ];
 
 const bottomLinks = [
-  { label: 'Lịch sử Jobs', to: '/jobs' },
-  { label: 'API cho nhà phát triển', to: '/api-keys' },
+  { label: 'Lịch sử Jobs', to: '/jobs', Icon: History },
+  { label: 'API cho nhà phát triển', to: '/api-keys', Icon: KeyRound },
 ];
 
 const adminLinks = [
-  { label: 'Quản lý Users', to: '/admin/users' },
-  { label: 'AI Model Hub', to: '/admin/model-hub' },
-  { label: 'Cài đặt hệ thống', to: '/admin/settings' },
+  { label: 'Quản lý Users', to: '/admin/users', Icon: UsersRound },
+  { label: 'AI Model Hub', to: '/admin/model-hub', Icon: Boxes },
+  { label: 'Cài đặt hệ thống', to: '/admin/settings', Icon: Settings },
 ];
 
+const itemStyle = (active) => ({
+  display: 'flex',
+  alignItems: 'center',
+  gap: '8px',
+  padding: '6px 8px',
+  borderRadius: 'var(--radius-sm)',
+  color: active ? 'var(--primary)' : 'var(--text-dim)',
+  background: active ? 'var(--primary-light)' : 'transparent',
+  textDecoration: 'none',
+  transition: 'all 0.15s',
+  fontSize: 'var(--text-sm)',
+  fontWeight: active ? 600 : 400,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  marginBottom: '2px',
+});
+
+const headingStyle = {
+  fontSize: '10px',
+  fontWeight: 600,
+  letterSpacing: '0.04em',
+  color: 'var(--text-muted)',
+  textTransform: 'uppercase',
+  margin: '10px 8px 4px',
+};
+
 export default function Sidebar() {
-  const [expanded, setExpanded] = useState(true);
-  const { theme } = useTheme();
   const { user } = useAuth();
   const location = useLocation();
   // Mục QUẢN TRỊ chỉ dành cho admin — trước đây hiện cho MỌI user, bấm vào thì
@@ -61,14 +101,13 @@ export default function Sidebar() {
     <aside
       className="scrollbar-thin"
       style={{
-        width: expanded ? 'var(--sidebar-w)' : '64px',
- minWidth: '64px',
+        width: 'var(--sidebar-w)',
+        minWidth: 'var(--sidebar-w)',
         background: 'var(--surface)',
         borderRight: '1px solid var(--border)',
-        padding: expanded ? '32px 20px' : '20px 16px',
+        padding: '12px 10px',
         display: 'flex',
         flexDirection: 'column',
-        transition: 'width 0.3s',
         zIndex: 'var(--z-sidebar)',
         // Cả cột cuộn một khối: trước đây vùng menu có cuộn riêng (flex:1 +
         // overflow:auto) còn phần cuối (Jobs/API/Quản trị)
@@ -76,145 +115,72 @@ export default function Sidebar() {
         // thành văn bản", "Dịch video"... bị giấu dưới cuộn không ai thấy.
       }}
     >
-      <div style={{ marginBottom: '32px' }}>
-        <Link
-          to="/"
+      {/* Logo — một hàng mảnh thay khối logo 40px + tagline chiếm chỗ */}
+      <Link
+        to="/"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '4px 8px 12px',
+          textDecoration: 'none',
+        }}
+      >
+        <div
           style={{
-            display: expanded ? 'block' : 'flex',
+            width: '26px',
+            height: '26px',
+            flexShrink: 0,
+            background: 'linear-gradient(135deg, var(--gradient-start), var(--gradient-end))',
+            borderRadius: 'var(--radius-sm)',
+            color: '#fff',
+            display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <div
-            style={{
-              width: expanded ? '120px' : '32px',
-              height: expanded ? '40px' : '32px',
-              background: 'linear-gradient(135deg, var(--gradient-start), var(--gradient-end))',
-              borderRadius: 'var(--radius)',
-              fontWeight: 700,
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: expanded ? 'center' : 'center',
-              fontSize: expanded ? '18px' : '20px',
-            }}
-          >
-            {expanded ? 'VoiceVibe' : 'V'}
-          </div>
-        </Link>
-        {expanded && (
-          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginTop: '8px' }}>
-            AI Voice cho một thế giới mới
-          </p>
-        )}
-      </div>
+          <AudioWaveform size={15} strokeWidth={2.2} />
+        </div>
+        <span style={{ fontSize: 'var(--text-base)', fontWeight: 700, color: 'var(--fg-strong)' }}>
+          VoiceVibe
+        </span>
+      </Link>
 
-      <div className="scrollbar-thin">
+      <div className="scrollbar-thin" style={{ flex: 1 }}>
         {navigation.map((group) => (
-          <div key={group.heading} style={{ marginBottom: expanded ? '24px' : '12px' }}>
-            {expanded && (
-              <h4
-                style={{
-                  fontSize: 'var(--text-xs)',
-                  fontWeight: 600,
-                  color: 'var(--text-muted)',
-                  textTransform: 'uppercase',
-                  marginBottom: '8px',
-                }}
-              >
-                {group.heading}
-              </h4>
-            )}
-            {group.items.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                style={{
-                  display: 'block',
-                  padding: expanded ? '10px 12px' : '8px',
-                  borderRadius: 'var(--radius)',
-                  color: location.pathname === item.to ? 'var(--primary)' : 'var(--text-dim)',
-                  background: location.pathname === item.to ? 'var(--primary-light)' : 'transparent',
-                  textDecoration: 'none',
-                  transition: 'all 0.2s',
-                  fontSize: expanded ? 'var(--text-sm)' : '12px',
-                  fontWeight: location.pathname === item.to ? 600 : 400,
-                  marginBottom: expanded ? '4px' : '2px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-                title={!expanded ? item.label : undefined}
-              >
-                {expanded ? item.label : item.label.charAt(0)}
-              </Link>
-            ))}
+          <div key={group.heading}>
+            <h4 style={headingStyle}>{group.heading}</h4>
+            {group.items.map(({ label, to, Icon }) => {
+              const active = location.pathname === to;
+              return (
+                <Link key={to} to={to} style={itemStyle(active)} title={label}>
+                  <Icon size={14} strokeWidth={2} style={{ flexShrink: 0, opacity: active ? 1 : 0.75 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+                </Link>
+              );
+            })}
           </div>
         ))}
       </div>
 
       <div>
-        {bottomLinks.map((link) => (
-          <Link
-            key={link.to}
-            to={link.to}
-            style={{
-              display: expanded ? 'block' : 'flex',
-              padding: expanded ? '10px 12px' : '8px',
-              borderRadius: 'var(--radius)',
-              color: 'var(--text-dim)',
-              textDecoration: 'none',
-              transition: 'all 0.2s',
-              fontSize: expanded ? 'var(--text-sm)' : '12px',
-              marginBottom: expanded ? '4px' : '2px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-            title={!expanded ? link.label : undefined}
-          >
-            {expanded ? link.label : link.label.charAt(0)}
+        {bottomLinks.map(({ label, to, Icon }) => (
+          <Link key={to} to={to} style={itemStyle(location.pathname === to)} title={label}>
+            <Icon size={14} strokeWidth={2} style={{ flexShrink: 0, opacity: 0.75 }} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
           </Link>
         ))}
 
-        {isAdmin && expanded && (
-          <h4
-            style={{
-              fontSize: 'var(--text-xs)',
-              fontWeight: 600,
-              color: 'var(--text-muted)',
-              textTransform: 'uppercase',
-              marginBottom: '8px',
-              marginTop: '16px',
-            }}
-          >
-            QUẢN TRỊ
-          </h4>
-        )}
-        {isAdmin && adminLinks.map((link) => (
-          <Link
-            key={link.to}
-            to={link.to}
-            style={{
-              display: expanded ? 'block' : 'flex',
-              padding: expanded ? '10px 12px' : '8px',
-              borderRadius: 'var(--radius)',
-              color: location.pathname === link.to ? 'var(--primary)' : 'var(--text-dim)',
-              background: location.pathname === link.to ? 'var(--primary-light)' : 'transparent',
-              textDecoration: 'none',
-              transition: 'all 0.2s',
-              fontSize: expanded ? 'var(--text-sm)' : '12px',
-              fontWeight: location.pathname === link.to ? 600 : 400,
-              marginBottom: expanded ? '4px' : '2px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}
-            title={!expanded ? link.label : undefined}
-          >
-            {expanded ? link.label : link.label.charAt(0)}
-          </Link>
-        ))}
+        {isAdmin && <h4 style={{ ...headingStyle, marginTop: '12px' }}>QUẢN TRỊ</h4>}
+        {isAdmin && adminLinks.map(({ label, to, Icon }) => {
+          const active = location.pathname === to;
+          return (
+            <Link key={to} to={to} style={itemStyle(active)} title={label}>
+              <Icon size={14} strokeWidth={2} style={{ flexShrink: 0, opacity: active ? 1 : 0.75 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+            </Link>
+          );
+        })}
       </div>
     </aside>
   );

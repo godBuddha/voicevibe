@@ -168,22 +168,22 @@ export default function AdminModelHub() {
   };
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '24px', fontWeight: 700 }}>
+    <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
+      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '14px', fontWeight: 700 }}>
         AI Model Hub
       </h1>
-      <p style={{ color: 'var(--text-dim)', marginBottom: '48px' }}>
+      <p style={{ color: 'var(--text-dim)', marginBottom: '20px' }}>
         Quản lý providers, mô hình và pipeline AI
       </p>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: '32px' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: '16px' }}>
         {['providers', 'stages', 'prompts'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             style={{
-              padding: '12px 24px',
+              padding: '10px 14px',
               border: 'none',
               background: activeTab === tab ? 'var(--bg)' : 'transparent',
               color: activeTab === tab ? 'var(--text)' : 'var(--text-dim)',
@@ -201,7 +201,7 @@ export default function AdminModelHub() {
       {/* Providers */}
       {activeTab === 'providers' && (
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700 }}>AI Providers</h3>
             <button
               onClick={addProvider}
@@ -209,7 +209,7 @@ export default function AdminModelHub() {
                 background: 'var(--gradient)',
                 color: '#fff',
                 border: 'none',
-                padding: '8px 16px',
+                padding: '8px 12px',
                 borderRadius: 'var(--radius)',
                 fontSize: 'var(--text-sm)',
                 fontWeight: 600,
@@ -221,11 +221,11 @@ export default function AdminModelHub() {
           </div>
           
           {selectedProvider && (
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '24px', marginBottom: '24px' }}>
-              <h4 style={{ fontSize: 'var(--text-lg)', fontWeight: 600, marginBottom: '16px' }}>
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px', marginBottom: '14px' }}>
+              <h4 style={{ fontSize: 'var(--text-lg)', fontWeight: 600, marginBottom: '12px' }}>
                 Chỉnh sửa provider: {selectedProvider.name}
               </h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '8px' }}>
                     Base URL
@@ -236,7 +236,7 @@ export default function AdminModelHub() {
                     onChange={(e) => setSelectedProvider({ ...selectedProvider, base_url: e.target.value })}
                     style={{
                       width: '100%',
-                      padding: '8px 12px',
+                      padding: '8px 10px',
                       borderRadius: 'var(--radius)',
                       border: '1px solid var(--border)',
                       fontSize: 'var(--text-sm)',
@@ -255,7 +255,7 @@ export default function AdminModelHub() {
                     onChange={(e) => setSelectedProvider({ ...selectedProvider, api_key: e.target.value })}
                     style={{
                       width: '100%',
-                      padding: '8px 12px',
+                      padding: '8px 10px',
                       borderRadius: 'var(--radius)',
                       border: '1px solid var(--border)',
                       fontSize: 'var(--text-sm)',
@@ -265,14 +265,14 @@ export default function AdminModelHub() {
                   />
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                 <button
                   onClick={() => setSelectedProvider(null)}
                   style={{
                     background: 'var(--bg)',
                     color: 'var(--text-dim)',
                     border: '1px solid var(--border)',
-                    padding: '8px 16px',
+                    padding: '8px 12px',
                     borderRadius: 'var(--radius)',
                     fontWeight: 600,
                     fontSize: 'var(--text-sm)',
@@ -288,7 +288,7 @@ export default function AdminModelHub() {
                     background: 'var(--gradient)',
                     color: '#fff',
                     border: 'none',
-                    padding: '8px 16px',
+                    padding: '8px 12px',
                     borderRadius: 'var(--radius)',
                     fontWeight: 600,
                     fontSize: 'var(--text-sm)',
@@ -302,7 +302,7 @@ export default function AdminModelHub() {
             </div>
           )}
 
-          <div style={{ display: 'grid', gap: '16px' }}>
+          <div style={{ display: 'grid', gap: '12px' }}>
             {providers.map(provider => (
               <div
                 key={provider.id}
@@ -310,7 +310,7 @@ export default function AdminModelHub() {
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
                   borderRadius: 'var(--radius-lg)',
-                  padding: '20px',
+                  padding: '12px',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
@@ -337,7 +337,7 @@ export default function AdminModelHub() {
                         background: 'var(--info-light)',
                         color: 'var(--info)',
                         border: 'none',
-                        padding: '6px 12px',
+                        padding: '6px 10px',
                         borderRadius: 'var(--radius)',
                         fontWeight: 600,
                         fontSize: 'var(--text-xs)',
@@ -353,7 +353,7 @@ export default function AdminModelHub() {
                         background: 'var(--warning-light)',
                         color: 'var(--warning)',
                         border: 'none',
-                        padding: '6px 12px',
+                        padding: '6px 10px',
                         borderRadius: 'var(--radius)',
                         fontWeight: 600,
                         fontSize: 'var(--text-xs)',
@@ -368,7 +368,7 @@ export default function AdminModelHub() {
                         background: 'var(--primary-light)',
                         color: 'var(--primary)',
                         border: 'none',
-                        padding: '6px 12px',
+                        padding: '6px 10px',
                         borderRadius: 'var(--radius)',
                         fontWeight: 600,
                         fontSize: 'var(--text-xs)',
@@ -383,7 +383,7 @@ export default function AdminModelHub() {
                         background: 'var(--danger-light)',
                         color: 'var(--danger)',
                         border: 'none',
-                        padding: '6px 12px',
+                        padding: '6px 10px',
                         borderRadius: 'var(--radius)',
                         fontWeight: 600,
                         fontSize: 'var(--text-xs)',
@@ -408,21 +408,21 @@ export default function AdminModelHub() {
       {/* Stages */}
       {activeTab === 'stages' && (
         <div>
-          <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: '24px' }}>Các công đoạn xử lý</h3>
+          <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: '14px' }}>Các công đoạn xử lý</h3>
           {/* Trình soạn stage: gán (provider, model) chính cho từng công đoạn —
               đúng nghĩa PUT /stages/{stage} order=0 của backend. */}
           {editingStage && (
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '24px', marginBottom: '24px' }}>
-              <h4 style={{ fontSize: 'var(--text-lg)', fontWeight: 600, marginBottom: '16px' }}>
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px', marginBottom: '14px' }}>
+              <h4 style={{ fontSize: 'var(--text-lg)', fontWeight: 600, marginBottom: '12px' }}>
                 Gán model cho công đoạn: {editingStage.stage}
               </h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '8px' }}>Provider</label>
                   <select
                     value={editingStage.provider_id || ''}
                     onChange={(e) => setEditingStage({ ...editingStage, provider_id: e.target.value })}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: 'var(--text-sm)', background: 'var(--bg)', color: 'var(--text)' }}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: 'var(--text-sm)', background: 'var(--bg)', color: 'var(--text)' }}
                   >
                     <option value="">(engine local mặc định)</option>
                     {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -435,21 +435,21 @@ export default function AdminModelHub() {
                     value={editingStage.model || ''}
                     onChange={(e) => setEditingStage({ ...editingStage, model: e.target.value })}
                     placeholder="tên model, để trống = mặc định"
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: 'var(--text-sm)', background: 'var(--bg)', color: 'var(--text)' }}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', fontSize: 'var(--text-sm)', background: 'var(--bg)', color: 'var(--text)' }}
                   />
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                <button onClick={() => setEditingStage(null)} style={{ background: 'var(--bg)', color: 'var(--text-dim)', border: '1px solid var(--border)', padding: '8px 16px', borderRadius: 'var(--radius)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button onClick={() => setEditingStage(null)} style={{ background: 'var(--bg)', color: 'var(--text-dim)', border: '1px solid var(--border)', padding: '8px 12px', borderRadius: 'var(--radius)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
                   Huỷ
                 </button>
-                <button onClick={() => updateStage(editingStage.stage, editingStage.provider_id, editingStage.model)} disabled={loading} style={{ background: 'var(--gradient)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 'var(--radius)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1 }}>
+                <button onClick={() => updateStage(editingStage.stage, editingStage.provider_id, editingStage.model)} disabled={loading} style={{ background: 'var(--gradient)', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: 'var(--radius)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1 }}>
                   Lưu
                 </button>
               </div>
             </div>
           )}
-          <div style={{ display: 'grid', gap: '24px' }}>
+          <div style={{ display: 'grid', gap: '14px' }}>
             {stages.map(sg => (
               <div
                 key={sg.stage}
@@ -457,20 +457,20 @@ export default function AdminModelHub() {
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
                   borderRadius: 'var(--radius-lg)',
-                  padding: '24px',
+                  padding: '14px',
                 }}
               >
-                <h4 style={{ fontSize: 'var(--text-lg)', fontWeight: 600, marginBottom: '20px', textTransform: 'capitalize' }}>
+                <h4 style={{ fontSize: 'var(--text-lg)', fontWeight: 600, marginBottom: '12px', textTransform: 'capitalize' }}>
                   {sg.stage}
                 </h4>
-                <div style={{ marginBottom: '20px' }}>
+                <div style={{ marginBottom: '12px' }}>
                   <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '8px', fontWeight: 600 }}>
                     Mô hình chính ({sg.models.length})
                   </label>
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     {sg.models.map((m, i) => (
                       <li key={i} style={{
-                        padding: '6px 12px',
+                        padding: '6px 10px',
                         background: 'var(--primary-light)',
                         color: 'var(--primary)',
                         borderRadius: 'var(--radius)',
@@ -489,7 +489,7 @@ export default function AdminModelHub() {
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                     {(sg.fallback || []).map((m, i) => (
                       <li key={i} style={{
-                        padding: '6px 12px',
+                        padding: '6px 10px',
                         background: 'var(--warning-light)',
                         color: 'var(--warning)',
                         borderRadius: 'var(--radius)',
@@ -501,7 +501,7 @@ export default function AdminModelHub() {
                     ))}
                   </ul>
                 </div>
-                <div style={{ marginTop: '20px', fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
+                <div style={{ marginTop: '12px', fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
                   <button
                     onClick={() => setEditingStage({
                       stage: sg.stage,
@@ -512,7 +512,7 @@ export default function AdminModelHub() {
                       background: 'var(--primary-light)',
                       color: 'var(--primary)',
                       border: 'none',
-                      padding: '6px 12px',
+                      padding: '6px 10px',
                       borderRadius: 'var(--radius)',
                       fontWeight: 600,
                       cursor: 'pointer',
@@ -530,8 +530,8 @@ export default function AdminModelHub() {
       {/* Prompts */}
       {activeTab === 'prompts' && (
         <div>
-          <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: '24px' }}>Prompt Templates</h3>
-          <div style={{ display: 'grid', gap: '24px' }}>
+          <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: '14px' }}>Prompt Templates</h3>
+          <div style={{ display: 'grid', gap: '14px' }}>
             {prompts.map(p => (
               <div
                 key={p.task_key}
@@ -539,10 +539,10 @@ export default function AdminModelHub() {
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
                   borderRadius: 'var(--radius-lg)',
-                  padding: '24px',
+                  padding: '14px',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                   <h4 style={{ fontSize: 'var(--text-lg)', fontWeight: 600, textTransform: 'capitalize' }}>
                     {p.task_key}
                   </h4>
@@ -553,7 +553,7 @@ export default function AdminModelHub() {
                         background: 'var(--warning-light)',
                         color: 'var(--warning)',
                         border: 'none',
-                        padding: '6px 12px',
+                        padding: '6px 10px',
                         borderRadius: 'var(--radius)',
                         fontWeight: 600,
                         fontSize: 'var(--text-xs)',
@@ -568,7 +568,7 @@ export default function AdminModelHub() {
                         background: 'var(--primary-light)',
                         color: 'var(--primary)',
                         border: 'none',
-                        padding: '6px 12px',
+                        padding: '6px 10px',
                         borderRadius: 'var(--radius)',
                         fontWeight: 600,
                         fontSize: 'var(--text-xs)',
@@ -587,7 +587,7 @@ export default function AdminModelHub() {
                       rows={4}
                       style={{
                         width: '100%',
-                        padding: '12px',
+                        padding: '10px',
                         borderRadius: 'var(--radius)',
                         border: '1px solid var(--border)',
                         fontSize: 'var(--text-base)',
@@ -597,14 +597,14 @@ export default function AdminModelHub() {
                         resize: 'vertical',
                       }}
                     />
-                    <div style={{ display: 'flex', gap: '12px', marginTop: '16px', justifyContent: 'flex-end' }}>
+                    <div style={{ display: 'flex', gap: '10px', marginTop: '12px', justifyContent: 'flex-end' }}>
                       <button
                         onClick={() => setEditingPrompt(null)}
                         style={{
                           background: 'var(--bg)',
                           color: 'var(--text-dim)',
                           border: '1px solid var(--border)',
-                          padding: '8px 16px',
+                          padding: '8px 12px',
                           borderRadius: 'var(--radius)',
                           fontWeight: 600,
                           cursor: 'pointer',
@@ -618,7 +618,7 @@ export default function AdminModelHub() {
                           background: 'var(--gradient)',
                           color: '#fff',
                           border: 'none',
-                          padding: '8px 16px',
+                          padding: '8px 12px',
                           borderRadius: 'var(--radius)',
                           fontWeight: 600,
                           cursor: 'pointer',
@@ -633,7 +633,7 @@ export default function AdminModelHub() {
                     background: 'var(--bg)',
                     border: '1px solid var(--border)',
                     borderRadius: 'var(--radius)',
-                    padding: '16px',
+                    padding: '12px',
                     fontSize: 'var(--text-sm)',
                     color: 'var(--text)',
                     lineHeight: 1.6,

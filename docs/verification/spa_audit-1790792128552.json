@@ -1,0 +1,239 @@
+{
+  "startedAt": "2026-09-30T18:15:28.629Z",
+  "base": "http://127.0.0.1:8801",
+  "api": "http://127.0.0.1:18080",
+  "mode": "nav",
+  "fast": false,
+  "pages": [
+    {
+      "route": "/login",
+      "theme": "light",
+      "authed": false,
+      "http": [
+        {
+          "url": "http://127.0.0.1:8801/v1/auth/me",
+          "status": 401,
+          "snippet": "{\"detail\":\"chưa đăng nhập\"}"
+        },
+        {
+          "url": "http://127.0.0.1:8801/v1/auth/me",
+          "status": 401,
+          "snippet": "{\"detail\":\"chưa đăng nhập\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        },
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/00-login.png",
+      "ok": true,
+      "durationMs": 2973
+    },
+    {
+      "route": "/",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/01-dashboard.png",
+      "ok": true,
+      "durationMs": 2748
+    },
+    {
+      "route": "/dub",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/02-dub.png",
+      "ok": true,
+      "durationMs": 2658
+    },
+    {
+      "route": "/tts",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/03-tts.png",
+      "ok": true,
+      "durationMs": 2220
+    },
+    {
+      "route": "/voices",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/04-voices.png",
+      "ok": true,
+      "durationMs": 3435
+    },
+    {
+      "route": "/stt",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/05-stt.png",
+      "ok": true,
+      "durationMs": 2274
+    },
+    {
+      "route": "/subtitle",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/06-subtitle.png",
+      "ok": true,
+      "durationMs": 2576
+    },
+    {
+      "route": "/jobs",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/07-jobs.png",
+      "ok": true,
+      "durationMs": 2308
+    },
+    {
+      "route": "/api-keys",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/08-api-keys.png",
+      "ok": true,
+      "durationMs": 3404
+    },
+    {
+      "route": "/admin/users",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/10-admin-users.png",
+      "ok": true,
+      "durationMs": 2267
+    },
+    {
+      "route": "/admin/model-hub",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/11-admin-model-hub.png",
+      "ok": true,
+      "durationMs": 3435
+    },
+    {
+      "route": "/admin/settings",
+      "theme": "light",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/12-admin-settings.png",
+      "ok": true,
+      "durationMs": 2270
+    },
+    {
+      "route": "/",
+      "theme": "dark",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/13-dashboard-dark.png",
+      "ok": true,
+      "durationMs": 3104
+    },
+    {
+      "route": "/dub",
+      "theme": "dark",
+      "authed": true,
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "dom": [],
+      "screenshot": "/home/jewking/Documents/voicevibe/docs/screenshots-spa/14-dub-dark.png",
+      "ok": true,
+      "durationMs": 2971
+    }
+  ],
+  "flows": [],
+  "summary": {
+    "pagesChecked": 14,
+    "pageErrors": 0,
+    "consoleErrors": 0,
+    "domFindings": 0,
+    "unexpectedHttp": 0,
+    "duplicateShots": 0,
+    "dialogs": 0,
+    "flowsRun": 0,
+    "failedFlows": 0,
+    "failedExpected": []
+  },
+  "unexpectedHttpDetail": []
+}

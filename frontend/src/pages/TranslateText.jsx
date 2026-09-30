@@ -67,26 +67,26 @@ export default function TranslateText() {
   };
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '24px', fontWeight: 700 }}>
+    <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '14px', fontWeight: 700 }}>
         Dịch văn bản
       </h1>
-      <p style={{ color: 'var(--text-dim)', marginBottom: '48px' }}>
+      <p style={{ color: 'var(--text-dim)', marginBottom: '20px' }}>
         Dịch văn bản giữa 9 ngôn ngữ bằng AI — dùng đúng bộ dịch đã cấu hình trong Model Hub, có chuỗi dự phòng về bộ dịch nhỏ chạy tại máy
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '40px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '20px' }}>
         {/* Left */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           {/* Chọn cặp ngôn ngữ */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
               Dịch từ
               <select
                 value={sourceLang}
                 onChange={(e) => setSourceLang(e.target.value)}
                 style={{
-                  padding: '8px 12px', borderRadius: 'var(--radius)',
+                  padding: '8px 10px', borderRadius: 'var(--radius)',
                   border: '1px solid var(--border)', fontSize: 'var(--text-sm)',
                   background: 'var(--bg)', color: 'var(--text)',
                 }}
@@ -103,7 +103,7 @@ export default function TranslateText() {
                 value={targetLang}
                 onChange={(e) => setTargetLang(e.target.value)}
                 style={{
-                  padding: '8px 12px', borderRadius: 'var(--radius)',
+                  padding: '8px 10px', borderRadius: 'var(--radius)',
                   border: '1px solid var(--border)', fontSize: 'var(--text-sm)',
                   background: 'var(--bg)', color: 'var(--text)',
                 }}
@@ -117,7 +117,7 @@ export default function TranslateText() {
 
           {/* Văn bản nguồn */}
           <div>
-            <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '12px', fontWeight: 600 }}>
+            <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '10px', fontWeight: 600 }}>
               Văn bản cần dịch
             </label>
             <textarea
@@ -126,7 +126,7 @@ export default function TranslateText() {
               placeholder="Nhập hoặc dán văn bản cần dịch vào đây..."
               rows={8}
               style={{
-                width: '100%', padding: '16px',
+                width: '100%', padding: '12px',
                 borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)',
                 fontSize: 'var(--text-base)', background: 'var(--bg)',
                 color: 'var(--text)', resize: 'vertical', fontFamily: 'inherit',
@@ -140,7 +140,7 @@ export default function TranslateText() {
 
           {error && (
             <div style={{
-              padding: '16px', borderRadius: 'var(--radius)',
+              padding: '12px', borderRadius: 'var(--radius)',
               background: 'var(--danger-light)', color: 'var(--danger)', whiteSpace: 'pre-wrap',
             }}>
               {error}
@@ -152,7 +152,7 @@ export default function TranslateText() {
             onClick={startTranslate}
             style={{
               background: 'var(--gradient)', color: '#fff', border: 'none',
-              padding: '16px 32px', borderRadius: 'var(--radius)',
+              padding: '12px 16px', borderRadius: 'var(--radius)',
               fontSize: 'var(--text-base)', fontWeight: 600,
               cursor: isProcessing || !text.trim() ? 'not-allowed' : 'pointer',
               opacity: isProcessing || !text.trim() ? 0.6 : 1,
@@ -164,7 +164,7 @@ export default function TranslateText() {
 
           {/* Progress */}
           {job && job.status !== 'done' && !error && (
-            <div style={{ padding: '20px', borderRadius: 'var(--radius)', background: 'var(--info-light)', color: 'var(--info)' }}>
+            <div style={{ padding: '12px', borderRadius: 'var(--radius)', background: 'var(--info-light)', color: 'var(--info)' }}>
               <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>
                 {job.status === 'queued' ? 'Hàng đợi' : job.status === 'running' ? 'Đang dịch' : job.status}
               </div>
@@ -174,7 +174,7 @@ export default function TranslateText() {
           {/* Kết quả */}
           {translated !== null && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                 <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700 }}>
                   Bản dịch ({LANGUAGES[targetLang]})
                 </h3>
@@ -183,7 +183,7 @@ export default function TranslateText() {
                     onClick={copyResult}
                     style={{
                       background: 'var(--info-light)', color: 'var(--info)', border: 'none',
-                      padding: '8px 16px', borderRadius: 'var(--radius)',
+                      padding: '8px 12px', borderRadius: 'var(--radius)',
                       fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer',
                     }}
                   >
@@ -193,7 +193,7 @@ export default function TranslateText() {
                     onClick={downloadTxt}
                     style={{
                       background: 'var(--success-light)', color: 'var(--success)', border: 'none',
-                      padding: '8px 16px', borderRadius: 'var(--radius)',
+                      padding: '8px 12px', borderRadius: 'var(--radius)',
                       fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer',
                     }}
                   >
@@ -204,7 +204,7 @@ export default function TranslateText() {
               <div
                 style={{
                   background: 'var(--surface)', border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-lg)', padding: '24px',
+                  borderRadius: 'var(--radius-lg)', padding: '14px',
                   whiteSpace: 'pre-wrap', fontSize: 'var(--text-base)', lineHeight: 1.7,
                 }}
               >
@@ -215,9 +215,9 @@ export default function TranslateText() {
         </div>
 
         {/* Right sidebar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-          <div style={{ background: 'var(--info-light)', border: '1px solid var(--info)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
-            <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '12px', color: 'var(--info)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ background: 'var(--info-light)', border: '1px solid var(--info)', borderRadius: 'var(--radius-lg)', padding: '12px' }}>
+            <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '10px', color: 'var(--info)' }}>
               💡 Mẹo
             </h4>
             <ul style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', listStyle: 'none', padding: 0, margin: 0 }}>

@@ -69,8 +69,8 @@ export default function Voices() {
   };
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+    <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
           <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '8px', fontWeight: 700 }}>
             Giọng Clone
@@ -85,7 +85,7 @@ export default function Voices() {
             background: 'var(--gradient)',
             color: '#fff',
             border: 'none',
-            padding: '12px 24px',
+            padding: '10px 14px',
             borderRadius: 'var(--radius)',
             fontSize: 'var(--text-base)',
             fontWeight: 600,
@@ -99,7 +99,7 @@ export default function Voices() {
       {/* Error */}
       {error && (
         <div style={{
-          padding: '16px', borderRadius: 'var(--radius)', marginBottom: '24px',
+          padding: '12px', borderRadius: 'var(--radius)', marginBottom: '14px',
           background: 'var(--danger-light)', color: 'var(--danger)',
         }}>
           {error}
@@ -113,14 +113,14 @@ export default function Voices() {
             background: 'var(--surface)',
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius-lg)',
-            padding: '32px',
-            marginBottom: '32px',
+            padding: '16px',
+            marginBottom: '16px',
           }}
         >
-          <h3 style={{ fontSize: 'var(--text-xl)', marginBottom: '24px', fontWeight: 700 }}>
+          <h3 style={{ fontSize: 'var(--text-xl)', marginBottom: '14px', fontWeight: 700 }}>
             Tạo giọng mới
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div>
               <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '8px', fontWeight: 600 }}>
                 Tên giọng
@@ -132,7 +132,7 @@ export default function Voices() {
                 onChange={(e) => setNewVoiceName(e.target.value)}
                 style={{
                   width: '100%',
-                  padding: '10px 12px',
+                  padding: '10px 10px',
                   borderRadius: 'var(--radius)',
                   border: '1px solid var(--border)',
                   fontSize: 'var(--text-base)',
@@ -159,7 +159,7 @@ export default function Voices() {
               )}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '16px', marginTop: '24px' }}>
+          <div style={{ display: 'flex', gap: '12px', marginTop: '14px' }}>
             <button
               onClick={createVoice}
               disabled={isUploading}
@@ -167,7 +167,7 @@ export default function Voices() {
                 background: 'var(--gradient)',
                 color: '#fff',
                 border: 'none',
-                padding: '10px 24px',
+                padding: '10px 14px',
                 borderRadius: 'var(--radius)',
                 fontWeight: 600,
                 cursor: isUploading ? 'not-allowed' : 'pointer',
@@ -187,7 +187,7 @@ export default function Voices() {
                 background: 'var(--bg)',
                 color: 'var(--text-dim)',
                 border: '1px solid var(--border)',
-                padding: '10px 24px',
+                padding: '10px 14px',
                 borderRadius: 'var(--radius)',
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -200,7 +200,7 @@ export default function Voices() {
       )}
 
       {/* Voices grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
         {voices.map((voice) => (
           <div
             key={voice.id}
@@ -208,13 +208,13 @@ export default function Voices() {
               background: 'var(--surface)',
               border: '1px solid var(--border)',
               borderRadius: 'var(--radius-lg)',
-              padding: '24px',
+              padding: '14px',
               display: 'flex',
               flexDirection: 'column',
-              gap: '16px',
+              gap: '12px',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div
                 style={{
                   width: '48px',
@@ -258,7 +258,7 @@ export default function Voices() {
               <button
                 onClick={() => deleteVoice(voice.id)}
                 style={{
-                  padding: '8px 12px',
+                  padding: '8px 10px',
                   borderRadius: 'var(--radius)',
                   background: 'var(--danger-light)',
                   color: 'var(--danger)',
@@ -276,7 +276,7 @@ export default function Voices() {
       </div>
       {!voices.length && !showCreate && (
         <div style={{ textAlign: 'center', padding: '64px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>🎤</div>
+          <div style={{ fontSize: '48px', marginBottom: '12px' }}>🎤</div>
           <div style={{ color: 'var(--text-dim)' }}>Chưa có giọng nào. Tạo giọng đầu tiên từ một mẫu 5-10 giây.</div>
         </div>
       )}

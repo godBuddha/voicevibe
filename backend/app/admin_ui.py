@@ -20,11 +20,11 @@ ADMIN_HTML = r"""<!DOCTYPE html>
 __THEME_BOOT__
 <style>
 __THEME_CSS__
-  body { background:var(--bg); color:var(--fg); font:15px/1.5 system-ui,sans-serif; margin:0; padding:32px; }
-  h1 { font-size:22px; margin:0 0 6px; } .sub { color:var(--mut); margin-bottom:24px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin-bottom:18px; }
+  body { background:var(--bg); color:var(--fg); font:13.5px/1.5 system-ui,sans-serif; margin:0; padding:20px; }
+  h1 { font-size:18px; margin:0 0 6px; } .sub { color:var(--mut); margin-bottom:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:14px 16px; margin-bottom:12px; }
   .card h2 { font-size:14px; margin:0 0 12px; color:var(--acc); text-transform:uppercase; letter-spacing:.08em; }
-  .row { display:flex; gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .row { display:flex; gap:10px; align-items:center; padding:6px 0; border-bottom:1px solid var(--line); flex-wrap:wrap; }
   .row:last-child { border-bottom:none; }
   .k { width:250px; min-width:200px; } .k b { display:block; } .k span { color:var(--mut); font-size:12px; }
   input { background:var(--input); border:1px solid var(--line); color:var(--fg); border-radius:8px; padding:8px 10px; flex:1; min-width:200px; }
@@ -43,7 +43,7 @@ __THEME_CSS__
                  border-radius:99px; padding:8px 18px; cursor:pointer; font-size:13.5px; }
   .tabs button.on { border-color:var(--acc); color:var(--fg); font-weight:600; }
   table.users { width:100%; border-collapse:collapse; font-size:13.5px; }
-  table.users th, table.users td { text-align:left; padding:9px 8px; border-bottom:1px solid var(--line); }
+  table.users th, table.users td { text-align:left; padding:7px 8px; border-bottom:1px solid var(--line); }
   table.users th { color:var(--mut); font-weight:500; font-size:12.5px; }
   .badge { font-size:11px; padding:2px 9px; border-radius:99px; border:1px solid var(--line); }
   .badge.admin { border-color:var(--acc); color:var(--acc); }

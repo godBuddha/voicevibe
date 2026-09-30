@@ -104,11 +104,11 @@ export default function AdminSettings() {
   }[src] || { text: 'mặc định', bg: 'var(--bg)', color: 'var(--text-dim)' });
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1000px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '24px', fontWeight: 700 }}>
+    <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>
+      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '14px', fontWeight: 700 }}>
         Cài đặt hệ thống
       </h1>
-      <p style={{ color: 'var(--text-dim)', marginBottom: '48px' }}>
+      <p style={{ color: 'var(--text-dim)', marginBottom: '20px' }}>
         Quản lý các cấu hình và tham số hệ thống. Giá trị secret hiển thị dạng mặt-nạ;
         muốn đổi thì nhập giá trị MỚI, để trống là giữ nguyên.
       </p>
@@ -116,7 +116,7 @@ export default function AdminSettings() {
       {/* Error */}
       {error && (
         <div style={{
-          padding: '16px', borderRadius: 'var(--radius)', marginBottom: '24px',
+          padding: '12px', borderRadius: 'var(--radius)', marginBottom: '14px',
           background: 'var(--danger-light)', color: 'var(--danger)',
         }}>
           {error}
@@ -124,8 +124,8 @@ export default function AdminSettings() {
       )}
 
       {/* Add new setting form */}
-      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '24px', marginBottom: '32px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px', marginBottom: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 600 }}>Thêm cài đặt mới</h3>
           <button
             onClick={() => setShowAddForm(!showAddForm)}
@@ -133,7 +133,7 @@ export default function AdminSettings() {
               background: 'var(--gradient)',
               color: '#fff',
               border: 'none',
-              padding: '8px 16px',
+              padding: '8px 12px',
               borderRadius: 'var(--radius)',
               fontSize: 'var(--text-sm)',
               fontWeight: 600,
@@ -144,7 +144,7 @@ export default function AdminSettings() {
           </button>
         </div>
         {showAddForm && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: '16px', alignItems: 'end' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto', gap: '12px', alignItems: 'end' }}>
             <div>
               <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '8px', fontWeight: 600 }}>
                 Key
@@ -156,7 +156,7 @@ export default function AdminSettings() {
                 placeholder="ví dụ: translate.model"
                 style={{
                   width: '100%',
-                  padding: '8px 12px',
+                  padding: '8px 10px',
                   borderRadius: 'var(--radius)',
                   border: '1px solid var(--border)',
                   fontSize: 'var(--text-base)',
@@ -176,7 +176,7 @@ export default function AdminSettings() {
                 placeholder="Giá trị"
                 style={{
                   width: '100%',
-                  padding: '8px 12px',
+                  padding: '8px 10px',
                   borderRadius: 'var(--radius)',
                   border: '1px solid var(--border)',
                   fontSize: 'var(--text-base)',
@@ -192,7 +192,7 @@ export default function AdminSettings() {
                 background: 'var(--primary)',
                 color: '#fff',
                 border: 'none',
-                padding: '8px 16px',
+                padding: '8px 12px',
                 borderRadius: 'var(--radius)',
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -208,7 +208,7 @@ export default function AdminSettings() {
       {/* Settings by category */}
       {Object.keys(grouped).length === 0 && (
         <div style={{ textAlign: 'center', padding: '64px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚙️</div>
+          <div style={{ fontSize: '48px', marginBottom: '12px' }}>⚙️</div>
           <div style={{ color: 'var(--text-dim)' }}>Chưa có cài đặt nào. Thêm cài đặt đầu tiên.</div>
         </div>
       )}
@@ -220,14 +220,14 @@ export default function AdminSettings() {
             background: 'var(--surface)',
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius-lg)',
-            padding: '24px',
-            marginBottom: '24px',
+            padding: '14px',
+            marginBottom: '14px',
           }}
         >
-          <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: '20px' }}>
+          <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: '12px' }}>
             {category}
           </h3>
-          <div style={{ display: 'grid', gap: '16px' }}>
+          <div style={{ display: 'grid', gap: '12px' }}>
             {grouped[category].map((row) => {
               const badge = sourceBadge(row.source);
               return (
@@ -236,9 +236,9 @@ export default function AdminSettings() {
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '240px 1fr auto',
-                    gap: '16px',
+                    gap: '12px',
                     alignItems: 'center',
-                    padding: '12px',
+                    padding: '10px',
                     background: 'var(--bg)',
                     borderRadius: 'var(--radius)',
                   }}

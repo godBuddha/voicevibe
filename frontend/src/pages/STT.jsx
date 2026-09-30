@@ -89,17 +89,17 @@ export default function STT() {
   };
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '24px', fontWeight: 700 }}>
+    <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '14px', fontWeight: 700 }}>
         Chuyển giọng nói thành văn bản (STT)
       </h1>
-      <p style={{ color: 'var(--text-dim)', marginBottom: '48px' }}>
+      <p style={{ color: 'var(--text-dim)', marginBottom: '20px' }}>
         Chuyển đổi audio thành văn bản chính xác với nhận dạng người nói
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '40px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '20px' }}>
         {/* Left: Upload and transcript */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Upload */}
           {!transcript && (
             <div
@@ -122,7 +122,7 @@ export default function STT() {
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: '16px',
+                gap: '12px',
               }}
             >
               <input
@@ -160,7 +160,7 @@ export default function STT() {
                 background: 'var(--gradient)',
                 color: '#fff',
                 border: 'none',
-                padding: '16px 32px',
+                padding: '12px 16px',
                 borderRadius: 'var(--radius)',
                 fontSize: 'var(--text-base)',
                 fontWeight: 600,
@@ -177,7 +177,7 @@ export default function STT() {
           {/* Error */}
           {error && (
             <div style={{
-              padding: '16px', borderRadius: 'var(--radius)',
+              padding: '12px', borderRadius: 'var(--radius)',
               background: 'var(--danger-light)', color: 'var(--danger)', whiteSpace: 'pre-wrap',
             }}>
               {error}
@@ -186,7 +186,7 @@ export default function STT() {
 
           {/* Progress */}
           {job && job.status !== 'done' && !error && (
-            <div style={{ padding: '20px', borderRadius: 'var(--radius)', background: 'var(--info-light)', color: 'var(--info)' }}>
+            <div style={{ padding: '12px', borderRadius: 'var(--radius)', background: 'var(--info-light)', color: 'var(--info)' }}>
               <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '8px' }}>
                 {job.status === 'queued' ? 'Hàng đợi' : job.status === 'running' ? 'Đang xử lý' : job.status}
               </div>
@@ -215,7 +215,7 @@ export default function STT() {
           {/* Transcript result */}
           {transcript && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700 }}>Transcript</h3>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
@@ -224,7 +224,7 @@ export default function STT() {
                       background: 'var(--info-light)',
                       color: 'var(--info)',
                       border: 'none',
-                      padding: '8px 16px',
+                      padding: '8px 12px',
                       borderRadius: 'var(--radius)',
                       fontSize: 'var(--text-sm)',
                       fontWeight: 600,
@@ -239,7 +239,7 @@ export default function STT() {
                       background: 'var(--info-light)',
                       color: 'var(--info)',
                       border: 'none',
-                      padding: '8px 16px',
+                      padding: '8px 12px',
                       borderRadius: 'var(--radius)',
                       fontSize: 'var(--text-sm)',
                       fontWeight: 600,
@@ -258,7 +258,7 @@ export default function STT() {
                       background: 'var(--bg)',
                       color: 'var(--text-dim)',
                       border: '1px solid var(--border)',
-                      padding: '8px 16px',
+                      padding: '8px 12px',
                       borderRadius: 'var(--radius)',
                       fontSize: 'var(--text-sm)',
                       fontWeight: 600,
@@ -274,7 +274,7 @@ export default function STT() {
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
                   borderRadius: 'var(--radius-lg)',
-                  padding: '24px',
+                  padding: '14px',
                   maxHeight: '400px',
                   overflow: 'auto',
                   fontSize: 'var(--text-base)',
@@ -290,10 +290,10 @@ export default function STT() {
           {/* Speakers */}
           {speakers.length > 0 && (
             <div>
-              <h3 style={{ fontSize: 'var(--text-xl)', marginBottom: '16px', fontWeight: 700 }}>Nhãn người nói</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              <h3 style={{ fontSize: 'var(--text-xl)', marginBottom: '12px', fontWeight: 700 }}>Nhãn người nói</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {speakers.map((s) => (
-                  <div key={s.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                     <div
                       style={{
                         width: '36px',
@@ -325,10 +325,10 @@ export default function STT() {
         </div>
 
         {/* Right sidebar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Tips */}
-          <div style={{ background: 'var(--info-light)', border: '1px solid var(--info)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
-            <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '12px', color: 'var(--info)' }}>
+          <div style={{ background: 'var(--info-light)', border: '1px solid var(--info)', borderRadius: 'var(--radius-lg)', padding: '12px' }}>
+            <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '10px', color: 'var(--info)' }}>
               💡 Mẹo
             </h4>
             <ul style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', listStyle: 'none', padding: 0, margin: 0 }}>
@@ -339,8 +339,8 @@ export default function STT() {
           </div>
 
           {/* Features */}
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
-            <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '12px' }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '12px' }}>
+            <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '10px' }}>
               🎯 Tính năng
             </h4>
             <ul style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', listStyle: 'none', padding: 0, margin: 0 }}>

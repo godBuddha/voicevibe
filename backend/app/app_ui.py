@@ -23,7 +23,7 @@ __THEME_BOOT__
 <style>
 __THEME_CSS__
   * { box-sizing:border-box; }
-  body { background:var(--bg); color:var(--fg); font:14.5px/1.55 system-ui,-apple-system,sans-serif; margin:0; }
+  body { background:var(--bg); color:var(--fg); font:13.5px/1.5 system-ui,-apple-system,sans-serif; margin:0; }
   a { color:var(--acc); text-decoration:none; }
   h1,h2,h3 { margin:0 0 8px; }
   .mut { color:var(--mut); font-size:12.5px; }
@@ -31,36 +31,44 @@ __THEME_CSS__
   /* ---- layout ---- */
   #shell { display:flex; min-height:100vh; }
   #sidebar { width:var(--side-w); background:var(--side); border-right:1px solid var(--line);
-             padding:18px 14px 14px; display:flex; flex-direction:column; gap:4px;
+             padding:12px 10px 10px; display:flex; flex-direction:column; gap:4px;
              position:fixed; top:0; bottom:0; left:0; overflow:hidden; z-index:30; }
-  main { margin-left:var(--side-w); flex:1; padding:0 26px 40px; }
+  main { margin-left:var(--side-w); flex:1; padding:0 20px 24px; }
+  /* Gập sidebar (desktop): toàn bộ hàng ngang nhường cho nội dung —
+     trạng thái lưu localStorage, F5 không mất. */
+  body.side-hidden #sidebar { display:none; }
+  body.side-hidden main { margin-left:0; }
   @media (max-width: 920px) {
     #sidebar { display:none; }
     main { margin-left:0; }
     #burger { display:inline-flex !important; }
   }
   #burger { display:none; background:var(--card); border:1px solid var(--line); color:var(--fg);
-            border-radius:10px; padding:8px 12px; cursor:pointer; }
+            border-radius:8px; padding:6px 10px; cursor:pointer; }
+  .icon-btn { background:var(--card); border:1px solid var(--line); color:var(--fg);
+              border-radius:8px; width:30px; height:30px; padding:0; cursor:pointer; font-size:14px;
+              display:inline-flex; align-items:center; justify-content:center; flex:none; }
+  .icon-btn:hover { border-color:var(--acc); }
 
   /* ---- sidebar ---- */
-  .logo { display:flex; gap:10px; align-items:center; padding:2px 8px 10px; }
-  .logo .mark { width:38px; height:38px; border-radius:12px; background:linear-gradient(135deg,var(--acc),var(--acc2));
-                display:flex; align-items:center; justify-content:center; font-size:19px; }
-  .logo b { font-size:16px; } .logo .mut { line-height:1.2; }
+  .logo { display:flex; gap:8px; align-items:center; padding:2px 6px 10px; }
+  .logo .mark { width:28px; height:28px; border-radius:8px; background:linear-gradient(135deg,var(--acc),var(--acc2));
+                display:flex; align-items:center; justify-content:center; font-size:14px; }
+  .logo b { font-size:14px; } .logo .mut { line-height:1.2; }
   /* nav là phần DUY NHẤT cuộn -> sidecard + liên kết Mã nguồn (AGPL §13) luôn
      ghim ở đáy và nhìn thấy được, dù danh sách menu dài bao nhiêu. */
   .nav { display:flex; flex-direction:column; gap:2px; flex:1; overflow-y:auto; min-height:0; }
   .nav .group { color:var(--mut); font-size:11px; text-transform:uppercase; letter-spacing:.08em;
-                padding:10px 10px 4px; }
-  .nav a { display:flex; gap:10px; align-items:center; padding:6px 12px; border-radius:10px;
-           color:var(--fg); cursor:pointer; font-size:14px; }
+                padding:8px 8px 3px; }
+  .nav a { display:flex; gap:8px; align-items:center; padding:5px 10px; border-radius:8px;
+           color:var(--fg); cursor:pointer; font-size:13px; }
   .nav a:hover { background:var(--hover); }
   .nav a.on { background:linear-gradient(90deg,var(--acc),var(--acc2)); color:var(--on-acc); font-weight:600; }
   .nav a.soon { color:var(--mut); opacity:.65; }
   .nav a.soon:hover { background:var(--hover); }
   .sidecard { margin-top:10px; flex:none; background:linear-gradient(160deg,var(--sidecard-from),var(--sidecard-to));
-              border:1px solid var(--line); border-radius:14px; padding:12px 14px; font-size:13px; }
-  .sidecard b { font-size:16px; }
+              border:1px solid var(--line); border-radius:12px; padding:10px 12px; font-size:12.5px; }
+  .sidecard b { font-size:14px; }
   .sidecard button { width:100%; margin-top:8px; }
   .side-foot { margin-top:10px; padding-top:10px; border-top:1px solid var(--line);
                text-align:center; }
@@ -68,44 +76,48 @@ __THEME_CSS__
   .side-foot a:hover { color:var(--acc); }
 
   /* ---- topbar ---- */
-  .topbar { display:flex; gap:14px; align-items:center; padding:16px 0 18px; flex-wrap:wrap; }
+  .topbar { display:flex; gap:10px; align-items:center; padding:12px 0; flex-wrap:wrap; }
   .search { flex:1; min-width:220px; max-width:430px; background:var(--card); border:1px solid var(--line);
-            border-radius:12px; padding:10px 14px; display:flex; gap:8px; align-items:center; }
+            border-radius:8px; padding:7px 12px; display:flex; gap:8px; align-items:center; }
   .search input { border:none; outline:none; background:transparent; width:100%; font:inherit; color:var(--fg); }
   .who { display:flex; gap:9px; align-items:center; }
-  .avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,var(--acc),var(--acc2));
+  .avatar { width:28px; height:28px; border-radius:50%; font-size:12px; background:linear-gradient(135deg,var(--acc),var(--acc2));
             color:var(--on-acc); display:flex; align-items:center; justify-content:center; font-weight:700; }
   .theme-btn { background:var(--card); border:1px solid var(--line); color:var(--fg);
-               border-radius:99px; padding:9px 15px; cursor:pointer; font-size:13px; white-space:nowrap; }
+               border-radius:8px; padding:6px 12px; cursor:pointer; font-size:12.5px; white-space:nowrap; }
   .theme-btn:hover { border-color:var(--acc); }
 
   /* ---- cards / pages ---- */
   .page { display:none; } .page.on { display:block; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; }
-  .grid2 { display:grid; grid-template-columns: 1.6fr 1fr; gap:16px; margin-top:16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .grid2 { display:grid; grid-template-columns: 1.6fr 1fr; gap:12px; margin-top:12px; }
   @media (max-width: 980px) { .grid2 { grid-template-columns:1fr; } }
+  /* COMPACT: hero là thanh mảnh một hàng (tiêu đề+desc trái, nút phải) thay khối dày 30px. */
   .hero { background:var(--hero-grad);
-          color:var(--on-acc); border-radius:20px; padding:30px; }
-  .hero h1 { font-size:26px; } .hero p { opacity:.92; max-width:520px; }
-  .hero button { background:var(--card); color:var(--acc); border:none; border-radius:12px;
-                 padding:11px 22px; font-weight:700; cursor:pointer; margin-top:14px; font-size:15px; }
-  .statrow { display:flex; gap:22px; flex-wrap:wrap; margin-top:18px; }
-  .stat b { font-size:17px; display:block; } .stat span { opacity:.85; font-size:12.5px; }
+          color:var(--on-acc); border-radius:12px; padding:12px 16px;
+          display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .hero h1 { font-size:16px; margin:0; } .hero p { opacity:.85; max-width:560px; font-size:12.5px; margin:2px 0 0; }
+  .hero button { background:var(--card); color:var(--acc); border:none; border-radius:8px;
+                 padding:7px 14px; font-weight:600; cursor:pointer; margin:0; font-size:13px; white-space:nowrap; }
+  .statrow { display:flex; gap:12px; flex-wrap:wrap; margin-top:12px; }
+  .stat { flex:1; min-width:150px; background:var(--card); border:1px solid var(--line);
+          border-radius:12px; padding:10px 14px; }
+  .stat b { font-size:16px; display:block; } .stat span { color:var(--mut); font-size:12px; }
   .chips { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
-  .chip { background:var(--chip); border:1px solid var(--line); border-radius:10px; padding:9px 14px;
-          cursor:pointer; font-size:13.5px; }
+  .chip { background:var(--chip); border:1px solid var(--line); border-radius:8px; padding:7px 12px;
+          cursor:pointer; font-size:12.5px; }
   .chip:hover { border-color:var(--acc); }
-  label { display:block; color:var(--mut); font-size:12.5px; margin:12px 0 5px; }
+  label { display:block; color:var(--mut); font-size:12.5px; margin:10px 0 4px; }
   input, select, textarea { background:var(--input); border:1px solid var(--line); color:var(--fg);
-          border-radius:10px; padding:10px 12px; width:100%; font:inherit; }
+          border-radius:8px; padding:8px 10px; width:100%; font:inherit; }
   textarea { min-height:96px; resize:vertical; }
   button.go { background:linear-gradient(90deg,var(--acc),var(--acc2)); border:none; color:var(--on-acc);
-              border-radius:11px; padding:11px 22px; font-weight:700; cursor:pointer; margin-top:16px; font-size:15px; }
+              border-radius:8px; padding:8px 18px; font-weight:600; cursor:pointer; margin-top:12px; font-size:13.5px; }
   button.ghost { background:transparent; border:1px solid var(--line); color:var(--mut);
                  border-radius:9px; padding:7px 13px; cursor:pointer; font-size:13px; }
   .row { display:flex; gap:12px; flex-wrap:wrap; } .row > div { flex:1; min-width:170px; }
   .status { margin-top:10px; font-size:13.5px; } .ok { color:var(--ok); } .err { color:var(--err); }
-  .job { border:1px solid var(--line); border-radius:12px; padding:13px 15px; margin-bottom:10px; background:var(--card); }
+  .job { border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px; background:var(--card); }
   .job .h { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:center; }
   .pill { font-size:12px; padding:3px 11px; border-radius:99px; }
   .pill.done { background:var(--pill-done-bg); color:var(--ok); }
@@ -113,7 +125,7 @@ __THEME_CSS__
   .pill.failed { background:var(--pill-fail-bg); color:var(--err); }
   .pill.queued { background:var(--pill-queue-bg); color:var(--mut); }
   audio, video { width:100%; margin-top:10px; border-radius:10px; }
-  .donut-wrap { display:flex; gap:18px; align-items:center; }
+  .donut-wrap { display:flex; gap:12px; align-items:center; }
   .legend { font-size:13px; } .legend i { display:inline-block; width:10px; height:10px;
            border-radius:3px; margin-right:7px; }
   .usagebar { height:8px; border-radius:99px; background:var(--track); margin:7px 0; overflow:hidden; }
@@ -176,6 +188,7 @@ __THEME_CSS__
 
   <main>
     <div class="topbar">
+      <button class="icon-btn" onclick="toggleSide()" title="Ẩn/hiện thanh menu">◧</button>
       <button id="burger" onclick="toggleSide()">☰</button>
       <div class="search">🔍<input id="q" placeholder="Tìm kiếm dự án, giọng nói, công cụ…"></div>
       <button class="theme-btn" data-theme-label onclick="vvToggleTheme()" title="Chuyển chế độ sáng/tối">🌙 Chế độ tối</button>
@@ -187,16 +200,18 @@ __THEME_CSS__
     <!-- DASHBOARD -->
     <section id="page-dashboard" class="page on">
       <div class="hero">
-        <h1>Dịch Audio, Video Online</h1>
-        <p>Xóa nhòa cách biệt ngôn ngữ — dịch nhanh với AI, giữ nguyên giọng nhân vật,
-           chạy trên hạ tầng của chính bạn.</p>
-        <button onclick="go('dub')">Bắt đầu ngay →</button>
-        <div class="statrow">
-          <div class="stat"><b id="st-voices">25+</b><span>Giọng đọc AI</span></div>
-          <div class="stat"><b>2+</b><span>Ngôn ngữ local</span></div>
-          <div class="stat"><b>3–8s</b><span>Clone giọng</span></div>
-          <div class="stat"><b id="st-jobs">0</b><span>Job đã xử lý</span></div>
+        <div>
+          <h1>Dịch Audio, Video Online</h1>
+          <p>Xóa nhòa cách biệt ngôn ngữ — dịch nhanh với AI, giữ nguyên giọng nhân vật,
+             chạy trên hạ tầng của chính bạn.</p>
         </div>
+        <button onclick="go('dub')">Bắt đầu ngay →</button>
+      </div>
+      <div class="statrow">
+        <div class="stat"><b id="st-voices">25+</b><span>Giọng đọc AI</span></div>
+        <div class="stat"><b>2+</b><span>Ngôn ngữ local</span></div>
+        <div class="stat"><b>3–8s</b><span>Clone giọng</span></div>
+        <div class="stat"><b id="st-jobs">0</b><span>Job đã xử lý</span></div>
       </div>
       <div class="grid2">
         <div class="card">
@@ -208,7 +223,7 @@ __THEME_CSS__
             <span class="chip" onclick="go('stt')">📝 Giọng nói → văn bản</span>
             <span class="chip" onclick="go('api')">🔑 Quản lý API key</span>
           </div>
-          <h3 style="margin-top:20px">Dự án gần đây</h3>
+          <h3 style="margin-top:14px">Dự án gần đây</h3>
           <div id="dash-jobs" class="mut">…</div>
           <a href="#/jobs" onclick="go('jobs')">Xem tất cả →</a>
         </div>
@@ -369,8 +384,16 @@ function go(page) {
   if (page === "api") loadKeys();
   if (window.innerWidth < 920) $("sidebar").style.display = "none";
 }
-function toggleSide() { const s = $("sidebar");
-  s.style.display = (s.style.display === "block") ? "none" : "block"; }
+function toggleSide() {
+  if (window.innerWidth < 920) {  // mobile: media query đã ẩn sẵn, burger = hiện tạm
+    const s = $("sidebar");
+    s.style.display = (s.style.display === "block") ? "none" : "block";
+    return;
+  }
+  // Desktop: gập HOÀN TOÀN, ghi nhớ lựa chọn qua F5 (giống SPA — vv_side_hidden)
+  const hidden = document.body.classList.toggle("side-hidden");
+  try { localStorage.setItem("vv_side_hidden", hidden ? "1" : "0"); } catch (e) {}
+}
 
 // Phiên hết hạn / chưa đăng nhập -> để server quyết định, không tự đoán.
 function needLogin() { location.href = "/login?next=" + encodeURIComponent(location.pathname + location.hash); }
@@ -381,6 +404,13 @@ async function logout() {
 }
 
 async function boot() {
+  // Khôi phục lựa chọn "ẩn thanh menu" của phiên trước (desktop only — mobile
+  // vốn ẩn sẵn bằng media query, class sẽ không có tác dụng gì thêm).
+  try {
+    if (localStorage.getItem("vv_side_hidden") === "1" && window.innerWidth >= 920) {
+      document.body.classList.add("side-hidden");
+    }
+  } catch (e) {}
   const hash = (location.hash || "#/dashboard").replace("#/","");
   go(PAGES.includes(hash) ? hash : "dashboard");
   refreshMe();

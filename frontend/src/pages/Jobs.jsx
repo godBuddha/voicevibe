@@ -175,23 +175,23 @@ export default function Jobs() {
   };
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '24px', fontWeight: 700 }}>
+    <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
+      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '14px', fontWeight: 700 }}>
         Lịch sử Jobs
       </h1>
-      <p style={{ color: 'var(--text-dim)', marginBottom: '48px' }}>
+      <p style={{ color: 'var(--text-dim)', marginBottom: '20px' }}>
         Theo dõi tất cả các job đã tạo và trạng thái xử lý
       </p>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '32px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <label style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>Trạng thái:</label>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             style={{
-              padding: '8px 12px',
+              padding: '8px 10px',
               borderRadius: 'var(--radius)',
               border: '1px solid var(--border)',
               fontSize: 'var(--text-sm)',
@@ -207,13 +207,13 @@ export default function Jobs() {
             <option value="cancelled">Đã hủy</option>
           </select>
         </div>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           <label style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>Loại:</label>
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
             style={{
-              padding: '8px 12px',
+              padding: '8px 10px',
               borderRadius: 'var(--radius)',
               border: '1px solid var(--border)',
               fontSize: 'var(--text-sm)',
@@ -230,21 +230,21 @@ export default function Jobs() {
       </div>
 
       {/* Results count */}
-      <div style={{ marginBottom: '16px', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ marginBottom: '12px', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>Hiển thị {filteredJobs.length} / {jobs.length} job</span>
         {actionError && <span style={{ color: 'var(--danger)', fontWeight: 600 }}>{actionError}</span>}
       </div>
 
       {/* Job list */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '32px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '16px' }}>
         <div>
           {filteredJobs.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '64px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
+              <div style={{ fontSize: '48px', marginBottom: '12px' }}>📋</div>
               <div style={{ color: 'var(--text-dim)' }}>Không có job nào</div>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {filteredJobs.map(job => {
                 const status = mapStatus[job.status] || { color: 'var(--text-dim)', bg: 'var(--bg)', label: job.status };
                 const type = mapType[job.type] || { label: job.type, icon: '📄' };
@@ -261,7 +261,7 @@ export default function Jobs() {
                       background: selectedJob?.id === job.id ? 'var(--primary-light)' : 'var(--surface)',
                       border: '1px solid var(--border)',
                       borderRadius: 'var(--radius-lg)',
-                      padding: '20px',
+                      padding: '12px',
                       textAlign: 'left',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
@@ -275,7 +275,7 @@ export default function Jobs() {
                       if (selectedJob?.id !== job.id) e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
-                    <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
                       <div style={{ fontSize: '24px' }}>{type.icon}</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '8px' }}>
@@ -322,14 +322,14 @@ export default function Jobs() {
                         )}
                         {/* Hành động: Hủy (còn hoạt động) / Xóa (đã kết thúc).
                             Nút phải stopPropagation — hàng là vùng chọn chi tiết. */}
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
                           {isActive && (
                             <button
                               disabled={isBusy}
                               onClick={(e) => doCancel(job, e)}
                               style={{
                                 background: 'var(--warning-light)', color: 'var(--warning)',
-                                border: 'none', padding: '6px 14px', borderRadius: 'var(--radius)',
+                                border: 'none', padding: '6px 12px', borderRadius: 'var(--radius)',
                                 fontSize: 'var(--text-xs)', fontWeight: 600,
                                 cursor: isBusy ? 'wait' : 'pointer', opacity: isBusy ? 0.6 : 1,
                               }}
@@ -343,7 +343,7 @@ export default function Jobs() {
                               onClick={(e) => doDelete(job, e)}
                               style={{
                                 background: 'var(--bg)', color: 'var(--danger)',
-                                border: '1px solid var(--border)', padding: '6px 14px',
+                                border: '1px solid var(--border)', padding: '6px 12px',
                                 borderRadius: 'var(--radius)', fontSize: 'var(--text-xs)',
                                 fontWeight: 600, cursor: isBusy ? 'wait' : 'pointer',
                                 opacity: isBusy ? 0.6 : 1,
@@ -365,19 +365,19 @@ export default function Jobs() {
         {/* Job details */}
         <div>
           {selectedJob ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div
                 style={{
                   background: 'var(--surface)',
                   border: '1px solid var(--border)',
                   borderRadius: 'var(--radius-lg)',
-                  padding: '24px',
+                  padding: '14px',
                 }}
               >
-                <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 700, marginBottom: '20px' }}>
+                <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 700, marginBottom: '12px' }}>
                   Chi tiết Job #{selectedJob.id}
                 </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: 'var(--text-sm)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: 'var(--text-sm)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-dim)' }}>Loại</span>
                     <span style={{ fontWeight: 600 }}>{mapType[selectedJob.type]?.label || selectedJob.type}</span>
@@ -404,7 +404,7 @@ export default function Jobs() {
                     </div>
                   )}
                   {selectedJob.status === 'failed' && selectedJob.error && (
-                    <div style={{ padding: '12px', borderRadius: 'var(--radius)', background: 'var(--danger-light)', color: 'var(--danger)', whiteSpace: 'pre-wrap' }}>
+                    <div style={{ padding: '10px', borderRadius: 'var(--radius)', background: 'var(--danger-light)', color: 'var(--danger)', whiteSpace: 'pre-wrap' }}>
                       {selectedJob.error}
                     </div>
                   )}
@@ -418,10 +418,10 @@ export default function Jobs() {
                     background: 'var(--surface)',
                     border: '1px solid var(--border)',
                     borderRadius: 'var(--radius-lg)',
-                    padding: '24px',
+                    padding: '14px',
                   }}
                 >
-                  <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 700, marginBottom: '20px' }}>
+                  <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 700, marginBottom: '12px' }}>
                     Kết quả
                   </h3>
                   {result.kind === 'audio' && (
@@ -436,7 +436,7 @@ export default function Jobs() {
                         background: 'var(--bg)',
                         border: '1px solid var(--border)',
                         borderRadius: 'var(--radius)',
-                        padding: '12px',
+                        padding: '10px',
                         fontSize: 'var(--text-xs)',
                         whiteSpace: 'pre-wrap',
                         maxHeight: '200px',
@@ -450,26 +450,26 @@ export default function Jobs() {
                   <a
                     href={result.url || BASE + result.download_url}
                     download={result.filename}
-                    style={{ display: 'inline-block', marginTop: '16px', color: 'var(--primary)', fontWeight: 600 }}
+                    style={{ display: 'inline-block', marginTop: '12px', color: 'var(--primary)', fontWeight: 600 }}
                   >
                     Tải về máy ({result.filename})
                   </a>
                 </div>
               )}
               {selectedJob.status === 'done' && !result && resultError && (
-                <div style={{ padding: '16px', borderRadius: 'var(--radius)', background: 'var(--danger-light)', color: 'var(--danger)' }}>
+                <div style={{ padding: '12px', borderRadius: 'var(--radius)', background: 'var(--danger-light)', color: 'var(--danger)' }}>
                   Không tải được kết quả: {resultError}
                 </div>
               )}
               {selectedJob.status === 'done' && !result && !resultError && (
-                <div style={{ padding: '16px', borderRadius: 'var(--radius)', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-dim)', fontSize: 'var(--text-sm)' }}>
+                <div style={{ padding: '12px', borderRadius: 'var(--radius)', background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text-dim)', fontSize: 'var(--text-sm)' }}>
                   Đang tải kết quả...
                 </div>
               )}
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '40px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>📄</div>
+            <div style={{ textAlign: 'center', padding: '20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
+              <div style={{ fontSize: '48px', marginBottom: '12px' }}>📄</div>
               <div style={{ color: 'var(--text-dim)' }}>Chọn một job để xem chi tiết</div>
             </div>
           )}

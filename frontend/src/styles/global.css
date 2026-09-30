@@ -20,7 +20,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-size: var(--text-base);
-  line-height: 1.6;
+  line-height: 1.5; /* compact UI: 1.6 -> 1.5, dày chữ hơn mà vẫn dễ đọc */
 }
 
 #root {

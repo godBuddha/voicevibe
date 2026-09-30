@@ -58,20 +58,20 @@ export default function TTS() {
   };
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '24px', fontWeight: 700 }}>
+    <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '14px', fontWeight: 700 }}>
         Chuyển văn bản thành giọng nói
       </h1>
-      <p style={{ color: 'var(--text-dim)', marginBottom: '48px' }}>
+      <p style={{ color: 'var(--text-dim)', marginBottom: '20px' }}>
         Nhập văn bản, chọn giọng đọc (kể cả giọng bạn đã nhân bản ở trang Giọng Clone) và tạo file âm thanh tiếng Việt tự nhiên
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '40px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '20px' }}>
         {/* Left: Editor & Controls */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Text input */}
           <div>
-            <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '12px', fontWeight: 600 }}>
+            <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '10px', fontWeight: 600 }}>
               Nhập văn bản
             </label>
             <textarea
@@ -81,7 +81,7 @@ export default function TTS() {
               rows={12}
               style={{
                 width: '100%',
-                padding: '16px',
+                padding: '12px',
                 borderRadius: 'var(--radius-lg)',
                 border: '1px solid var(--border)',
                 fontSize: 'var(--text-base)',
@@ -99,15 +99,15 @@ export default function TTS() {
 
           {/* Voice selector */}
           <div>
-            <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '12px', fontWeight: 600 }}>
+            <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '10px', fontWeight: 600 }}>
               Chọn giọng đọc
             </label>
             {voices.length === 0 ? (
-              <div style={{ padding: '20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text-dim)', fontSize: 'var(--text-sm)' }}>
+              <div style={{ padding: '12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text-dim)', fontSize: 'var(--text-sm)' }}>
                 Chưa có giọng nào — tạo giọng ở trang “Giọng Clone”, hoặc cứ tạo giọng nói với giọng mặc định của hệ thống.
               </div>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px' }}>
                 {voices.map((v) => (
                   <button
                     key={v.id}
@@ -116,7 +116,7 @@ export default function TTS() {
                       background: selectedVoice === v.id ? 'var(--primary-light)' : 'var(--surface)',
                       border: selectedVoice === v.id ? '1px solid var(--primary)' : '1px solid var(--border)',
                       borderRadius: 'var(--radius)',
-                      padding: '12px 16px',
+                      padding: '10px 12px',
                       textAlign: 'center',
                       cursor: 'pointer',
                       transition: 'all 0.2s',
@@ -145,7 +145,7 @@ export default function TTS() {
               background: 'var(--gradient)',
               color: '#fff',
               border: 'none',
-              padding: '16px 32px',
+              padding: '12px 16px',
               borderRadius: 'var(--radius)',
               fontSize: 'var(--text-base)',
               fontWeight: 600,
@@ -160,7 +160,7 @@ export default function TTS() {
           {/* Error */}
           {error && (
             <div style={{
-              padding: '16px', borderRadius: 'var(--radius)',
+              padding: '12px', borderRadius: 'var(--radius)',
               background: 'var(--danger-light)', color: 'var(--danger)', whiteSpace: 'pre-wrap',
             }}>
               {error}
@@ -170,7 +170,7 @@ export default function TTS() {
           {/* Audio player */}
           {audioUrl && (
             <div>
-              <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '12px', fontWeight: 600 }}>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '10px', fontWeight: 600 }}>
                 Kết quả
               </label>
               <audio
@@ -178,7 +178,7 @@ export default function TTS() {
                 src={audioUrl}
                 style={{ width: '100%', outline: 'none' }}
               />
-              <a href={result?.url} download={result?.filename} style={{ display: 'inline-block', marginTop: '12px', color: 'var(--primary)', fontWeight: 600 }}>
+              <a href={result?.url} download={result?.filename} style={{ display: 'inline-block', marginTop: '10px', color: 'var(--primary)', fontWeight: 600 }}>
                 Tải về máy ({result?.filename})
               </a>
             </div>
@@ -186,7 +186,7 @@ export default function TTS() {
 
           {/* Status */}
           {job && job.status !== 'done' && !error && (
-            <div style={{ padding: '16px', borderRadius: 'var(--radius)', background: 'var(--info-light)', color: 'var(--info)' }}>
+            <div style={{ padding: '12px', borderRadius: 'var(--radius)', background: 'var(--info-light)', color: 'var(--info)' }}>
               <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '8px' }}>
                 {job.status === 'queued' ? 'Hàng đợi' : job.status === 'running' ? 'Đang xử lý' : job.status}
               </div>
@@ -211,14 +211,14 @@ export default function TTS() {
         </div>
 
         {/* Right sidebar: waveform placeholder */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Waveform placeholder */}
           <div
             style={{
               background: 'var(--surface)',
               border: '1px solid var(--border)',
               borderRadius: 'var(--radius-lg)',
-              padding: '24px',
+              padding: '14px',
               height: '200px',
               display: 'flex',
               alignItems: 'center',
@@ -226,7 +226,7 @@ export default function TTS() {
             }}
           >
             <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-              <div style={{ fontSize: '48px', marginBottom: '12px' }}>声波</div>
+              <div style={{ fontSize: '48px', marginBottom: '10px' }}>声波</div>
               <div style={{ fontSize: 'var(--text-sm)' }}>Waveform sẽ hiển thị tại đây sau khi tạo</div>
             </div>
           </div>
@@ -237,10 +237,10 @@ export default function TTS() {
               background: 'var(--info-light)',
               border: '1px solid var(--info)',
               borderRadius: 'var(--radius-lg)',
-              padding: '16px',
+              padding: '12px',
             }}
           >
-            <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '12px', color: 'var(--info)' }}>
+            <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '10px', color: 'var(--info)' }}>
               💡 Mẹo
             </h4>
             <ul style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', listStyle: 'none', padding: 0, margin: 0 }}>

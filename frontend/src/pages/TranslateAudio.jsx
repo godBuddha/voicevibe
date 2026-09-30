@@ -115,17 +115,17 @@ export default function TranslateAudio() {
   const activeJob = stage === 'stt' ? sttJob : trJob;
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '24px', fontWeight: 700 }}>
+    <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
+      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '14px', fontWeight: 700 }}>
         Dịch âm thanh
       </h1>
-      <p style={{ color: 'var(--text-dim)', marginBottom: '48px' }}>
+      <p style={{ color: 'var(--text-dim)', marginBottom: '20px' }}>
         Nộp file audio/video → AI nghe ra lời thoại rồi dịch sang ngôn ngữ bạn chọn. Chạy 2 giai đoạn lần lượt: nghe ra chữ, rồi dịch
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '40px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '20px' }}>
         {/* Left */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Upload */}
           {!file && (
             <div
@@ -141,7 +141,7 @@ export default function TranslateAudio() {
                 padding: '64px', textAlign: 'center', cursor: 'pointer',
                 background: 'var(--surface)', minHeight: '240px',
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'center', gap: '16px',
+                justifyContent: 'center', gap: '12px',
               }}
             >
               <input
@@ -164,7 +164,7 @@ export default function TranslateAudio() {
           {file && (
             <div style={{
               background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-lg)', padding: '16px 24px',
+              borderRadius: 'var(--radius-lg)', padding: '12px 14px',
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             }}>
               <div>
@@ -177,7 +177,7 @@ export default function TranslateAudio() {
                 onClick={() => { setFile(null); setError(null); }}
                 style={{
                   background: 'var(--bg)', color: 'var(--text-dim)',
-                  border: '1px solid var(--border)', padding: '6px 14px',
+                  border: '1px solid var(--border)', padding: '6px 12px',
                   borderRadius: 'var(--radius)', fontSize: 'var(--text-sm)',
                   fontWeight: 600, cursor: 'pointer',
                 }}
@@ -189,14 +189,14 @@ export default function TranslateAudio() {
 
           {/* Cặp ngôn ngữ */}
           {file && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
                 Ngôn ngữ trong file
                 <select
                   value={sourceLang}
                   onChange={(e) => setSourceLang(e.target.value)}
                   style={{
-                    padding: '8px 12px', borderRadius: 'var(--radius)',
+                    padding: '8px 10px', borderRadius: 'var(--radius)',
                     border: '1px solid var(--border)', fontSize: 'var(--text-sm)',
                     background: 'var(--bg)', color: 'var(--text)',
                   }}
@@ -214,7 +214,7 @@ export default function TranslateAudio() {
                   value={targetLang}
                   onChange={(e) => setTargetLang(e.target.value)}
                   style={{
-                    padding: '8px 12px', borderRadius: 'var(--radius)',
+                    padding: '8px 10px', borderRadius: 'var(--radius)',
                     border: '1px solid var(--border)', fontSize: 'var(--text-sm)',
                     background: 'var(--bg)', color: 'var(--text)',
                   }}
@@ -229,7 +229,7 @@ export default function TranslateAudio() {
 
           {error && (
             <div style={{
-              padding: '16px', borderRadius: 'var(--radius)',
+              padding: '12px', borderRadius: 'var(--radius)',
               background: 'var(--danger-light)', color: 'var(--danger)', whiteSpace: 'pre-wrap',
             }}>
               {error}
@@ -241,7 +241,7 @@ export default function TranslateAudio() {
               onClick={startTranslate}
               style={{
                 background: 'var(--gradient)', color: '#fff', border: 'none',
-                padding: '16px 32px', borderRadius: 'var(--radius)',
+                padding: '12px 16px', borderRadius: 'var(--radius)',
                 fontSize: 'var(--text-base)', fontWeight: 600, cursor: 'pointer',
                 maxWidth: '360px',
               }}
@@ -252,7 +252,7 @@ export default function TranslateAudio() {
 
           {/* Progress 2 giai đoạn */}
           {isProcessing && (
-            <div style={{ padding: '20px', borderRadius: 'var(--radius)', background: 'var(--info-light)', color: 'var(--info)' }}>
+            <div style={{ padding: '12px', borderRadius: 'var(--radius)', background: 'var(--info-light)', color: 'var(--info)' }}>
               <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '8px' }}>
                 {stageLabel[stage] || 'Đang xử lý'}
               </div>
@@ -275,7 +275,7 @@ export default function TranslateAudio() {
             <>
               {transcript?.length > 0 && (
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                     <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700 }}>
                       Lời thoại gốc ({transcript.length} câu)
                     </h3>
@@ -283,7 +283,7 @@ export default function TranslateAudio() {
                       onClick={() => downloadTxt(transcript.map((c) => c.text).join('\n'), `${baseName}-loi-thoai.txt`)}
                       style={{
                         background: 'var(--info-light)', color: 'var(--info)', border: 'none',
-                        padding: '8px 16px', borderRadius: 'var(--radius)',
+                        padding: '8px 12px', borderRadius: 'var(--radius)',
                         fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer',
                       }}
                     >
@@ -292,7 +292,7 @@ export default function TranslateAudio() {
                   </div>
                   <div style={{
                     background: 'var(--surface)', border: '1px solid var(--border)',
-                    borderRadius: 'var(--radius-lg)', padding: '24px', maxHeight: '300px',
+                    borderRadius: 'var(--radius-lg)', padding: '14px', maxHeight: '300px',
                     overflow: 'auto', whiteSpace: 'pre-wrap', fontSize: 'var(--text-base)',
                     lineHeight: 1.7,
                   }} className="scrollbar-thin">
@@ -310,7 +310,7 @@ export default function TranslateAudio() {
                 </div>
               )}
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700 }}>
                     Bản dịch ({LANGUAGES[targetLang]})
                   </h3>
@@ -318,7 +318,7 @@ export default function TranslateAudio() {
                     onClick={() => downloadTxt(translated, `${baseName}-ban-dich.txt`)}
                     style={{
                       background: 'var(--success-light)', color: 'var(--success)', border: 'none',
-                      padding: '8px 16px', borderRadius: 'var(--radius)',
+                      padding: '8px 12px', borderRadius: 'var(--radius)',
                       fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer',
                     }}
                   >
@@ -327,7 +327,7 @@ export default function TranslateAudio() {
                 </div>
                 <div style={{
                   background: 'var(--surface)', border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-lg)', padding: '24px',
+                  borderRadius: 'var(--radius-lg)', padding: '14px',
                   whiteSpace: 'pre-wrap', fontSize: 'var(--text-base)', lineHeight: 1.7,
                 }}>
                   {translated}
@@ -344,7 +344,7 @@ export default function TranslateAudio() {
                 }}
                 style={{
                   background: 'var(--bg)', color: 'var(--text-dim)',
-                  border: '1px solid var(--border)', padding: '10px 20px',
+                  border: '1px solid var(--border)', padding: '10px 12px',
                   borderRadius: 'var(--radius)', fontSize: 'var(--text-sm)',
                   fontWeight: 600, cursor: 'pointer', maxWidth: '200px',
                 }}
@@ -356,9 +356,9 @@ export default function TranslateAudio() {
         </div>
 
         {/* Right sidebar */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-          <div style={{ background: 'var(--info-light)', border: '1px solid var(--info)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
-            <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '12px', color: 'var(--info)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div style={{ background: 'var(--info-light)', border: '1px solid var(--info)', borderRadius: 'var(--radius-lg)', padding: '12px' }}>
+            <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '10px', color: 'var(--info)' }}>
               💡 Mẹo
             </h4>
             <ul style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', listStyle: 'none', padding: 0, margin: 0 }}>

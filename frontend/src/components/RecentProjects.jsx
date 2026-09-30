@@ -1,3 +1,5 @@
+import { FolderOpen } from 'lucide-react';
+
 export function RecentProjects({ jobs, navigate }) {
   const formatTime = (date) => {
     const isoDate = typeof date === 'string' ? new Date(date) : date;
@@ -38,23 +40,24 @@ export function RecentProjects({ jobs, navigate }) {
   if (!jobs || jobs.length === 0) {
     return (
       <div>
-        <h3 style={{ fontSize: 'var(--text-xl)', marginBottom: '24px', fontWeight: 700 }}>
+        <h3 style={{ fontSize: 'var(--text-base)', marginBottom: '10px', fontWeight: 700 }}>
           Dự án gần đây
         </h3>
-        <div style={{ textAlign: 'center', padding: '48px', borderRadius: 'var(--radius)', background: 'var(--surface)', border: '1px solid var(--border)' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>📁</div>
-          <p style={{ color: 'var(--text-dim)' }}>Chưa có dự án nào</p>
+        <div style={{ textAlign: 'center', padding: '24px', borderRadius: 'var(--radius)', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+          <FolderOpen size={28} style={{ color: 'var(--text-muted)', marginBottom: '8px' }} />
+          <p style={{ color: 'var(--text-dim)', fontSize: 'var(--text-sm)', marginBottom: '0' }}>Chưa có dự án nào</p>
           <button
             onClick={() => navigate('/dub')}
             style={{
               background: 'var(--gradient)',
               color: '#fff',
               border: 'none',
-              padding: '10px 20px',
-              borderRadius: 'var(--radius)',
+              padding: '6px 14px',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: 'var(--text-sm)',
               fontWeight: 600,
               cursor: 'pointer',
-              marginTop: '16px',
+              marginTop: '12px',
             }}
           >
             Tạo dự án đầu tiên
@@ -66,10 +69,10 @@ export function RecentProjects({ jobs, navigate }) {
 
   return (
     <div>
-      <h3 style={{ fontSize: 'var(--text-xl)', marginBottom: '24px', fontWeight: 700 }}>
+      <h3 style={{ fontSize: 'var(--text-base)', marginBottom: '10px', fontWeight: 700 }}>
         Dự án gần đây
       </h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: '8px' }}>
         {jobs.slice(0, 8).map((job) => (
           <button
             key={job.id}
@@ -78,29 +81,31 @@ export function RecentProjects({ jobs, navigate }) {
               background: 'var(--surface)',
               border: '1px solid var(--border)',
               borderRadius: 'var(--radius-md)',
-              padding: '16px',
+              padding: '10px 12px',
               textAlign: 'left',
               cursor: 'pointer',
-              transition: 'all 0.2s',
+              transition: 'all 0.15s',
             }}
             onMouseEnter={(e) => {
-              e.target.style.transform = 'translateY(-2px)';
-              e.target.style.boxShadow = 'var(--shadow)';
+              e.currentTarget.style.transform = 'translateY(-1px)';
+              e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+              e.currentTarget.style.borderColor = 'var(--border-strong)';
             }}
             onMouseLeave={(e) => {
-              e.target.style.transform = 'none';
-              e.target.style.boxShadow = 'none';
+              e.currentTarget.style.transform = 'none';
+              e.currentTarget.style.boxShadow = 'none';
+              e.currentTarget.style.borderColor = 'var(--border)';
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-              <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, padding: '2px 8px', borderRadius: 'var(--radius-xs)', background: 'var(--primary-light)', color: 'var(--primary)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <span style={{ fontSize: '10px', fontWeight: 600, padding: '1px 6px', borderRadius: 'var(--radius-xs)', background: 'var(--primary-light)', color: 'var(--primary)' }}>
                 {mapType[job.type] || job.type}
               </span>
               <span
                 style={{
-                  fontSize: 'var(--text-xs)',
+                  fontSize: '10px',
                   fontWeight: 600,
-                  padding: '2px 8px',
+                  padding: '1px 6px',
                   borderRadius: 'var(--radius-xs)',
                   backgroundColor: mapStatus[job.status]?.color || 'var(--text-dim)',
                   color: '#fff',
@@ -109,13 +114,23 @@ export function RecentProjects({ jobs, navigate }) {
                 {mapStatus[job.status]?.label || job.status}
               </span>
             </div>
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {job.file?.name || job.text?.substring(0, 40)}
+            {/* adaptJob đã tính sẵn nhãn hiển thị (tên file → đầu đoạn text →
+                nhãn loại job) — đọc đúng field đó thay vì job.file/job.text
+                vốn không bao giờ có ở SPA. */}
+            <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {job.label || job.type}
             </div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dim)' }}>
-              {job.file?.size && prettifyBytes(job.file.size)} | {job.file?.duration ? `${Math.floor(job.file.duration / 60)}:${(job.file.duration % 60).toString().padStart(2, '0')}` : ''}
-            </div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dim)', marginTop: '8px' }}>
+            {/* Một số job (translate văn bản…) không có file/độ dài — chỉ vẽ
+                dòng phụ khi CÓ dữ liệu, tránh dấu "|" trơ giữa khoảng trống. */}
+            {(job.file?.size || job.file?.duration) && (
+              <div style={{ fontSize: '10px', color: 'var(--text-dim)' }}>
+                {[
+                  job.file?.size && prettifyBytes(job.file.size),
+                  job.file?.duration && `${Math.floor(job.file.duration / 60)}:${(job.file.duration % 60).toString().padStart(2, '0')}`,
+                ].filter(Boolean).join(' | ')}
+              </div>
+            )}
+            <div style={{ fontSize: '10px', color: 'var(--text-dim)', marginTop: '4px' }}>
               {formatTime(job.createdAt)}
             </div>
           </button>

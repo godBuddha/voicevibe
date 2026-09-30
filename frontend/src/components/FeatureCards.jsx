@@ -1,28 +1,30 @@
+import { Globe, Sparkles, Zap, Repeat } from 'lucide-react';
+
 export function FeatureCards() {
   const features = [
     {
-      icon: '🌍',
+      Icon: Globe,
       title: '44+ Ngôn ngữ',
       description: 'Hỗ trợ đa dạng ngôn ngữ từ tiếng Việt, Anh, Nhật, Hàn, châu Âu và nhiều hơn nữa',
       bg: 'var(--info-light)',
       color: 'var(--info)',
     },
     {
-      icon: '🎯',
+      Icon: Sparkles,
       title: 'Giọng nói tự nhiên',
       description: 'AI tạo ra giọng nói sống động, truyền cảm như người thật với nhiều phong cách',
       bg: 'var(--success-light)',
       color: 'var(--success)',
     },
     {
-      icon: '⚡',
+      Icon: Zap,
       title: 'Xử lý nhanh',
       description: 'Công nghệ AI tiên tiến giúp xử lý video, audio chỉ trong vài phút thay vì hàng giờ',
       bg: 'var(--warning-light)',
       color: 'var(--warning)',
     },
     {
-      icon: '🔁',
+      Icon: Repeat,
       title: 'Clone giọng',
       description: 'Tạo giọng của riêng bạn chỉ với vài mẫu âm thanh 5-8 giây',
       bg: 'var(--primary-light)',
@@ -32,43 +34,43 @@ export function FeatureCards() {
 
   return (
     <div>
-      <h3 style={{ fontSize: 'var(--text-xl)', marginBottom: '24px', fontWeight: 700 }}>
+      <h3 style={{ fontSize: 'var(--text-base)', marginBottom: '10px', fontWeight: 700 }}>
         Tính năng nổi bật
       </h3>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px' }}>
-        {features.map((feat) => (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
+        {features.map(({ Icon, ...feat }) => (
           <div
             key={feat.title}
             style={{
               background: 'var(--surface)',
               border: '1px solid var(--border)',
               borderRadius: 'var(--radius-lg)',
-              padding: '24px',
+              padding: '10px 12px',
               display: 'flex',
-              gap: '16px',
+              gap: '10px',
               alignItems: 'flex-start',
             }}
           >
             <div
               style={{
-                fontSize: '32px',
                 background: feat.bg,
-                borderRadius: 'var(--radius-full)',
-                width: '60px',
-                height: '60px',
+                borderRadius: 'var(--radius-sm)',
+                width: '28px',
+                height: '28px',
+                color: feat.color,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
               }}
             >
-              {feat.icon}
+              <Icon size={15} strokeWidth={2} />
             </div>
-            <div>
-              <h4 style={{ fontSize: 'var(--text-lg)', fontWeight: 700, marginBottom: '8px', color: feat.color }}>
+            <div style={{ minWidth: 0 }}>
+              <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 700, marginBottom: '2px', color: feat.color }}>
                 {feat.title}
               </h4>
-              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)', lineHeight: 1.5 }}>
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dim)', lineHeight: 1.5, margin: 0 }}>
                 {feat.description}
               </p>
             </div>

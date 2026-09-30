@@ -34,8 +34,8 @@ export function DonutChart({ usage }) {
     const h = canvas.height;
     const centerX = w / 2;
     const centerY = h / 2;
-    const radius = Math.min(centerX, centerY) - 20;
-    const lineWidth = 30;
+    const radius = Math.min(centerX, centerY) - 14;
+    const lineWidth = 22;
 
     ctx.clearRect(0, 0, w, h);
 
@@ -62,13 +62,13 @@ export function DonutChart({ usage }) {
 
     // Center text — tổng số job
     ctx.fillStyle = 'var(--text)';
-    ctx.font = 'bold 24px Inter';
+    ctx.font = 'bold 19px Inter';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`${total.toLocaleString('vi-VN')}`, centerX, centerY - 10);
-    ctx.font = '14px Inter';
+    ctx.fillText(`${total.toLocaleString('vi-VN')}`, centerX, centerY - 8);
+    ctx.font = '11px Inter';
     ctx.fillStyle = 'var(--text-dim)';
-    ctx.fillText('Jobs', centerX, centerY + 16);
+    ctx.fillText('Jobs', centerX, centerY + 13);
   }, [usage, colors, total]);
 
   if (!usage) return null;
@@ -77,31 +77,31 @@ export function DonutChart({ usage }) {
     <div style={{ textAlign: 'center' }}>
       <canvas
         ref={canvasRef}
-        width={200}
-        height={200}
-        style={{ maxWidth: '200px', maxHeight: '200px' }}
+        width={160}
+        height={160}
+        style={{ maxWidth: '160px', maxHeight: '160px' }}
       />
-      <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'left' }}>
+      <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '5px', textAlign: 'left' }}>
         {Object.entries(breakdown).map(([key, val]) => (
-          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div
               style={{
-                width: '12px',
-                height: '12px',
+                width: '9px',
+                height: '9px',
                 borderRadius: '2px',
                 backgroundColor: colors[key] || '#94a3b8',
               }}
             />
-            <div style={{ flex: 1, fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
+            <div style={{ flex: 1, fontSize: 'var(--text-xs)', color: 'var(--text-dim)' }}>
               {labels[key] || 'Khác'}
             </div>
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
+            <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--text)' }}>
               {val.toLocaleString('vi-VN')}
             </div>
           </div>
         ))}
         {total === 0 && (
-          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
+          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dim)' }}>
             Chưa có job nào — tạo job đầu tiên từ menu bên trái.
           </div>
         )}

@@ -153,17 +153,17 @@ export default function Dub() {
   ];
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '40px', fontWeight: 700 }}>
+    <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
+      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '20px', fontWeight: 700 }}>
         Dịch Video & Audio
       </h1>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '40px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 400px', gap: '20px' }}>
         {/* Left: Form */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* File upload */}
           <div>
-            <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: '16px', fontWeight: 600 }}>Nguồn</h3>
+            <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: '12px', fontWeight: 600 }}>Nguồn</h3>
             <div
               onDragEnter={(e) => handleDrag(e, true)}
               onDragLeave={(e) => handleDrag(e, false)}
@@ -173,7 +173,7 @@ export default function Dub() {
               style={{
                 border: `2px dashed ${dragActive ? 'var(--primary)' : 'var(--border)'}`,
                 borderRadius: 'var(--radius-lg)',
-                padding: '48px',
+                padding: '20px',
                 textAlign: 'center',
                 cursor: 'pointer',
                 background: dragActive ? 'var(--primary-light)' : 'var(--surface)',
@@ -187,7 +187,7 @@ export default function Dub() {
                 accept="video/*,audio/*"
                 style={{ display: 'none' }}
               />
-              <div style={{ fontSize: '48px', marginBottom: '16px' }}>📁</div>
+              <div style={{ fontSize: '48px', marginBottom: '12px' }}>📁</div>
               {file ? (
                 <div>
                   <div style={{ fontWeight: 600, marginBottom: '8px' }}>{file.name}</div>
@@ -208,8 +208,8 @@ export default function Dub() {
 
           {/* Languages */}
           <div>
-            <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: '16px', fontWeight: 600 }}>Ngôn ngữ</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: '12px', fontWeight: 600 }}>Ngôn ngữ</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '8px' }}>
                   Ngôn ngữ gốc
@@ -219,7 +219,7 @@ export default function Dub() {
                   onChange={(e) => setFromLang(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '10px 12px',
+                    padding: '10px 10px',
                     borderRadius: 'var(--radius)',
                     border: '1px solid var(--border)',
                     fontSize: 'var(--text-base)',
@@ -243,7 +243,7 @@ export default function Dub() {
                   onChange={(e) => setToLang(e.target.value)}
                   style={{
                     width: '100%',
-                    padding: '10px 12px',
+                    padding: '10px 10px',
                     borderRadius: 'var(--radius)',
                     border: '1px solid var(--border)',
                     fontSize: 'var(--text-base)',
@@ -263,14 +263,14 @@ export default function Dub() {
 
           {/* Voice options */}
           <div>
-            <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: '16px', fontWeight: 600 }}>Giọng nói</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: '12px', fontWeight: 600 }}>Giọng nói</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {[
                 { value: 'original', label: 'Giữ giọng gốc (thay thế speaker bằng AI)' },
                 { value: 'clone', label: 'Giọng clone của tôi — mọi người nói dùng chung 1 giọng' },
                 { value: 'ai', label: 'AI chọn giọng phù hợp' },
               ].map((opt) => (
-                <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
                   <input
                     type="radio"
                     name="voiceOption"
@@ -287,9 +287,9 @@ export default function Dub() {
                   value={cloneVoiceId}
                   onChange={(e) => setCloneVoiceId(e.target.value)}
                   style={{
-                    marginLeft: '28px',
+                    marginLeft: '14px',
                     maxWidth: '320px',
-                    padding: '10px 12px',
+                    padding: '10px 10px',
                     borderRadius: 'var(--radius)',
                     border: '1px solid var(--border)',
                     fontSize: 'var(--text-base)',
@@ -306,7 +306,7 @@ export default function Dub() {
                 </select>
               )}
               {voiceOption === 'clone' && !voices.length && (
-                <div style={{ marginLeft: '28px', fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
+                <div style={{ marginLeft: '14px', fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
                   Chưa có giọng nào — tạo giọng ở trang “Giọng Clone” trước.
                 </div>
               )}
@@ -315,7 +315,7 @@ export default function Dub() {
 
           {/* Demucs toggle */}
           <div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={demucsEnabled}
@@ -337,7 +337,7 @@ export default function Dub() {
                 background: 'var(--gradient)',
                 color: '#fff',
                 border: 'none',
-                padding: '16px 32px',
+                padding: '12px 16px',
                 borderRadius: 'var(--radius)',
                 fontSize: 'var(--text-base)',
                 fontWeight: 600,
@@ -358,7 +358,7 @@ export default function Dub() {
           {/* Error */}
           {error && (
             <div style={{
-              padding: '16px', borderRadius: 'var(--radius)',
+              padding: '12px', borderRadius: 'var(--radius)',
               background: 'var(--danger-light)', color: 'var(--danger)', whiteSpace: 'pre-wrap',
             }}>
               {error}
@@ -367,14 +367,14 @@ export default function Dub() {
 
           {/* Result */}
           {result && (
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '24px' }}>
-              <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: '16px', fontWeight: 600 }}>Kết quả lồng tiếng</h3>
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px' }}>
+              <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: '12px', fontWeight: 600 }}>Kết quả lồng tiếng</h3>
               {result.kind === 'video' ? (
                 <video controls src={result.url} style={{ width: '100%', borderRadius: 'var(--radius)' }} />
               ) : (
                 <audio controls src={result.url} style={{ width: '100%' }} />
               )}
-              <a href={result.url} download={result.filename} style={{ display: 'inline-block', marginTop: '12px', color: 'var(--primary)', fontWeight: 600 }}>
+              <a href={result.url} download={result.filename} style={{ display: 'inline-block', marginTop: '10px', color: 'var(--primary)', fontWeight: 600 }}>
                 Tải về máy ({result.filename})
               </a>
             </div>
@@ -382,7 +382,7 @@ export default function Dub() {
         </div>
 
         {/* Right: Thông tin tệp & Pipeline */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Thời lượng đọc thật từ file — không có con số tiền nào */}
           {file && duration !== null && (
             <div
@@ -390,16 +390,16 @@ export default function Dub() {
                 background: 'var(--surface)',
                 border: '1px solid var(--border)',
                 borderRadius: 'var(--radius-lg)',
-                padding: '24px',
+                padding: '14px',
               }}
             >
-              <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: '20px', fontWeight: 600 }}>Thông tin tệp</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: '12px', fontWeight: 600 }}>Thông tin tệp</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-base)' }}>
                   <span style={{ color: 'var(--text-dim)' }}>Thời lượng</span>
                   <span style={{ fontWeight: 600 }}>{fmtTime(duration)}</span>
                 </div>
-                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginTop: '12px' }}>
+                <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginTop: '10px' }}>
                   {demucsEnabled && 'Đã bật tách nhạc nền (Demucs) • '}
                   Lồng tiếng chạy nhiều bước nên mất từ vài phút trở lên, tùy máy.
                 </div>
@@ -413,16 +413,16 @@ export default function Dub() {
               background: 'var(--surface)',
               border: '1px solid var(--border)',
               borderRadius: 'var(--radius-lg)',
-              padding: '24px',
+              padding: '14px',
             }}
           >
-            <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: '20px', fontWeight: 600 }}>Pipeline xử lý</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: '12px', fontWeight: 600 }}>Pipeline xử lý</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {pipelineSteps.map((step, i) => {
                 const isDone = currentStep > i;
                 const isCurrent = currentStep === i;
                 return (
-                  <div key={step.key} style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <div key={step.key} style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                     <div
                       style={{
                         width: '24px',

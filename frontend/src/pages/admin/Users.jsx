@@ -74,8 +74,8 @@ export default function AdminUsers() {
   };
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1400px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+    <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
           <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '8px', fontWeight: 700 }}>
             Quản lý Users
@@ -90,7 +90,7 @@ export default function AdminUsers() {
             background: 'var(--gradient)',
             color: '#fff',
             border: 'none',
-            padding: '12px 24px',
+            padding: '10px 14px',
             borderRadius: 'var(--radius)',
             fontSize: 'var(--text-base)',
             fontWeight: 600,
@@ -121,16 +121,16 @@ export default function AdminUsers() {
             style={{
               background: 'var(--surface)',
               borderRadius: 'var(--radius-lg)',
-              padding: '32px',
+              padding: '16px',
               maxWidth: '400px',
               width: '90%',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: '24px' }}>
+            <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: '14px' }}>
               Tạo User mới
             </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '8px', fontWeight: 600 }}>
                   Email
@@ -141,7 +141,7 @@ export default function AdminUsers() {
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                   style={{
                     width: '100%',
-                    padding: '10px 12px',
+                    padding: '10px 10px',
                     borderRadius: 'var(--radius)',
                     border: '1px solid var(--border)',
                     fontSize: 'var(--text-base)',
@@ -162,7 +162,7 @@ export default function AdminUsers() {
                   placeholder="Tối thiểu 8 ký tự"
                   style={{
                     width: '100%',
-                    padding: '10px 12px',
+                    padding: '10px 10px',
                     borderRadius: 'var(--radius)',
                     border: '1px solid var(--border)',
                     fontSize: 'var(--text-base)',
@@ -181,7 +181,7 @@ export default function AdminUsers() {
                   onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
                   style={{
                     width: '100%',
-                    padding: '10px 12px',
+                    padding: '10px 10px',
                     borderRadius: 'var(--radius)',
                     border: '1px solid var(--border)',
                     fontSize: 'var(--text-base)',
@@ -194,7 +194,7 @@ export default function AdminUsers() {
                 </select>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
               <button
                 onClick={createUser}
                 disabled={!newUser.email || !newUser.password || loading}
@@ -203,7 +203,7 @@ export default function AdminUsers() {
                   background: 'var(--gradient)',
                   color: '#fff',
                   border: 'none',
-                  padding: '10px 20px',
+                  padding: '10px 12px',
                   borderRadius: 'var(--radius)',
                   fontWeight: 600,
                   cursor: loading ? 'not-allowed' : 'pointer',
@@ -223,7 +223,7 @@ export default function AdminUsers() {
                   background: 'var(--bg)',
                   color: 'var(--text-dim)',
                   border: '1px solid var(--border)',
-                  padding: '10px 20px',
+                  padding: '10px 12px',
                   borderRadius: 'var(--radius)',
                   fontWeight: 600,
                   cursor: 'pointer',
@@ -242,19 +242,19 @@ export default function AdminUsers() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-base)' }}>
             <thead style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
               <tr>
-                <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)' }}>Email</th>
-                <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)' }}>Vai trò</th>
-                <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)' }}>Trạng thái</th>
-                <th style={{ padding: '16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-dim)' }}>Hành động</th>
+                <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)' }}>Email</th>
+                <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)' }}>Vai trò</th>
+                <th style={{ padding: '12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)' }}>Trạng thái</th>
+                <th style={{ padding: '12px', textAlign: 'center', fontWeight: 600, color: 'var(--text-dim)' }}>Hành động</th>
               </tr>
             </thead>
             <tbody>
               {users.map(user => (
                 <tr key={user.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '16px', color: 'var(--text)' }}>{user.email}</td>
-                  <td style={{ padding: '16px' }}>
+                  <td style={{ padding: '12px', color: 'var(--text)' }}>{user.email}</td>
+                  <td style={{ padding: '12px' }}>
                     <span style={{
-                      padding: '4px 12px',
+                      padding: '4px 10px',
                       borderRadius: 'var(--radius-xs)',
                       background: user.role === 'admin' ? 'var(--danger-light)' : 'var(--info-light)',
                       color: user.role === 'admin' ? 'var(--danger)' : 'var(--info)',
@@ -264,9 +264,9 @@ export default function AdminUsers() {
                       {user.role === 'admin' ? 'Admin' : 'User'}
                     </span>
                   </td>
-                  <td style={{ padding: '16px' }}>
+                  <td style={{ padding: '12px' }}>
                     <span style={{
-                      padding: '4px 12px',
+                      padding: '4px 10px',
                       borderRadius: 'var(--radius-xs)',
                       background: user.status === 'active' ? 'var(--success-light)' : 'var(--danger-light)',
                       color: user.status === 'active' ? 'var(--success)' : 'var(--danger)',
@@ -276,7 +276,7 @@ export default function AdminUsers() {
                       {user.status === 'active' ? 'Hoạt động' : 'Chặn'}
                     </span>
                   </td>
-                  <td style={{ padding: '16px' }}>
+                  <td style={{ padding: '12px' }}>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
                       <button
                         onClick={() => resetPassword(user.id)}

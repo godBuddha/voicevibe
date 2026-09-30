@@ -63,8 +63,8 @@ export default function ApiKeys() {
   const hideCreated = () => setWasCreated(null);
 
   return (
-    <div style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+    <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
           <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '8px', fontWeight: 700 }}>
             API Keys
@@ -79,7 +79,7 @@ export default function ApiKeys() {
             background: 'var(--gradient)',
             color: '#fff',
             border: 'none',
-            padding: '12px 24px',
+            padding: '10px 14px',
             borderRadius: 'var(--radius)',
             fontSize: 'var(--text-base)',
             fontWeight: 600,
@@ -93,7 +93,7 @@ export default function ApiKeys() {
       {/* Error */}
       {error && (
         <div style={{
-          padding: '16px', borderRadius: 'var(--radius)', marginBottom: '24px',
+          padding: '12px', borderRadius: 'var(--radius)', marginBottom: '14px',
           background: 'var(--danger-light)', color: 'var(--danger)',
         }}>
           {error}
@@ -118,16 +118,16 @@ export default function ApiKeys() {
             style={{
               background: 'var(--surface)',
               borderRadius: 'var(--radius-lg)',
-              padding: '32px',
+              padding: '16px',
               maxWidth: '500px',
               width: '90%',
             }}
             onMouseDown={hideCreated}
           >
-            <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: '16px' }}>
+            <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: '12px' }}>
               API Key mới đã tạo
             </h3>
-            <p style={{ fontSize: 'var(--text-base)', color: 'var(--text-dim)', marginBottom: '24px' }}>
+            <p style={{ fontSize: 'var(--text-base)', color: 'var(--text-dim)', marginBottom: '14px' }}>
               Đây là lần duy nhất bạn có thể xem key này. Vui lòng sao lưu ngay.
             </p>
             <div
@@ -135,11 +135,11 @@ export default function ApiKeys() {
                 background: 'var(--bg)',
                 border: '1px solid var(--border)',
                 borderRadius: 'var(--radius)',
-                padding: '12px',
+                padding: '10px',
                 fontFamily: 'monospace',
                 fontSize: '14px',
                 wordBreak: 'break-all',
-                marginBottom: '24px',
+                marginBottom: '14px',
                 userSelect: 'all',
                 cursor: 'text',
               }}
@@ -152,7 +152,7 @@ export default function ApiKeys() {
                 background: 'var(--gradient)',
                 color: '#fff',
                 border: 'none',
-                padding: '12px 24px',
+                padding: '10px 14px',
                 borderRadius: 'var(--radius)',
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -185,19 +185,19 @@ export default function ApiKeys() {
             style={{
               background: 'var(--surface)',
               borderRadius: 'var(--radius-lg)',
-              padding: '32px',
+              padding: '16px',
               maxWidth: '400px',
               width: '90%',
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: '16px' }}>
+            <h3 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: '12px' }}>
               Tạo API Key mới
             </h3>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '24px' }}>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '14px' }}>
               Key có toàn quyền truy cập API bằng tài khoản của bạn. Máy gọi gửi header <code>X-API-Key</code>.
             </p>
-            <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '14px' }}>
               <button
                 onClick={createKey}
                 disabled={loading}
@@ -206,7 +206,7 @@ export default function ApiKeys() {
                   background: 'var(--gradient)',
                   color: '#fff',
                   border: 'none',
-                  padding: '10px 20px',
+                  padding: '10px 12px',
                   borderRadius: 'var(--radius)',
                   fontWeight: 600,
                   cursor: loading ? 'not-allowed' : 'pointer',
@@ -223,7 +223,7 @@ export default function ApiKeys() {
                   background: 'var(--bg)',
                   color: 'var(--text-dim)',
                   border: '1px solid var(--border)',
-                  padding: '10px 20px',
+                  padding: '10px 12px',
                   borderRadius: 'var(--radius)',
                   fontWeight: 600,
                   cursor: 'pointer',
@@ -237,10 +237,10 @@ export default function ApiKeys() {
       )}
 
       {/* Keys list */}
-      <div style={{ display: 'grid', gap: '20px' }}>
+      <div style={{ display: 'grid', gap: '12px' }}>
         {keys.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '64px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-            <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔑</div>
+            <div style={{ fontSize: '48px', marginBottom: '12px' }}>🔑</div>
             <div style={{ color: 'var(--text-dim)' }}>Chưa có API key nào. Tạo key đầu tiên để bắt đầu.</div>
           </div>
         ) : (
@@ -251,7 +251,7 @@ export default function ApiKeys() {
                 background: 'var(--surface)',
                 border: '1px solid var(--border)',
                 borderRadius: 'var(--radius-lg)',
-                padding: '24px',
+                padding: '14px',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
@@ -273,7 +273,7 @@ export default function ApiKeys() {
                     background: 'var(--info-light)',
                     color: 'var(--info)',
                     border: 'none',
-                    padding: '8px 16px',
+                    padding: '8px 12px',
                     borderRadius: 'var(--radius)',
                     fontWeight: 600,
                     fontSize: 'var(--text-sm)',
@@ -289,7 +289,7 @@ export default function ApiKeys() {
                     background: 'var(--danger-light)',
                     color: 'var(--danger)',
                     border: 'none',
-                    padding: '8px 16px',
+                    padding: '8px 12px',
                     borderRadius: 'var(--radius)',
                     fontWeight: 600,
                     fontSize: 'var(--text-sm)',

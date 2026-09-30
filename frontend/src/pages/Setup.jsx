@@ -50,25 +50,25 @@ export default function Setup() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '32px',
+        padding: '16px',
       }}
     >
       <div
         style={{
           background: 'var(--surface)',
           borderRadius: 'var(--radius-lg)',
-          padding: '48px',
+          padding: '20px',
           width: '100%',
           maxWidth: '440px',
           textAlign: 'center',
         }}
       >
-        <h2 style={{ marginBottom: '12px', fontSize: 'var(--text-3xl)' }}>Tạo tài khoản mới</h2>
-        <p style={{ color: 'var(--text-dim)', marginBottom: '40px' }}>
+        <h2 style={{ marginBottom: '10px', fontSize: 'var(--text-3xl)' }}>Tạo tài khoản mới</h2>
+        <p style={{ color: 'var(--text-dim)', marginBottom: '20px' }}>
           Bắt đầu hành trình AI Voice của bạn
         </p>
 
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <input
             type="text"
             placeholder="Tên đầy đủ"
@@ -76,7 +76,7 @@ export default function Setup() {
             onChange={(e) => setName(e.target.value)}
             style={{
               width: '100%',
-              padding: '14px 16px',
+              padding: '12px 12px',
               borderRadius: 'var(--radius)',
               border: '1px solid var(--border)',
               fontSize: 'var(--text-base)',
@@ -92,7 +92,7 @@ export default function Setup() {
             onChange={(e) => setEmail(e.target.value)}
             style={{
               width: '100%',
-              padding: '14px 16px',
+              padding: '12px 12px',
               borderRadius: 'var(--radius)',
               border: '1px solid var(--border)',
               fontSize: 'var(--text-base)',
@@ -108,7 +108,7 @@ export default function Setup() {
             onChange={(e) => setPassword(e.target.value)}
             style={{
               width: '100%',
-              padding: '14px 16px',
+              padding: '12px 12px',
               borderRadius: 'var(--radius)',
               border: '1px solid var(--border)',
               fontSize: 'var(--text-base)',
@@ -124,7 +124,7 @@ export default function Setup() {
             onChange={(e) => setConfirm(e.target.value)}
             style={{
               width: '100%',
-              padding: '14px 16px',
+              padding: '12px 12px',
               borderRadius: 'var(--radius)',
               border: '1px solid var(--border)',
               fontSize: 'var(--text-base)',
@@ -142,7 +142,7 @@ export default function Setup() {
             type="submit"
             disabled={loading}
             style={{
-              padding: '14px 24px',
+              padding: '12px 14px',
               borderRadius: 'var(--radius)',
               background: 'var(--gradient)',
               color: '#fff',
@@ -155,7 +155,7 @@ export default function Setup() {
           >
             {loading ? 'Đang tạo tài khoản...' : 'Tạo tài khoản'}
           </button>
-          <div style={{ textAlign: 'center', marginTop: '16px' }}>
+          <div style={{ textAlign: 'center', marginTop: '12px' }}>
             <span style={{ color: 'var(--text-dim)', fontSize: 'var(--text-sm)' }}>
               Đã có tài khoản?{' '}
               <button

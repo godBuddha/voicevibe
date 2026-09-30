@@ -43,7 +43,7 @@ THEME_CSS = """
   --chart-tts:#22c58b; --chart-stt:#38bdf8; --chart-translate:#7c5cff;
   --chart-dub:#a78bfa; --chart-subtitle:#ffb020; --chart-other:#ff8a4c;
   /* --- số đo layout (KHÔNG theme) --- */
-  --side-w:248px; --top-h:60px;
+  --side-w:224px; --top-h:48px;
 }
 
 html[data-theme="dark"] {

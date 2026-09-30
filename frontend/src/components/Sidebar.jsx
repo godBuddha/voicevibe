@@ -11,9 +11,9 @@ const navigation = [
       // LƯU Ý: bản mock từng có thêm mục "TTS Studio" cũng trỏ /tts — hai mục
       // cùng một trang nên bấm vào đâu cũng sáng cả hai. Hệ thống chỉ có MỘT
       // tính năng TTS, mục thừa đã bỏ.
-      // Chưa có pipeline phụ-đề→giọng-nói: để '#' (hạng mục bị khoá) thay vì
-      // trỏ /dub — bản mock trỏ bừa khiến highlight nhầm trên /dub.
-      { label: 'Chuyển phụ đề thành giọng nói', to: '#' },
+      // Mục "Chuyển phụ đề thành giọng nói" của mock cũng đã bỏ: backend chỉ
+      // có 5 loại job (tts/stt/translate/dub/subtitle), KHÔNG có pipeline
+      // phụ-đề→giọng-nói — giữ lại chỉ tạo link chết bấm không ăn.
       { label: 'Tạo giọng nói của riêng bạn', to: '/voices' },
     ],
   },

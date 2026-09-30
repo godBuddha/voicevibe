@@ -39,7 +39,7 @@ export default function STT() {
         timeoutMs: 30 * 60 * 1000,
       });
       if (done.status === 'failed') {
-        setError(done.error || 'Nhận dạng thất bại (credit đã hoàn lại).');
+        setError(done.error || 'Nhận dạng thất bại.');
       } else {
         const res = await getResult(created.jobId);
         // Kết quả là file SRT thật — phân tích để có transcript + người nói
@@ -50,7 +50,7 @@ export default function STT() {
           id: i + 1, speaker: c.speaker || '', start: c.start, end: c.end, text: c.text,
         })));
         if (!cues.length) {
-          setError('Không nhận dạng được lời nói nào trong file (chỉ có nhạc/tiếng ồn?) — job đã chạy xong, credit không bị mất.');
+          setError('Không nhận dạng được lời nói nào trong file (chỉ có nhạc/tiếng ồn?) — job đã chạy xong, không mất gì.');
         }
       }
     } catch (err) {

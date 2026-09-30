@@ -82,6 +82,10 @@ assert rows == before == 1, "migration làm mất row!"
 assert keys == 1, "migration làm mất api_keys!"
 assert role == "user", f"backfill role sai: {role!r}"
 assert len(new_cols) == 5 and len(new_tabs) == 6
+# (5b) di sản credits phải được DROP: cột users.credits + bảng credit_ledger.
+assert "credits" not in cols, "cột users.credits chưa bị drop!"
+assert "credit_ledger" not in tables, "bảng credit_ledger chưa bị drop!"
+print(f"5b. di sản credits đã DROP: users.credits + credit_ledger (số dư cũ 42 bỏ)")
 
 # (6) Idempotent.
 ensure_schema(engine)

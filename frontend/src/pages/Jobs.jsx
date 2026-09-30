@@ -127,15 +127,15 @@ export default function Jobs() {
   // % hiển thị an toàn (trước đây toFixed trên giá trị lạ → NaN% trên UI).
   const fmtPercent = (p) => (Number.isFinite(Number(p)) ? Number(p).toFixed(1) : '0.0');
 
-  // HỦY / XÓA. Hủy = job còn hoạt động (server hoàn credit); Xóa = job đã
-  // kết thúc (dọn khỏi lịch sử + file kết quả riêng). Hành động trên hàng nào
-  // phải stopPropagation — hàng là vùng bấm chọn chi tiết.
+  // HỦY / XÓA. Hủy = job còn hoạt động (miễn phí — không trừ, không hoàn gì);
+  // Xóa = job đã kết thúc (dọn khỏi lịch sử + file kết quả riêng). Hành động
+  // trên hàng nào phải stopPropagation — hàng là vùng bấm chọn chi tiết.
   const [actionError, setActionError] = useState(null);
   const [busyId, setBusyId] = useState(null);
 
   const doCancel = async (job, e) => {
     e.stopPropagation();
-    if (!window.confirm(`Hủy job này? Credit đã trừ sẽ được hoàn lại (${job.credits || 0} credits).`)) return;
+    if (!window.confirm('Hủy job này? Job đang chờ/xử lý sẽ bị dừng.')) return;
     setBusyId(job.id);
     setActionError(null);
     try {
@@ -282,9 +282,6 @@ export default function Jobs() {
                           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, padding: '2px 8px', borderRadius: 'var(--radius-xs)', background: status.bg, color: status.color, whiteSpace: 'nowrap' }}>
                             {status.label}
                           </span>
-                          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dim)' }}>
-                            {job.credits ? `${job.credits.toLocaleString('vi-VN')} credits` : ''}
-                          </span>
                         </div>
                         <div style={{ fontSize: 'var(--text-base)', fontWeight: 600, marginBottom: '8px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {job.label}
@@ -401,16 +398,11 @@ export default function Jobs() {
                     <span style={{ color: 'var(--text-dim)' }}>Ngày tạo</span>
                     <span style={{ fontWeight: 600 }}>{formatDate(selectedJob.createdAt)}</span>
                   </div>
-                  {selectedJob.status === 'done' && selectedJob.updatedAt && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  {selectedJob.status === 'done' && selectedJob.updatedAt && (                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--text-dim)' }}>Hoàn thành</span>
                       <span style={{ fontWeight: 600 }}>{formatDate(selectedJob.updatedAt)}</span>
                     </div>
                   )}
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--text-dim)' }}>Credits</span>
-                    <span style={{ fontWeight: 600 }}>{(selectedJob.credits || 0).toLocaleString('vi-VN')}</span>
-                  </div>
                   {selectedJob.status === 'failed' && selectedJob.error && (
                     <div style={{ padding: '12px', borderRadius: 'var(--radius)', background: 'var(--danger-light)', color: 'var(--danger)', whiteSpace: 'pre-wrap' }}>
                       {selectedJob.error}

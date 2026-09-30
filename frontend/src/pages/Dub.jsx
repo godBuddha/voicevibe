@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { useApi } from '../hooks/useApi.jsx';
-import { useAuth } from '../hooks/useAuth.jsx';
 import { uploadMedia, createJob, pollJob, getResult } from '../api/jobs.js';
 
 const LANGUAGES = {
@@ -23,7 +22,6 @@ const fmtTime = (s) => {
 };
 
 export default function Dub() {
-  const { user } = useAuth();
   const { api } = useApi();
   const fileInputRef = useRef(null);
   const [file, setFile] = useState(null);
@@ -33,16 +31,13 @@ export default function Dub() {
   const [demucsEnabled, setDemucsEnabled] = useState(false);
   const [voices, setVoices] = useState([]);
   const [cloneVoiceId, setCloneVoiceId] = useState('');
-  const [pricing, setPricing] = useState({});
-  const [estimate, setEstimate] = useState(null);
+  const [duration, setDuration] = useState(null);
   const [job, setJob] = useState(null);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [dragActive, setDragActive] = useState(false);
 
-  // Giọng clone + bảng giá thật: trước đây chưa từng tải cả hai (voices gọi
-  // 405, pricing không ai gọi) — ước tính credit là số bịa 50/phút.
   useEffect(() => {
     (async () => {
       try {
@@ -50,19 +45,8 @@ export default function Dub() {
       } catch (e) {
         console.error('tải danh sách giọng thất bại', e);
       }
-      try {
-        setPricing(await api.get('/v1/pricing'));
-      } catch (e) {
-        console.error('tải bảng giá thất bại', e);
-      }
     })();
   }, [api]);
-
-  // Bảng giá về sau khi người dùng đã chọn file (mạng chậm) → tính lại ước
-  // tính, không để "0 credits" đứng đời (đã gặp thật qua tunnel).
-  useEffect(() => {
-    if (file && estimate && !estimate.credits) calcEstimate(file);
-  }, [pricing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cloneVoice = voices.find((v) => String(v.id) === String(cloneVoiceId));
 
@@ -70,11 +54,11 @@ export default function Dub() {
     if (!f) return;
     if (f.type.startsWith('video/') || f.type.startsWith('audio/')) {
       setFile(f);
-      setEstimate(null);
+      setDuration(null);
       setResult(null);
       setJob(null);
       setError(null);
-      calcEstimate(f);
+      readDuration(f);
     } else {
       alert('Chỉ hỗ trợ file video hoặc audio');
     }
@@ -95,19 +79,18 @@ export default function Dub() {
     }
   };
 
-  // Ước tính THẬT: thời lượng đọc từ metadata file (trước đây cứng 180 giây)
-  // và credit là GIÁ PHẲNG mỗi job theo bảng giá backend — server không thu
-  // theo phút (đã gặp thật: con số ước tính luôn sai với mọi file).
-  const calcEstimate = async (f) => {
+  // Thời lượng THẬT đọc từ metadata file (trước đây cứng 180 giây) — hiển thị
+  // trên panel "Thông tin tệp", không gắn với bất kỳ con số tiền nào.
+  const readDuration = async (f) => {
     const url = URL.createObjectURL(f);
     try {
-      const duration = await new Promise((resolve) => {
+      const d = await new Promise((resolve) => {
         const a = new Audio();
         a.onloadedmetadata = () => resolve(a.duration || 0);
         a.onerror = () => resolve(0);
         a.src = url;
       });
-      setEstimate({ credits: Number(pricing.dub) || 0, duration });
+      setDuration(d);
     } finally {
       URL.revokeObjectURL(url);
     }
@@ -145,7 +128,7 @@ export default function Dub() {
         timeoutMs: 45 * 60 * 1000,
       });
       if (done.status === 'failed') {
-        setError(done.error || 'Job thất bại (credit đã hoàn lại).');
+        setError(done.error || 'Job thất bại.');
       } else {
         setResult(await getResult(created.jobId));
       }
@@ -348,10 +331,7 @@ export default function Dub() {
           {/* Start button */}
           <div>
             <button
-              disabled={
-                !file || isProcessing || (voiceOption === 'clone' && !cloneVoice) ||
-                (estimate && estimate.credits > (user?.credits || 0))
-              }
+              disabled={!file || isProcessing || (voiceOption === 'clone' && !cloneVoice)}
               onClick={startDub}
               style={{
                 background: 'var(--gradient)',
@@ -366,13 +346,7 @@ export default function Dub() {
                 maxWidth: '320px',
               }}
             >
-              {estimate && estimate.credits > (user?.credits || 0)
-                ? `Không đủ credits (cần ${estimate.credits.toLocaleString('vi-VN')})`
-                : isProcessing
-                ? 'Đang xử lý...'
-                : estimate
-                ? `Bắt đầu dịch (${estimate.credits.toLocaleString('vi-VN')} credits)`
-                : 'Chọn file để tính credit'}
+              {isProcessing ? 'Đang xử lý...' : file ? 'Bắt đầu dịch' : 'Chọn file để bắt đầu'}
             </button>
             {voiceOption === 'clone' && !cloneVoice && (
               <div style={{ marginTop: '8px', fontSize: 'var(--text-sm)', color: 'var(--warning)' }}>
@@ -407,10 +381,10 @@ export default function Dub() {
           )}
         </div>
 
-        {/* Right: Estimation & Pipeline */}
+        {/* Right: Thông tin tệp & Pipeline */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-          {/* Estimate */}
-          {estimate && (
+          {/* Thời lượng đọc thật từ file — không có con số tiền nào */}
+          {file && duration !== null && (
             <div
               style={{
                 background: 'var(--surface)',
@@ -419,21 +393,15 @@ export default function Dub() {
                 padding: '24px',
               }}
             >
-              <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: '20px', fontWeight: 600 }}>Ước tính</h3>
+              <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: '20px', fontWeight: 600 }}>Thông tin tệp</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-base)' }}>
                   <span style={{ color: 'var(--text-dim)' }}>Thời lượng</span>
-                  <span style={{ fontWeight: 600 }}>{fmtTime(estimate.duration)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-base)' }}>
-                  <span style={{ color: 'var(--text-dim)' }}>Credits</span>
-                  <span style={{ fontWeight: 600, color: 'var(--primary)' }}>
-                    {estimate.credits.toLocaleString('vi-VN')} (giá phẳng mỗi job)
-                  </span>
+                  <span style={{ fontWeight: 600 }}>{fmtTime(duration)}</span>
                 </div>
                 <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginTop: '12px' }}>
-                  {demucsEnabled && '+ Demucs (tách nhạc nền) • '}
-                  Giá theo bảng giá hệ thống, đọc từ server
+                  {demucsEnabled && 'Đã bật tách nhạc nền (Demucs) • '}
+                  Lồng tiếng chạy nhiều bước nên mất từ vài phút trở lên, tùy máy.
                 </div>
               </div>
             </div>

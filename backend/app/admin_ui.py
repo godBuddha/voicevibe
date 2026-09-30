@@ -206,11 +206,9 @@ function renderUsers(users) {
     <td><b>${esc(u.email)}</b>${u.has_password ? "" : ' <span class="mut">(chưa có mật khẩu)</span>'}</td>
     <td>${u.role === "admin" ? '<span class="badge admin">Quản trị</span>' : '<span class="badge">Người dùng</span>'}</td>
     <td>${u.is_active ? '<span class="badge">Hoạt động</span>' : '<span class="badge off">Đã khoá</span>'}</td>
-    <td>${u.credits.toLocaleString("vi-VN")}</td>
     <td class="mut">${u.last_login_at ? new Date(u.last_login_at * 1000).toLocaleString("vi-VN") : "—"}</td>
     <td><div class="row-actions">
       <button class="ghost" onclick="resetPw('${esc(u.user_id)}', '${esc(u.email)}')">Đặt lại mật khẩu</button>
-      <button class="ghost" onclick="grantCredits('${esc(u.user_id)}')">Cấp credits</button>
       ${u.is_active
         ? `<button class="ghost" onclick="toggleActive('${esc(u.user_id)}', false)">Vô hiệu hóa</button>`
         : `<button class="ghost" onclick="toggleActive('${esc(u.user_id)}', true)">Kích hoạt</button>`}
@@ -229,7 +227,7 @@ function renderUsers(users) {
     </div>
     <div class="card"><h2>Người dùng (${users.length})</h2>
       <table class="users"><thead><tr><th>Email</th><th>Vai trò</th><th>Trạng thái</th>
-        <th>Credits</th><th>Đăng nhập gần nhất</th><th></th></tr></thead>
+        <th>Đăng nhập gần nhất</th><th></th></tr></thead>
         <tbody>${rows}</tbody></table>
       <p class="sub" style="margin-top:14px">Đăng ký công khai ${users.length ? "" : ""}do Admin bật/tắt
         ở Cấu hình hệ thống → <code>auth.allow_signup</code>.</p>
@@ -253,15 +251,6 @@ async function resetPw(id, email) {
   const d = await r.json();
   flash(r.ok ? `✔ đã đổi mật khẩu (${d.sessions_revoked} phiên bị đăng xuất)` : "✗ " + (d.detail || r.status),
         r.ok ? "ok" : "err");
-  loadUsers();
-}
-async function grantCredits(id) {
-  const v = prompt("Số credits muốn cấp thêm (dùng số âm để trừ):", "1000");
-  if (!v) return;
-  const r = await api(`/v1/admin/users/${id}/credits`,
-                      { method: "POST", body: JSON.stringify({ delta: parseInt(v, 10) || 0 }) });
-  const d = await r.json();
-  flash(r.ok ? `✔ số dư mới: ${d.credits}` : "✗ " + (d.detail || r.status), r.ok ? "ok" : "err");
   loadUsers();
 }
 async function toggleActive(id, active) {

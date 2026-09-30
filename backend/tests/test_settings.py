@@ -53,7 +53,10 @@ print("masking ................... OK")
 set_setting("max_speed", 1.4)
 assert get_setting("max_speed") == 1.4
 assert get_setting("no.such.key", "fallback") == "fallback"
-assert get_setting("pricing.dub") == 60
+# key pricing.* đã GỠ khỏi registry (hệ thống credits bãi bỏ) — caller default
+# là con đường duy nhất, và key cũ tuyệt đối không hồi sinh.
+assert get_setting("pricing.dub") is None
+assert get_setting("max_speed", 7) == 1.4
 print("defaults + custom get ..... OK")
 
 # 4) env fallback when DB empty
@@ -82,7 +85,9 @@ items = {s["key"]: s for s in r.json()["settings"]}
 assert items["hf_token"]["value"].startswith("••••")
 assert items["hf_token"]["is_secret"] is True
 assert items["hf_token"]["set_in_db"] is True
-assert items["pricing.dub"]["value"] == 60
+# registry không còn key pricing.* (đã gỡ cùng hệ thống credits)
+assert not any(k.startswith("pricing.") for k in items), \
+    sorted(k for k in items if k.startswith("pricing."))
 
 r = c.put("/v1/admin/settings/translate.model", headers=AH, json={"value": "deepseek-chat"})
 assert r.status_code == 200

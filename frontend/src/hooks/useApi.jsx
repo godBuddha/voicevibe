@@ -19,7 +19,6 @@ const REAL_ADAPTERS = {
   // (Trước đây ApiKeys setKeys({keys: []}) rồi keys.map → TypeError trắng trang.)
   '/v1/voices': (d) => (d.voices || []).map(adaptVoice),
   '/v1/keys': (d) => d.keys || [],
-  '/v1/pricing': (d) => d.pricing || {},
 };
 
 export function ApiProvider({ children }) {

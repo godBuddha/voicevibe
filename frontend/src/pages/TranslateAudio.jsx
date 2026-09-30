@@ -1,6 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useApi } from '../hooks/useApi.jsx';
-import { useAuth } from '../hooks/useAuth.jsx';
 import { uploadMedia, createJob, pollJob, getResult, parseSrt } from '../api/jobs.js';
 
 // Bảng ngôn ngữ — giữ một bộ giống Subtitle.jsx / TranslateText.jsx.
@@ -12,12 +11,10 @@ const LANGUAGES = {
 
 export default function TranslateAudio() {
   const { api } = useApi();
-  const { user } = useAuth();
   const fileInputRef = useRef(null);
   const [file, setFile] = useState(null);
   const [sourceLang, setSourceLang] = useState('vi');
   const [targetLang, setTargetLang] = useState('en');
-  const [pricing, setPricing] = useState({});
   const [stage, setStage] = useState(null); // 'stt' | 'translate'
   const [sttJob, setSttJob] = useState(null);
   const [trJob, setTrJob] = useState(null);
@@ -25,16 +22,6 @@ export default function TranslateAudio() {
   const [translated, setTranslated] = useState(null);
   const [error, setError] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        setPricing(await api.get('/v1/pricing'));
-      } catch (e) {
-        console.error('tải bảng giá thất bại', e);
-      }
-    })();
-  }, [api]);
 
   const handleFile = (f) => {
     if (f && (f.type.startsWith('video/') || f.type.startsWith('audio/'))) {
@@ -57,8 +44,8 @@ export default function TranslateAudio() {
     setTranslated(null);
     try {
       // Hai giai đoạn dùng nguyên hai job có sẵn trong server — KHÔNG bịa
-      // pipeline mới: (1) nghe ra chữ (type=stt, trả SRT), (2) dịch cả khối
-      // chữ (type=translate). Nghĩa là giá cũng cộng đúng bảng giá: stt + translate.
+      // pipeline mới: (1) nghe ra chữ (type=stt, trả SRT), (2) dịch cả khối chữ
+      // (type=translate). Cả hai job hiện đầy đủ trong Lịch sử Jobs.
       const media_url = await uploadMedia(file);
 
       setStage('stt');
@@ -69,7 +56,7 @@ export default function TranslateAudio() {
         onUpdate: setSttJob, timeoutMs: 30 * 60 * 1000,
       });
       if (sttDone.status === 'failed') {
-        throw new Error(sttDone.error || 'Nghe ra chữ thất bại (credit đã hoàn lại).');
+        throw new Error(sttDone.error || 'Nghe ra chữ thất bại.');
       }
       const sttRes = await getResult(sttCreated.jobId);
       // to_srt (stt.py) gắn nhãn người nói ở CUỐI dòng: "text [SPEAKER_00]" —
@@ -97,7 +84,7 @@ export default function TranslateAudio() {
         onUpdate: setTrJob, timeoutMs: 15 * 60 * 1000,
       });
       if (trDone.status === 'failed') {
-        throw new Error(trDone.error || 'Dịch thất bại (credit đã hoàn lại).');
+        throw new Error(trDone.error || 'Dịch thất bại.');
       }
       const trRes = await getResult(trCreated.jobId);
       setTranslated(trRes.content ?? '');
@@ -120,8 +107,6 @@ export default function TranslateAudio() {
   };
 
   const baseName = file?.name?.replace(/\.[^.]+$/, '') || 'am-thanh';
-  const sttPrice = Number(pricing.stt) || 0;
-  const trPrice = Number(pricing.translate) || 0;
 
   const stageLabel = {
     stt: 'Giai đoạn 1/2 — nghe ra chữ',
@@ -261,7 +246,7 @@ export default function TranslateAudio() {
                 maxWidth: '360px',
               }}
             >
-              Dịch âm thanh ({(sttPrice + trPrice).toLocaleString('vi-VN')} credits)
+              Dịch âm thanh
             </button>
           )}
 
@@ -372,24 +357,6 @@ export default function TranslateAudio() {
 
         {/* Right sidebar */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
-            <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '12px' }}>
-              💰 Chi phí
-            </h4>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', lineHeight: 1.8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Số dư:</span>
-                <strong style={{ color: 'var(--primary)' }}>
-                  {(user?.credits || 0).toLocaleString('vi-VN')}
-                </strong>
-              </div>
-              <div style={{ marginTop: '8px', color: 'var(--text-dim)' }}>
-                Nghe ra chữ: <strong>{sttPrice.toLocaleString('vi-VN')}</strong> + dịch:{' '}
-                <strong>{trPrice.toLocaleString('vi-VN')}</strong> credits (đọc từ server)
-              </div>
-            </div>
-          </div>
-
           <div style={{ background: 'var(--info-light)', border: '1px solid var(--info)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
             <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '12px', color: 'var(--info)' }}>
               💡 Mẹo

@@ -71,10 +71,10 @@ def seed_demo() -> None:
         if db.scalar(select(User).where(User.email == ADMIN_EMAIL)):
             return
         admin = User(email=ADMIN_EMAIL, role=ROLE_ADMIN,
-                     password_hash=hash_password(DEMO_PASSWORD), credits=49_858)
+                     password_hash=hash_password(DEMO_PASSWORD))
         db.add(admin)
         db.flush()
-        u = User(email="creator@demo", credits=49_858,
+        u = User(email="creator@demo",
                  password_hash=hash_password(DEMO_PASSWORD))
         db.add(u)
         db.flush()
@@ -82,12 +82,12 @@ def seed_demo() -> None:
                      engine="vieneu", ref_s3_key="voices/demo/ref.wav"))
         db.add(Voice(user_id=u.id, name="Mai Anh (preset)", lang="vi",
                      engine="vieneu", ref_s3_key=""))
-        for t, st, pr, cost, key in [("dub", JobStatus.done, 100, 60, None),
-                                     ("stt", JobStatus.done, 100, 5, "jobs/demo/transcript.srt"),
-                                     ("tts", JobStatus.running, 45, 10, None),
-                                     ("translate", JobStatus.queued, 0, 2, None)]:
+        for t, st, pr, key in [("dub", JobStatus.done, 100, None),
+                               ("stt", JobStatus.done, 100, "jobs/demo/transcript.srt"),
+                               ("tts", JobStatus.running, 45, None),
+                               ("translate", JobStatus.queued, 0, None)]:
             db.add(Job(user_id=u.id, type=t, status=st, progress=pr,
-                       credits_charged=cost, result_s3_key=key, params={"type": t}))
+                       result_s3_key=key, params={"type": t}))
 
         # Nhà cung cấp AI demo để tab AI không trống trong ảnh chụp — khoá là giá trị
         # GIẢ, và chỉ hiển thị dạng mask nên không lộ gì.

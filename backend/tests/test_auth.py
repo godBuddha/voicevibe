@@ -10,7 +10,7 @@ Mọi ca ở đây tương ứng một hành vi BẢO MẬT cụ thể, không p
   6.  Dev key (VOICEVIBE_API_KEYS) CHẾT sau khi đã có admin — không còn backdoor env
   7.  X-Admin-Key chỉ hoạt động khi `admin.api_key` được đặt tường minh
   8.  Công tắc `auth.allow_signup` (mặc định TẮT) + signup không bao giờ tạo admin
-  9.  voice_id của người khác -> 404 TRƯỚC khi trừ credit (không mất tiền oan)
+  9.  voice_id của người khác -> 404 TRƯỚC khi tạo job (job không được sinh ra)
   10. /media: chủ sở hữu đọc được, người khác 404, key đã thu hồi 401, admin đọc được
   11. scrypt: verify đúng/sai, hash hỏng, needs_rehash
   12. Chống tự khoá admin cuối cùng
@@ -244,7 +244,7 @@ assert r.json()["key"].startswith("vv_")
 set_setting("auth.allow_signup", False, is_secret=False, category="security")
 print("bật signup -> tạo user thường ........... OK")
 
-# ------------------------------------------- 10. quyền sở hữu voice (trước charge)
+# ------------------------------------------- 10. quyền sở hữu voice (trước khi tạo job)
 RL.reset()
 with SessionLocal() as db:
     other = db.scalar(__import__("sqlalchemy").select(User).where(User.email == "user@local"))
@@ -253,13 +253,15 @@ with SessionLocal() as db:
     db.add(v)
     db.commit()
     vid, other_id = v.id, other.id
-    before = other.credits
 
 r = c.post("/v1/jobs", json={"type": "tts", "text": "xin chào", "voice_id": vid})
 assert r.status_code == 404, f"admin dùng voice của người khác phải 404: {r.text}"
 with SessionLocal() as db:
-    assert db.get(User, other_id).credits == before, "voice không hợp lệ mà vẫn bị trừ credit!"
-print("voice của người khác -> 404, không trừ .. OK")
+    # job KHÔNG được phép sinh ra (trước đây job vẫn tạo rồi fail ở worker).
+    from sqlalchemy import select as _sel
+    assert db.scalar(_sel(__import__("sqlalchemy").func.count())
+                     .select_from(Job).where(Job.user_id == other_id)) == 0
+print("voice của người khác -> 404, không tạo job OK")
 
 # ------------------------------------------------------- 11. quyền sở hữu media
 RL.reset()
@@ -343,13 +345,14 @@ r = c.post("/v1/admin/users", json={"email": "tao-boi-admin@local",
                                     "password": "matkhau000", "role": "user"})
 assert r.status_code == 201, r.text
 created = r.json()
-assert created["credits"] == 50_000
+# hệ thống credits đã gỡ: payload user không còn field `credits`
+assert "credits" not in created, created
 rl = c.get("/v1/admin/users").json()["users"]
 assert any(u["user_id"] == created["user_id"] for u in rl)
+assert all("credits" not in u for u in rl), "admin list còn field credits!"
+# endpoint cấp credit cũ phải biến mất hẳn (404 — route không tồn tại)
 r = c.post(f"/v1/admin/users/{created['user_id']}/credits", json={"delta": -1000})
-assert r.status_code == 200 and r.json()["credits"] == 49_000
-assert c.post(f"/v1/admin/users/{created['user_id']}/credits",
-              json={"delta": -999_999}).status_code == 422
+assert r.status_code == 404, f"endpoint cấp credit còn sống: {r.text}"
 r = c.post(f"/v1/admin/users/{created['user_id']}/deactivate")
 assert r.status_code == 200 and r.json()["is_active"] is False
 # user bị khoá thì không đăng nhập được
@@ -358,7 +361,7 @@ blk = TestClient(app)
 assert blk.post("/v1/auth/login",
                 json={"email": "tao-boi-admin@local",
                       "password": "matkhau000"}).status_code == 401
-print("admin tạo/khoá user, cấp credits ........ OK")
+print("admin tạo/khoá user (không credits) ..... OK")
 
 # reset mật khẩu -> đá phiên cũ ra
 # Lưu ý: KHÔNG dùng `c` để đăng nhập user thường — nó sẽ ghi đè cookie admin của `c`.

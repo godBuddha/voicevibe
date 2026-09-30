@@ -1,23 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi.jsx';
-import { useAuth } from '../hooks/useAuth.jsx';
 import { createJob, pollJob, getResult } from '../api/jobs.js';
 
 export default function TTS() {
-  const { user } = useAuth();
   const { api } = useApi();
   const [text, setText] = useState('');
   const [selectedVoice, setSelectedVoice] = useState(null);
   const [voices, setVoices] = useState([]);
-  const [pricing, setPricing] = useState({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [audioUrl, setAudioUrl] = useState(null);
   const [result, setResult] = useState(null);
   const [job, setJob] = useState(null);
   const [error, setError] = useState(null);
 
-  // Giọng thật từ GET /v1/voices + bảng giá thật — trước đây gọi 405 nên grid
-  // giọng trống trơn, và "Dùng tới ~N credits" là phép chia bịa.
+  // Giọng thật từ GET /v1/voices — trước đây gọi 405 nên grid giọng trống trơn.
   useEffect(() => {
     (async () => {
       try {
@@ -26,11 +22,6 @@ export default function TTS() {
         if (list.length > 0) setSelectedVoice(list[0].id);
       } catch (e) {
         console.error('tải danh sách giọng thất bại', e);
-      }
-      try {
-        setPricing(await api.get('/v1/pricing'));
-      } catch (e) {
-        console.error('tải bảng giá thất bại', e);
       }
     })();
   }, [api]);
@@ -53,7 +44,7 @@ export default function TTS() {
       });
       const done = await pollJob(created.jobId, { onUpdate: setJob, timeoutMs: 10 * 60 * 1000 });
       if (done.status === 'failed') {
-        setError(done.error || 'Tạo giọng nói thất bại (credit đã hoàn lại).');
+        setError(done.error || 'Tạo giọng nói thất bại.');
       } else {
         const res = await getResult(created.jobId);
         setResult(res);
@@ -163,7 +154,7 @@ export default function TTS() {
               maxWidth: '240px',
             }}
           >
-            {isGenerating ? 'Đang tạo giọng nói...' : `Tạo giọng nói (${(Number(pricing.tts) || 10).toLocaleString('vi-VN')} credits)`}
+            {isGenerating ? 'Đang tạo giọng nói...' : 'Tạo giọng nói'}
           </button>
 
           {/* Error */}
@@ -219,28 +210,8 @@ export default function TTS() {
           )}
         </div>
 
-        {/* Right sidebar: Credits and waveform placeholder */}
+        {/* Right sidebar: waveform placeholder */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-          {/* Credits usage */}
-          <div
-            style={{
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '24px',
-            }}
-          >
-            <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: '16px', fontWeight: 700 }}>
-              Credits
-            </h3>
-            <div style={{ fontSize: 'var(--text-base)', color: 'var(--text)', marginBottom: '8px' }}>
-              Số dư: <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{(user?.credits || 0).toLocaleString('vi-VN')}</span>
-            </div>
-            <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
-              Giá tạo giọng nói: {(Number(pricing.tts) || 10).toLocaleString('vi-VN')} credits/job (đọc từ server)
-            </div>
-          </div>
-
           {/* Waveform placeholder */}
           <div
             style={{

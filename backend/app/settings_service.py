@@ -3,8 +3,8 @@
 Bootstrap secrets that MUST stay in env (unavoidable at boot):
   DATABASE_URL, SETTINGS_MASTER_KEY (encrypts secret settings at rest)
 
-Everything else — API keys, provider endpoints, model configs, pricing,
-feature flags — lives in the `settings` table, edited via the admin UI.
+Everything else — API keys, provider endpoints, model configs, feature
+flags — lives in the `settings` table, edited via the admin UI.
 Env vars act as dev fallback ONLY when the DB has no entry for a key.
 
 Selftest: tests/test_settings.py
@@ -48,16 +48,6 @@ SETTING_DEFS: list[dict] = [
      "default": "./media"},
     {"key": "max_speed", "category": "dubbing", "secret": False,
      "label": "Max speech tempo before re-translate", "default": 1.35},
-    {"key": "pricing.tts", "category": "pricing", "secret": False,
-     "label": "TTS credits/job", "default": 10},
-    {"key": "pricing.stt", "category": "pricing", "secret": False,
-     "label": "STT credits/job", "default": 5},
-    {"key": "pricing.translate", "category": "pricing", "secret": False,
-     "label": "Translate credits/job", "default": 2},
-    {"key": "pricing.dub", "category": "pricing", "secret": False,
-     "label": "Dub credits/job", "default": 60},
-    {"key": "pricing.subtitle", "category": "pricing", "secret": False,
-     "label": "Subtitle credits/job", "default": 8},
     {"key": "auth.allow_signup", "category": "security", "secret": False,
      "label": "Cho phép đăng ký công khai", "default": False},
     {"key": "admin.api_key", "category": "security", "secret": True,

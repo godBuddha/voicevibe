@@ -48,27 +48,15 @@ PIPELINES: dict[str, str] = {
 
 
 def _set_failed(job, exc: Exception, db) -> None:
-    """Mark failed + REFUND charged credits — failed jobs are free.
-
-   Job.credits_charged is zeroed (history stays in the ledger rows); the
-    refund is a positive ledger row with reason `refund:job:<type>`.
-    """
-    from .models import CreditLedger, JobStatus, Job, User
+    """Mark failed — job miễn phí (self-host), không trừ, không hoàn credit."""
+    from .models import JobStatus
 
     if job.status == JobStatus.cancelled:
-        # Đã hủy — không ghi đè thành failed, credit đã hoàn ở bước hủy rồi.
+        # Đã hủy — không ghi đè thành failed.
         return
     job.status = JobStatus.failed
     job.error = str(exc)[:500]
     job.progress = 100
-    charged = job.credits_charged or 0
-    if charged:
-        user = db.get(User, job.user_id)
-        if user is not None:
-            user.credits += charged
-            db.add(CreditLedger(user_id=user.id, delta=charged,
-                                reason=f"refund:job:{job.type}", job_id=job.id))
-            job.credits_charged = 0
 
 
 def _notify(url: str | None, payload: dict) -> None:
@@ -464,8 +452,8 @@ def _aborted(db, job_id: str) -> bool:
     Mỗi `_run_*` gọi ngay sau khi fetch job, TRƯỚC khi set status=running:
     nếu không có gate này, worker nhặt được task (requeue sau terminate, hoặc
     task đã vào hàng đợi trước lúc hủy) sẽ set running lại và ghi đè trạng thái
-    `cancelled` + tiền hoàn của người dùng (resurrect — đã gặp kiểu bug ngược
-    chiều này ở code khác). Trả kết quả bỏ qua: message được ack, không lặp.
+    `cancelled` (resurrect — đã gặp kiểu bug ngược chiều này ở code khác).
+    Trả kết quả bỏ qua: message được ack, không lặp.
     """
     from .models import Job, JobStatus
 

@@ -54,7 +54,7 @@ export default function Subtitle() {
         onUpdate: setJob, timeoutMs: 30 * 60 * 1000,
       });
       if (done.status === 'failed') {
-        setError(done.error || 'Tạo phụ đề thất bại (credit đã hoàn lại).');
+        setError(done.error || 'Tạo phụ đề thất bại.');
       } else {
         const res = await getResult(created.jobId);
         setResultKey(res);

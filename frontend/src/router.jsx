@@ -16,7 +16,6 @@ import ApiKeys from './pages/ApiKeys.jsx';
 import AdminUsers from './pages/admin/Users.jsx';
 import AdminModelHub from './pages/admin/ModelHub.jsx';
 import AdminSettings from './pages/admin/Settings.jsx';
-import Pricing from './pages/Pricing.jsx';
 
 function protectedLoader() {
   // BẪY: bản sinh đầu tiên viết `!localStorage.getItem(...) === 'true'` —
@@ -74,7 +73,6 @@ export default createBrowserRouter([
       { path: 'translate-audio', element: <TranslateAudio /> },
       { path: 'jobs', element: <Jobs /> },
       { path: 'api-keys', element: <ApiKeys /> },
-      { path: 'pricing', element: <Pricing /> },
       {
         path: 'admin',
         element: <RequireAdmin><Outlet /></RequireAdmin>,

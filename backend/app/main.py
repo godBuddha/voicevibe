@@ -1,9 +1,9 @@
 """
 VoiceVibe API.
 
-Persistence: Postgres (prod) / SQLite (dev) + Celery dispatch + credit metering.
+Persistence: Postgres (prod) / SQLite (dev) + Celery dispatch.
 Feature surface (mirrors sản phẩm gốc — xem README):
-  jobs:    tts | stt | translate | dub | subtitle   (async, credit-metered)
+  jobs:    tts | stt | translate | dub | subtitle   (async — self-host, miễn phí)
   voices:  reusable zero-shot voice profiles (5-10s reference clip)
   auth:    phiên cookie cho web + X-API-Key cho máy gọi (xem app/auth.py)
 
@@ -32,8 +32,6 @@ from .db import get_db
 from .migrations import ensure_schema
 from .models import (
     ApiKey,
-    CreditLedger,
-    FREE_CREDITS,
     Job,
     JobStatus,
     MediaObject,
@@ -61,9 +59,6 @@ from .storage import get_storage
 from .tasks import dispatch
 
 VALID_TYPES = {"tts", "stt", "translate", "dub", "subtitle"}
-
-# Placeholder pricing — D6 replaces with real metering (audio seconds / characters).
-COSTS = {"tts": 10, "stt": 5, "translate": 2, "dub": 60, "subtitle": 8}
 
 # Docs công khai mặc định TẮT: schema API lộ toàn bộ bề mặt tấn công. Bật khi cần
 # xem Swagger trên máy cá nhân: VOICEVIBE_ENABLE_DOCS=1
@@ -133,15 +128,6 @@ auth_optional = A.auth_optional
 admin_auth = A.current_admin
 
 
-def _charge(db: Session, user: User, job_id: str, jtype: str) -> int:
-    cost = int(get_setting(f"pricing.{jtype}", COSTS[jtype]))
-    if user.credits < cost:
-        raise HTTPException(status_code=402, detail=f"need {cost} credits, have {user.credits}")
-    user.credits -= cost
-    db.add(CreditLedger(user_id=user.id, delta=-cost, reason=f"job:{jtype}", job_id=job_id))
-    return cost
-
-
 class JobIn(BaseModel):
     type: str = Field(..., description="tts | stt | translate | dub | subtitle")
     media_url: str | None = None
@@ -194,8 +180,8 @@ def create_job(
     if job.type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"type must be one of {sorted(VALID_TYPES)}")
     if job.type == "subtitle":
-        # Kiểm TRƯỚC khi trừ credit — cùng nguyên tắc với quyền sở hữu voice bên
-        # dưới: cấu hình sai phải bị chặn lúc tạo job, không phải sau khi đã thu tiền.
+        # Kiểm cấu hình TRƯỚC khi tạo job — cùng nguyên tắc với quyền sở hữu voice
+        # bên dưới: cấu hình sai phải bị chặn lúc tạo job, không phải để worker fail.
         if not job.media_url:
             raise HTTPException(status_code=422,
                                 detail="subtitle cần media_url (audio hoặc video)")
@@ -208,9 +194,9 @@ def create_job(
                 status_code=422,
                 detail="bilingual cần target_lang (bản dịch lấy gì?)")
 
-    # Quyền sở hữu voice phải kiểm tra TRƯỚC khi trừ credit. Trước đây chỉ worker
-    # kiểm tra (tasks.py), tức là job đã tạo, đã trừ tiền rồi mới fail → user mất
-    # credit cho một job chắc chắn hỏng. Giữ kiểm tra ở worker làm lớp hai.
+    # Quyền sở hữu voice phải kiểm tra TRƯỚC khi tạo job. Trước đây chỉ worker
+    # kiểm tra (tasks.py), tức là job đã tạo rồi mới fail trong pipeline. Giữ
+    # kiểm tra ở worker làm lớp hai.
     if job.voice_id:
         voice = db.get(Voice, job.voice_id)
         if voice is None or voice.user_id != user.id:
@@ -218,15 +204,15 @@ def create_job(
 
     j = Job(user_id=user.id, type=job.type, params=job.model_dump(exclude_none=True))
     db.add(j)
-    db.flush()  # need j.id for the ledger row
-    cost = _charge(db, user, j.id, job.type)
-    j.credits_charged = cost
+    # flush cần thiết: Job.id do Python sinh (_uid) nhưng chỉ được gán lúc flush —
+    # dispatch(j.id) bên dưới cần giá trị thật.
+    db.flush()
     db.commit()
     mode, task_id = dispatch(j.id, j.params)
     # task_id để HỦY được sau này — lưu ngay cả khi dispatch inline (None).
     j.task_id = task_id
     db.commit()
-    return {"job_id": j.id, "status": j.status.value, "credits_charged": cost, "dispatch": mode}
+    return {"job_id": j.id, "status": j.status.value, "dispatch": mode}
 
 
 @app.get("/v1/jobs/{job_id}")
@@ -240,7 +226,7 @@ def get_job(
     # — không có hai field này panel chi tiết chỉ ra N/A vĩnh viễn.
     return {
         "job_id": j.id, "type": j.type, "status": j.status.value,
-        "progress": j.progress, "error": j.error, "credits_charged": j.credits_charged,
+        "progress": j.progress, "error": j.error,
         "params": j.params, "updated_at": j.updated_at,
     }
 
@@ -352,7 +338,6 @@ def me(user: User = Depends(auth), db: Session = Depends(get_db)) -> dict:
         "user_id": user.id,
         "email": user.email,
         "role": user.role,
-        "credits": user.credits,
         "voices": [{"id": x.id, "name": x.name, "lang": x.lang} for x in voices],
     }
 
@@ -447,7 +432,7 @@ def setup(body: SetupIn, request: Request, response: Response,
         raise HTTPException(status_code=409, detail="hệ thống đã có tài khoản quản trị")
     user = User(email=body.email.strip().lower(), role=ROLE_ADMIN,
                 password_hash=hash_password(body.password),
-                credits=FREE_CREDITS, last_login_at=int(time.time()))
+                last_login_at=int(time.time()))
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -455,7 +440,7 @@ def setup(body: SetupIn, request: Request, response: Response,
     db.commit()
     A.set_session_cookie(response, token, request)
     return {"user_id": user.id, "email": user.email, "role": user.role,
-            "credits": user.credits, "redirect": "/"}
+            "redirect": "/"}
 
 
 @app.post("/v1/auth/login")
@@ -475,7 +460,6 @@ def login(body: LoginIn, request: Request, response: Response,
     db.commit()
     A.set_session_cookie(response, token, request)
     return {"user_id": user.id, "email": user.email, "role": user.role,
-            "credits": user.credits,
             "redirect": "/admin" if user.is_admin else "/"}
 
 
@@ -492,7 +476,7 @@ def auth_me(user: User | None = Depends(auth_optional)) -> dict:
     if user is None:
         raise HTTPException(status_code=401, detail="chưa đăng nhập")
     return {"user_id": user.id, "email": user.email, "role": user.role,
-            "credits": user.credits, "is_admin": user.is_admin}
+            "is_admin": user.is_admin}
 
 
 # ---------------------------------------------------------------- Day 6: admin
@@ -524,12 +508,6 @@ def app_page(request: Request, db: Session = Depends(get_db)):
     if A.auth_optional(request, None, db) is None:
         return _redirect("/login")
     return _render(APP_HTML, request)
-
-
-@app.get("/v1/pricing")
-def pricing(user: User = Depends(auth)) -> dict:
-    """Bảng giá credits/job — nguồn sự thật là Settings (admin sửa được)."""
-    return {"pricing": {t: int(get_setting(f"pricing.{t}", COSTS[t])) for t in COSTS}}
 
 
 @app.post("/v1/media/upload", status_code=201)
@@ -614,7 +592,6 @@ def list_jobs(limit: int = 20, user: User = Depends(auth),
     return {"jobs": [{"job_id": j.id, "type": j.type, "status": j.status.value,
                       "progress": j.progress, "result_key": j.result_s3_key,
                       "error": j.error, "created_at": j.created_at,
-                      "credits_charged": j.credits_charged,
                       "params": j.params, "updated_at": j.updated_at} for j in rows]}
 
 
@@ -630,7 +607,8 @@ def _own_job(job_id: str, user: User, db: Session) -> Job:
 @app.post("/v1/jobs/{job_id}/cancel")
 def cancel_job(job_id: str, user: User = Depends(auth),
                db: Session = Depends(get_db)) -> dict:
-    """Hủy job đang chờ/đang chạy + HOÀN credit (job hủy thì không tính tiền).
+    """Hủy job đang chờ/đang chạy. Job miễn phí (self-host) — không trừ, không
+    hoàn credit.
 
     - Hủy = gạch trên DB luôn (nhanh, chắc chắn đổi trạng thái) KÈM revoke
       task Celery theo task_id nếu có: đang chờ → bị vứt không bao giờ chạy;
@@ -653,16 +631,8 @@ def cancel_job(job_id: str, user: User = Depends(auth),
     job.status = JobStatus.cancelled
     job.error = "Đã hủy bởi người dùng"
     job.progress = 100
-    charged = job.credits_charged or 0
-    if charged:
-        owner = db.get(User, job.user_id)
-        if owner is not None:
-            owner.credits += charged
-            db.add(CreditLedger(user_id=owner.id, delta=charged,
-                                reason=f"refund:job:{job.type}", job_id=job.id))
-            job.credits_charged = 0
     db.commit()
-    return {"job_id": job.id, "status": "cancelled", "refunded": charged}
+    return {"job_id": job.id, "status": "cancelled"}
 
 
 @app.delete("/v1/jobs/{job_id}")
@@ -691,19 +661,25 @@ def delete_job(job_id: str, user: User = Depends(auth),
 
 @app.get("/v1/usage")
 def usage(user: User = Depends(auth), db: Session = Depends(get_db)) -> dict:
-    """Số liệu THẬT cho donut dashboard — aggregate credit_ledger theo loại job."""
+    """Số liệu THẬT cho donut dashboard — ĐẾM JOB theo loại/trạng thái.
+
+    Self-host miễn phí nên không có đơn vị tiền tệ: thống kê = số job. Một query
+    group_by(type, status) là đủ cho cả donut theo loại lẫn thẻ "đang chạy".
+    """
     rows = db.execute(
-        select(CreditLedger.reason, func.sum(CreditLedger.delta))
-        .where(CreditLedger.user_id == user.id)
-        .group_by(CreditLedger.reason)
+        select(Job.type, Job.status, func.count())
+        .where(Job.user_id == user.id)
+        .group_by(Job.type, Job.status)
     ).all()
     by_type: dict[str, int] = {}
-    for reason, delta in rows:
-        t = reason.replace("job:", "") if (reason or "").startswith("job:") else "other"
-        by_type[t] = by_type.get(t, 0) + abs(int(delta or 0))
-    used = sum(by_type.values())
-    return {"free_quota": 50_000, "used": used,
-            "total": user.credits + used, "by_type": by_type}
+    by_status: dict[str, int] = {}
+    for jtype, status, n in rows:
+        by_type[jtype] = by_type.get(jtype, 0) + n
+        key = status.value if hasattr(status, "value") else str(status)
+        by_status[key] = by_status.get(key, 0) + n
+    total = sum(by_type.values())
+    return {"total_jobs": total, "by_type": by_type, "by_status": by_status,
+            "running": by_status.get("running", 0)}
 
 
 # Settings nằm trong gia đình /v1/admin/* — KHÔNG nằm ở /admin/settings:
@@ -812,7 +788,7 @@ def signup(body: SignupIn, request: Request,
     raw = "vv_" + _secrets.token_hex(16)
     db.add(ApiKey(key=_hash_key(raw), prefix=raw[:12], user_id=u.id))
     db.commit()
-    return {"user_id": u.id, "email": email, "role": u.role, "credits": u.credits,
+    return {"user_id": u.id, "email": email, "role": u.role,
             "key": raw, "note": "store it now — shown once"}
 
 
@@ -823,16 +799,10 @@ class CreateUserIn(BaseModel):
     email: str
     password: str
     role: str = ROLE_USER
-    credits: int | None = None
 
 
 class ResetPasswordIn(BaseModel):
     password: str
-
-
-class CreditsIn(BaseModel):
-    delta: int
-    reason: str | None = None
 
 
 def _admin_count(db: Session) -> int:
@@ -842,7 +812,7 @@ def _admin_count(db: Session) -> int:
 
 def _user_out(u: User) -> dict:
     return {"user_id": u.id, "email": u.email, "role": u.role,
-            "is_active": u.is_active, "credits": u.credits,
+            "is_active": u.is_active,
             "has_password": bool(u.password_hash),
             "created_at": u.created_at, "last_login_at": u.last_login_at}
 
@@ -868,13 +838,9 @@ def admin_create_user(body: CreateUserIn, _: User | None = Depends(admin_auth),
         raise HTTPException(status_code=422, detail=f"role phải là {ROLE_USER} hoặc {ROLE_ADMIN}")
     if db.scalar(select(User).where(User.email == email)):
         raise HTTPException(status_code=409, detail="email đã tồn tại")
-    credits = FREE_CREDITS if body.credits is None else int(body.credits)
-    u = User(email=email, role=body.role, password_hash=hash_password(body.password),
-             credits=credits)
+    u = User(email=email, role=body.role,
+             password_hash=hash_password(body.password))
     db.add(u)
-    db.flush()
-    if credits:
-        db.add(CreditLedger(user_id=u.id, delta=credits, reason="grant:signup"))
     db.commit()
     return _user_out(u)
 
@@ -905,23 +871,6 @@ def admin_reset_password(user_id: str, body: ResetPasswordIn,
     revoked = A.revoke_user_sessions(db, u.id)  # đổi mật khẩu -> đá mọi phiên cũ ra
     db.commit()
     return {"user_id": u.id, "sessions_revoked": revoked}
-
-
-@app.post("/v1/admin/users/{user_id}/credits")
-def admin_grant_credits(user_id: str, body: CreditsIn,
-                        _: User | None = Depends(admin_auth),
-                        db: Session = Depends(get_db)) -> dict:
-    """Cấp/trừ credit. Luôn ghi `credit_ledger` — không bao giờ sửa số dư mà thiếu vết."""
-    u = _get_user_or_404(db, user_id)
-    new_balance = u.credits + int(body.delta)
-    if new_balance < 0:
-        raise HTTPException(status_code=422,
-                            detail=f"không thể trừ quá số dư ({u.credits} credits)")
-    u.credits = new_balance
-    db.add(CreditLedger(user_id=u.id, delta=int(body.delta),
-                        reason=(body.reason or "grant:admin")))
-    db.commit()
-    return {"user_id": u.id, "credits": u.credits, "delta": int(body.delta)}
 
 
 @app.post("/v1/admin/users/{user_id}/deactivate")

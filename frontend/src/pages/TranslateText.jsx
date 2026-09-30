@@ -1,6 +1,4 @@
-import { useState, useEffect } from 'react';
-import { useApi } from '../hooks/useApi.jsx';
-import { useAuth } from '../hooks/useAuth.jsx';
+import { useState } from 'react';
 import { createJob, pollJob, getResult } from '../api/jobs.js';
 
 // Bảng ngôn ngữ dùng chung kiểu hiển thị với các trang khác (Subtitle.jsx) —
@@ -12,27 +10,14 @@ const LANGUAGES = {
 };
 
 export default function TranslateText() {
-  const { api } = useApi();
-  const { user } = useAuth();
   const [text, setText] = useState('');
   const [sourceLang, setSourceLang] = useState('vi');
   const [targetLang, setTargetLang] = useState('en');
-  const [pricing, setPricing] = useState({});
   const [job, setJob] = useState(null);
   const [translated, setTranslated] = useState(null);
   const [error, setError] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        setPricing(await api.get('/v1/pricing'));
-      } catch (e) {
-        console.error('tải bảng giá thất bại', e);
-      }
-    })();
-  }, [api]);
 
   const startTranslate = async () => {
     if (!text.trim()) {
@@ -44,8 +29,7 @@ export default function TranslateText() {
     setTranslated(null);
     setError(null);
     try {
-      // Job thật: type=translate + text + cặp ngôn ngữ (server tính tiền phẳng
-      // theo loại job — đọc từ /v1/pricing, không tự bịa số).
+      // Job thật: type=translate + text + cặp ngôn ngữ.
       const created = await createJob({
         type: 'translate',
         text,
@@ -54,7 +38,7 @@ export default function TranslateText() {
       });
       const done = await pollJob(created.jobId, { onUpdate: setJob });
       if (done.status === 'failed') {
-        setError(done.error || 'Dịch thất bại (credit đã hoàn lại).');
+        setError(done.error || 'Dịch thất bại.');
       } else {
         const res = await getResult(created.jobId);
         setTranslated(res.content ?? '');
@@ -81,8 +65,6 @@ export default function TranslateText() {
     a.click();
     URL.revokeObjectURL(url);
   };
-
-  const price = pricing.translate;
 
   return (
     <div style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto' }}>
@@ -177,7 +159,7 @@ export default function TranslateText() {
               maxWidth: '320px',
             }}
           >
-            {isProcessing ? 'Đang dịch...' : `Dịch ngay (${(Number(price) || 0).toLocaleString('vi-VN')} credits)`}
+            {isProcessing ? 'Đang dịch...' : 'Dịch ngay'}
           </button>
 
           {/* Progress */}
@@ -234,23 +216,6 @@ export default function TranslateText() {
 
         {/* Right sidebar */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
-            <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '12px' }}>
-              💰 Chi phí
-            </h4>
-              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text)', lineHeight: 1.8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span>Số dư:</span>
-                  <strong style={{ color: 'var(--primary)' }}>
-                    {(user?.credits || 0).toLocaleString('vi-VN')}
-                  </strong>
-                </div>
-                <div style={{ marginTop: '8px', color: 'var(--text-dim)' }}>
-                  Giá dịch: <strong>{(Number(price) || 0).toLocaleString('vi-VN')}</strong> credits/job (đọc từ server)
-                </div>
-              </div>
-          </div>
-
           <div style={{ background: 'var(--info-light)', border: '1px solid var(--info)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
             <h4 style={{ fontSize: 'var(--text-sm)', fontWeight: 600, marginBottom: '12px', color: 'var(--info)' }}>
               💡 Mẹo

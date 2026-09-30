@@ -5,7 +5,7 @@
 # worker không start nổi: "exec: celery: executable file not found in $PATH".
 celery[redis]>=5.4
 
-# Postgres driver: worker CŨNG đọc/ghi DB (job status, credits, ref sự kiện).
+# Postgres driver: worker CŨNG đọc/ghi DB (job status, task_id, kết quả).
 # Thiếu dòng này: "ModuleNotFoundError: No module named 'psycopg'" lúc khởi động.
 psycopg[binary]>=3.2
 

@@ -55,7 +55,7 @@ def main() -> int:
         page.screenshot(path=str(out / "prod-01-dashboard.png"), full_page=True)
         shots += 1
 
-        # tab Jobs: cho thấy job đã chạy qua worker THẬT và được hoàn credit
+        # tab Jobs: cho thấy job đã chạy qua worker THẬT tới kết quả
         page.evaluate("go('jobs')")
         page.wait_for_selector("#joblist", timeout=20000)
         page.wait_for_timeout(1200)

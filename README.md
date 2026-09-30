@@ -9,7 +9,7 @@ tách & clone nhiều người nói, API developer) — dựng bằng stack open
 ## Giao diện
 
 > Ảnh chụp từ app đang chạy thật (headless Chrome/Playwright), **dữ liệu trong ảnh là
-> demo seed cục bộ** (`creator@demo`, 49.858 credits) — không phải job thật.
+> demo seed cục bộ** (`creator@demo`) — không phải job thật.
 > Chụp lại bất cứ lúc nào bằng `backend/scripts/ui_shot.py`.
 
 ### App UI — `/` (inline, chạy ngay không cần build step)
@@ -214,7 +214,7 @@ người dùng kiểm tra được.
 ```
 Client / Web UI ──► FastAPI (api) ──► Celery queue (Redis) ──► AI Worker (GPU)
                         │                                           │
-                        ├── Postgres: users, jobs, credits, api_keys│
+                        ├── Postgres: users, jobs, api_keys        │
                         └── MinIO (S3): media in/out ◄──────────────┘
 
 AI Worker pipeline (dub):
@@ -320,8 +320,8 @@ chính thức; repo chỉ cung cấp core SDK → pipeline dub (D5) là phần c
 
 - [x] **D1** Skeleton: docker-compose (postgres/redis/minio/api/worker), API shape,
       timing-fit engine + selftest
-- [x] **D2** Postgres schema (users, jobs, credits, api_keys, voices) + Celery dispatch
-      + credit metering — selftest: `PYTHONPATH=. python tests/test_day2.py`
+- [x] **D2** Postgres schema (users, jobs, api_keys, voices) + Celery dispatch
+      — selftest: `PYTHONPATH=. python tests/test_day2.py`
 - [x] **D2.5** Provider layer: local ↔ OpenAI-compatible cloud + fallback chain
       — selftest: `PYTHONPATH=. python tests/test_providers.py`
 - [x] **D3** STT pipeline: faster-whisper large-v3 + pyannote diarization → SRT có speaker
@@ -333,11 +333,11 @@ chính thức; repo chỉ cung cấp core SDK → pipeline dub (D5) là phần c
       UI upload + preview (Next.js)
       — PASS trên RTX 3060: dub vi→en 13.4s→13.9s, 2 speakers giữ đúng giọng,
       round-trip ASR tiếng Anh p=1.00 (34 từ)
-- [x] **D6** Developer API hoàn chỉnh: API keys, rate limit, webhook, credit metering
-      + **Settings UI** (`/admin`): mọi cấu hình (HF token, cloud translation, pricing)
+- [x] **D6** Developer API hoàn chỉnh: API keys, rate limit, webhook
+      + **Settings UI** (`/admin`): mọi cấu hình (HF token, cloud translation)
       quản lý qua giao diện, lưu DB — secret mã hóa Fernet at rest, KHÔNG hardcode .env
-      — PASS trên GPU box: PUT/GET settings, secret masked `••••oken`, job qua API
-      đọc pricing từ Settings (credits_charged=5), keys create/revoke
+      — PASS trên GPU box: PUT/GET settings, secret masked `••••oken`, job qua API,
+      keys create/revoke (hệ thống credit đã GỠ — self-host miễn phí)
 - [x] **D7** Deploy + polish: supervisor service (auto-restart) + portal Caddy (token auth),
       video dubbing (MP4 in/out), background mode (silence/source_low)
       — PASS: video dub vi→en MP4 13.3s, ASR round-trip en p=1.00, external URL sống
@@ -484,6 +484,12 @@ Không đặt `APP_DOMAIN` thì Caddy dùng chứng chỉ **tự ký cho localho
   File upload mới có dạng `media/{user_id}/…`; kết quả job và clip giọng vẫn đọc được
   bình thường vì tra được chủ qua `jobs` / `voices`.
 - `/docs` **tắt mặc định** (bật bằng `VOICEVIBE_ENABLE_DOCS=1`).
+- **Hệ thống credits/Gói dịch vụ đã GỠ HOÀN TOÀN** (dữ liệu credits cũ bị dọn:
+  bảng `credit_ledger`, cột `users.credits`/`jobs.credits_charged` được DROP tự động
+  khi khởi động). Bản này 100% mã nguồn mở self-host — người dùng tự vận hành trên
+  máy của mình nên thu phí theo credits không còn ý nghĩa: job chạy **miễn phí**, không
+  có đường `/v1/pricing` hay `/v1/admin/users/{id}/credits`; thống kê Dashboard đếm
+  theo **số job** (loại/trạng thái); Hủy job vẫn hoạt động bình thường (không hoàn credit).
 
 ## 🔌 Cấu hình AI (Cloud API + Ollama)
 

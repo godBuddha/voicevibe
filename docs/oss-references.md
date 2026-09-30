@@ -102,7 +102,6 @@ Stars/chỉ số là ước lượng cùng ngày.
 | Upload lớn, resume được | **tus-js-client** (MIT) + **tusd** (MIT) | MIT | 🟡 ADOPT khi media lớn |
 | Webhook signing chuẩn hoá | **Standard Webhooks** spec | **Apache-2.0** | 🟢 ADOPT — ta đã có HMAC; chuẩn hoá header/timestamp để tương thích |
 | Hàng đợi job + progress | Ta dùng **Celery** (BSD-3) ✅; thay thế nhẹ hơn: **arq**/**taskiq**/**SAQ** (đều MIT) | BSD/MIT | 🟡 Cân nhắc; SAQ có sẵn progress/status |
-| Metering/credits | **OpenMeter** `openmeterio/openmeter` | **Apache-2.0** | 🟡 Học mô hình event→aggregate |
 | Phân quyền/entitlements | **OpenFGA**, **Cerbos**, **Casbin** | **Apache-2.0** | 🟡 Khi có gói trả phí |
 | UI quản lý API key | **Unkey** — **chỉ học thiết kế** (prefix, scope, last-used, revoke) | code **AGPL-3.0** | 🔴 **KHÔNG copy code** |
 

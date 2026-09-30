@@ -33,7 +33,7 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const res = await api.post('/v1/auth/login', { body: { email, password } });
-    // login trả {user_id, email, role, credits, redirect} — set trước, rồi
+    // login trả {user_id, email, role, redirect} — set trước, rồi
     // hỏi lại /v1/auth/me để có is_admin từ nguồn chính thống.
     localStorage.setItem('authenticated', 'true');
     try {

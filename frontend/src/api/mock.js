@@ -4,15 +4,15 @@ const USER = {
   email: 'admin@voicevibe.local',
   avatar: '/avatar.png',
   role: 'admin',
-  credits: 283_416,
-  creditsLimit: 500_000,
 };
 
+// Mock usage: ĐẾM JOB theo loại (self-host miễn phí — không có đơn vị tiền).
 const USAGE_BREAKDOWN = {
-  tts: 85_234,
-  translate: 124_582,
-  video: 73_600,
-  other: 0,
+  tts: 12,
+  translate: 8,
+  dub: 3,
+  stt: 5,
+  subtitle: 2,
 };
 
 const VOICES = [
@@ -33,7 +33,6 @@ const MOCK_JOBS = [
     fromLang: 'en',
     toLang: 'vi',
     voiceId: 1,
-    creditsUsed: 1200,
     createdAt: new Date(Date.now() - 4 * 60_000),
     completedAt: new Date(Date.now() - 1 * 60_000),
     result: { url: '/dubbed-result.mp4', transcript: 'Full transcript in Vietnamese...' },
@@ -45,7 +44,6 @@ const MOCK_JOBS = [
     file: { name: 'script.txt', size: 248, type: 'text/plain', duration: null },
     text: 'Xin chào, đây là bài test giọng nói AI của hệ thống VoiceVibe...',
     voiceId: 1,
-    creditsUsed: 340,
     createdAt: new Date(Date.now() - 45_000),
     startedAt: new Date(Date.now() - 30_000),
     progress: { percent: 67, step: 'TTS', message: 'Đang tạo file audio...' },
@@ -55,15 +53,14 @@ const MOCK_JOBS = [
     type: 'stt',
     status: 'queued',
     file: { name: 'audio-interview.mp3', size: 14_567_321, type: 'audio/mpeg', duration: 600 },
-    creditsUsed: 800,
     createdAt: new Date(Date.now() - 60_000),
   },
 ];
 
 const MOCK_V2USERS = [
-  { id: 1, email: 'admin@voicevibe.local', role: 'admin', credits: 283_416, status: 'active' },
-  { id: 2, email: 'user1@example.com', role: 'user', credits: 45_000, status: 'active' },
-  { id: 3, email: 'user2@example.com', role: 'user', credits: 0, status: 'suspended' },
+  { id: 1, email: 'admin@voicevibe.local', role: 'admin', status: 'active' },
+  { id: 2, email: 'user1@example.com', role: 'user', status: 'active' },
+  { id: 3, email: 'user2@example.com', role: 'user', status: 'suspended' },
 ];
 
 const MOCK_PROVIDERS = [
@@ -97,8 +94,6 @@ const MOCK_SETTINGS = {
   storage_endpoint: '/media',
   demucs_enabled: 'true',
   demucs_model: 'htdemucs',
-  billing_currency: 'VND',
-  billing_free_credits: '50000',
 };
 
 export async function mockRequest(method, path, options) {
@@ -115,9 +110,10 @@ export async function mockRequest(method, path, options) {
 
   if (path === '/v1/usage' && method === 'GET') {
     return {
-      used: Object.values(USAGE_BREAKDOWN).reduce((a, b) => a + b, 0),
-      limit: USER.creditsLimit,
-      breakdown: USAGE_BREAKDOWN,
+      total_jobs: Object.values(USAGE_BREAKDOWN).reduce((a, b) => a + b, 0),
+      by_type: USAGE_BREAKDOWN,
+      by_status: { done: 20, running: 1, queued: 2, failed: 2, cancelled: 5 },
+      running: 1,
     };
   }
 
@@ -138,7 +134,6 @@ export async function mockRequest(method, path, options) {
       id: MOCK_JOBS.length + 1,
       type: body.type,
       status: 'queued',
-      creditsUsed: body.creditsEstimated || 0,
       createdAt: new Date(),
       ...body,
     };
@@ -205,10 +200,6 @@ export async function mockRequest(method, path, options) {
     return { success: true, tempPassword: 'Temp123!' };
   }
 
-  if (path.startsWith('/v1/admin/users/') && path.includes('/credits') && method === 'POST') {
-    return { success: true };
-  }
-
   if (path.startsWith('/v1/admin/users/') && path.includes('/activate') && method === 'POST') {
     return { success: true };
   }
@@ -218,7 +209,7 @@ export async function mockRequest(method, path, options) {
   }
 
   if (path === '/v1/admin/users' && method === 'POST') {
-    return { id: 999, email: body.email, role: body.role, credits: body.credits, status: 'active' };
+    return { id: 999, email: body.email, role: body.role, status: 'active' };
   }
 
   if (path === '/v1/admin/settings' && method === 'GET') {

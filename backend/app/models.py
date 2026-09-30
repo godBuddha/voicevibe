@@ -1,7 +1,9 @@
-"""Day 2 schema: users, api_keys, voices, jobs, credit_ledger.
+"""Schema: users, api_keys, voices, jobs, settings.
 
-Credits model mirrors the original voice-product landing page: free starting credits,
-per-job metered spend (real metering lands D6 — placeholder pricing for now).
+Self-host + mã nguồn mở 100%: KHÔNG có hệ thống credit/giá — job chạy miễn phí,
+thống kê đếm theo job (xem GET /v1/usage). Bảng `credit_ledger` và cột
+`users.credits`/`jobs.credits_charged` của bản cũ đã bị gỡ; `app/migrations.py`
+tự DROP chúng trên database đang chạy.
 
 Phase 2 (accounts): `users` gains real credentials (`password_hash`, `role`,
 `is_active`), plus the `sessions` / `system_flags` / `media_objects` tables.
@@ -30,8 +32,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
 
-FREE_CREDITS = 50_000  # same hook as the original landing page
-
 ROLE_USER = "user"
 ROLE_ADMIN = "admin"
 
@@ -55,7 +55,6 @@ class User(Base):
     # của Postgres khi thêm giá trị mới.
     role: Mapped[str] = mapped_column(String(16), default=ROLE_USER)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    credits: Mapped[int] = mapped_column(Integer, default=FREE_CREDITS)
     last_login_at: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     created_at: Mapped[int] = mapped_column(BigInteger, default=_now)
     updated_at: Mapped[int] = mapped_column(BigInteger, default=_now, onupdate=_now)
@@ -238,7 +237,6 @@ class Job(Base):
     params: Mapped[dict] = mapped_column(JSON, default=dict)
     result_s3_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
-    credits_charged: Mapped[int] = mapped_column(Integer, default=0)
     # Celery task id — cần để HỦY được job đang chờ/đang chạy (revoke theo id).
     # KHÔNG có cột này thì không có cách nào ra lệnh cho Celery quăng task.
     task_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -246,19 +244,6 @@ class Job(Base):
     updated_at: Mapped[int] = mapped_column(BigInteger, default=_now, onupdate=_now)
 
     user: Mapped[User] = relationship()
-
-
-class CreditLedger(Base):
-    """Append-only credit movements — never mutate `users.credits` without a row here."""
-
-    __tablename__ = "credit_ledger"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
-    delta: Mapped[int] = mapped_column(Integer)  # negative = spend
-    reason: Mapped[str] = mapped_column(String(64))
-    job_id: Mapped[str | None] = mapped_column(String(12), nullable=True)
-    created_at: Mapped[int] = mapped_column(BigInteger, default=_now)
 
 
 class Setting(Base):

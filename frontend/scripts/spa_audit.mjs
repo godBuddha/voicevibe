@@ -354,7 +354,7 @@ const FLOWS = [
   flow('f-permissions', { expect: false }, async (page, rec) => {
     // Đảm bảo user auditor tồn tại (tạo nếu chưa — 409 nghĩa là đã có).
     let { status, json } = await apiFetch(ADMIN.cookie, 'POST', '/v1/admin/users', {
-      email: AUDITOR_EMAIL, password: AUDITOR_PW, role: 'user', credits: 1000,
+      email: AUDITOR_EMAIL, password: AUDITOR_PW, role: 'user',
     });
     if (status === 409) {
       const users = (await apiFetch(ADMIN.cookie, 'GET', '/v1/admin/users')).json.users || [];
@@ -427,7 +427,7 @@ const FLOWS = [
     await page.goto(`${BASE}/tts`, { waitUntil: 'networkidle2', timeout: 30000 });
     await sleep(500);
     await page.type('textarea', 'Xin chào VoiceVibe, đây là bài kiểm tra giọng đọc.');
-    // Nhãn nút có kèm giá credit ("Tạo giọng nói (10 credits)") — khớp MỜI.
+    // Khớp MỜI — không phụ thuộc nhãn nút.
     await clickText(page, 'Tạo giọng nói');
     await sleep(1500);
     const d = await lastDialog(rec);
@@ -496,7 +496,7 @@ const FLOWS = [
     await sleep(300);
     // chọn ngôn ngữ: select thứ nhất = nguồn (zh), thứ hai = đích (vi)
     await page.select('select', 'zh');
-    // KHÔNG exact: nút mang giá credit ("Bắt đầu dịch (60 credits)").
+    // Khớp MỜI — không phụ thuộc nhãn nút.
     await clickText(page, 'Bắt đầu dịch');
     await sleep(1500);
     const d = await lastDialog(rec);
@@ -567,7 +567,8 @@ const FLOWS = [
     rec.ok = rec.steps.every((s) => s.ok);
   }),
 
-  // ---- 11. Admin users: sửa credit, chặn/mở user auditor.
+  // ---- 11. Admin users: chặn/mở user auditor (hệ thống credits đã gỡ —
+  //        bảng user chỉ còn Reset mật khẩu + Chặn/Mở lại).
   flow('f-admin-users', { expect: true }, async (page, rec) => {
     await page.goto(`${BASE}/admin/users`, { waitUntil: 'networkidle2', timeout: 30000 });
     // Chờ CÓ DỮ LIỆU qua network (tunnel ~1s/lượt request — sleep 600ms từng
@@ -577,31 +578,12 @@ const FLOWS = [
     if (empty) { rec.steps.push({ action: 'mở trang', detail: 'trống lặng lẽ (403 bị nuốt / bug #8)', ok: false }); rec.ok = !rec.expect; return; }
     const rowHas = await page.evaluate((e) => document.body.innerText.includes(e), AUDITOR_EMAIL);
     if (!rowHas) { rec.steps.push({ action: 'tìm user auditor', detail: 'không thấy hàng — chạy f-permissions trước', ok: false }); rec.ok = !rec.expect; return; }
-    // Sửa credit: tìm hàng auditor → 'Sửa credit' → đổi số → Lưu
-    await page.evaluate((email) => {
-      const rows = [...document.querySelectorAll('tr')];
-      const row = rows.find((r) => r.innerText.includes(email));
-      row.querySelector('button').click(); // hàng có 3 nút: Reset/Sửa credit/Chặn
-    }, AUDITOR_EMAIL);
-    // click đúng nút 'Sửa credit' của hàng đó
-    await page.evaluate((email) => {
+    // Nút Chặn phải có mặt trên hàng auditor (bảng không còn cột/nút credit)
+    const hasBlock = await page.evaluate((email) => {
       const row = [...document.querySelectorAll('tr')].find((r) => r.innerText.includes(email));
-      [...row.querySelectorAll('button')].find((b) => b.textContent.includes('Sửa credit')).click();
+      return [...row.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Chặn');
     }, AUDITOR_EMAIL);
-    await page.evaluate((email) => {
-      const row = [...document.querySelectorAll('tr')].find((r) => r.innerText.includes(email));
-      const inp = row.querySelector('input[type=number]');
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-      setter.call(inp, '1500');
-      inp.dispatchEvent(new Event('input', { bubbles: true }));
-    }, AUDITOR_EMAIL);
-    await page.evaluate((email) => {
-      const row = [...document.querySelectorAll('tr')].find((r) => r.innerText.includes(email));
-      [...row.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Lưu').click();
-    }, AUDITOR_EMAIL);
-    await sleep(1200);
-    const credited = await page.evaluate(() => document.body.innerText.includes('1.500'));
-    rec.steps.push({ action: 'cấp credit 1500', detail: credited ? 'hiển thị 1.500' : 'không thấy cập nhật', ok: credited });
+    rec.steps.push({ action: 'nút Chặn có mặt', detail: hasBlock ? 'có nút Chặn' : 'thiếu nút Chặn', ok: hasBlock });
     // Chặn rồi mở lại
     await page.evaluate((email) => {
       const row = [...document.querySelectorAll('tr')].find((r) => r.innerText.includes(email));
@@ -748,7 +730,6 @@ const NAV_ROUTES = [
   ['06-subtitle', '/subtitle', true, null],
   ['07-jobs', '/jobs', true, null],
   ['08-api-keys', '/api-keys', true, null],
-  ['09-pricing', '/pricing', true, null],
   ['10-admin-users', '/admin/users', true, null],
   ['11-admin-model-hub', '/admin/model-hub', true, null],
   ['12-admin-settings', '/admin/settings', true, null],

@@ -2,7 +2,8 @@
 
 Single page, vanilla JS, hash routing (#/dashboard, #/dub, #/tts, #/voices,
 #/stt, #/jobs, #/api). Không build step — self-host chỉ cần Python.
-Usage donut đọc số liệu THẬT từ GET /v1/usage (aggregate credit_ledger).
+Usage donut đọc số liệu THẬT từ GET /v1/usage (đếm JOB — self-host miễn phí,
+không có hệ thống credit/giá).
 
 Màu sắc KHÔNG hardcode trong file này: mọi token đến từ app/theme.py (sáng + tối),
 nên giao diện có chế độ tối mà không cần build step. Xem tests/test_theme.py —
@@ -71,8 +72,6 @@ __THEME_CSS__
   .search { flex:1; min-width:220px; max-width:430px; background:var(--card); border:1px solid var(--line);
             border-radius:12px; padding:10px 14px; display:flex; gap:8px; align-items:center; }
   .search input { border:none; outline:none; background:transparent; width:100%; font:inherit; color:var(--fg); }
-  .credits-pill { background:var(--card); border:1px solid var(--line); border-radius:99px;
-                  padding:9px 16px; font-size:13.5px; }
   .who { display:flex; gap:9px; align-items:center; }
   .avatar { width:36px; height:36px; border-radius:50%; background:linear-gradient(135deg,var(--acc),var(--acc2));
             color:var(--on-acc); display:flex; align-items:center; justify-content:center; font-weight:700; }
@@ -165,7 +164,7 @@ __THEME_CSS__
       <a data-page="api" onclick="go('api')">🔌 API cho nhà phát triển</a>
     </nav>
     <div class="sidecard">
-      🎁 Miễn phí <b id="side-free">50.000</b> Credits
+      🚀 Chạy trên hạ tầng của chính bạn — không giới hạn
       <button class="go" onclick="go('dub')">Bắt đầu ngay</button>
       <!-- AGPL-3.0 §13: ứng dụng chạy qua mạng phải chỉ đường lấy mã nguồn.
            Đổi liên kết qua /admin/settings → app.source_url nếu bạn self-host bản sửa. -->
@@ -179,7 +178,6 @@ __THEME_CSS__
     <div class="topbar">
       <button id="burger" onclick="toggleSide()">☰</button>
       <div class="search">🔍<input id="q" placeholder="Tìm kiếm dự án, giọng nói, công cụ…"></div>
-      <div class="credits-pill">💰 <b id="top-credits">…</b> Credits</div>
       <button class="theme-btn" data-theme-label onclick="vvToggleTheme()" title="Chuyển chế độ sáng/tối">🌙 Chế độ tối</button>
       <div class="who"><div class="avatar" id="avatar">?</div>
         <div><b id="whoemail">…</b><div class="mut" id="whorole"></div></div></div>
@@ -197,7 +195,7 @@ __THEME_CSS__
           <div class="stat"><b id="st-voices">25+</b><span>Giọng đọc AI</span></div>
           <div class="stat"><b>2+</b><span>Ngôn ngữ local</span></div>
           <div class="stat"><b>3–8s</b><span>Clone giọng</span></div>
-          <div class="stat"><b id="st-free">50.000</b><span>Credits miễn phí</span></div>
+          <div class="stat"><b id="st-jobs">0</b><span>Job đã xử lý</span></div>
         </div>
       </div>
       <div class="grid2">
@@ -215,7 +213,7 @@ __THEME_CSS__
           <a href="#/jobs" onclick="go('jobs')">Xem tất cả →</a>
         </div>
         <div class="card">
-          <h3>Mức sử dụng của bạn</h3>
+          <h3>Job theo loại</h3>
           <div class="donut-wrap">
             <svg width="120" height="120" viewBox="0 0 120 120">
               <circle cx="60" cy="60" r="48" fill="none" stroke="var(--track)" stroke-width="14"/>
@@ -224,11 +222,11 @@ __THEME_CSS__
                       stroke-dasharray="0 302" transform="rotate(-90 60 60)"/>
               <text x="60" y="56" text-anchor="middle" font-size="17" font-weight="700"
                     fill="var(--fg)" id="donut-used">0</text>
-              <text x="60" y="74" text-anchor="middle" font-size="10" fill="var(--mut)" id="donut-total">/ 50.000</text>
+              <text x="60" y="74" text-anchor="middle" font-size="10" fill="var(--mut)" id="donut-total">Jobs</text>
             </svg>
             <div class="legend" id="legend">…</div>
           </div>
-          <div class="mut" style="margin-top:12px">Số liệu thật từ credit ledger — cập nhật theo từng job.</div>
+          <div class="mut" style="margin-top:12px">Số liệu thật theo từng job — cập nhật liên tục.</div>
         </div>
       </div>
     </section>
@@ -397,9 +395,6 @@ async function refreshMe() {
   if (r.status === 401) { needLogin(); return; }
   const d = await r.json();
   ME = d;
-  $("top-credits").textContent = fmt(d.credits);
-  $("side-free").textContent = fmt(d.credits);
-  $("st-free").textContent = fmt(d.credits);
   $("whoemail").textContent = d.email || "";
   $("avatar").textContent = (d.email || "?").charAt(0).toUpperCase();
   $("whorole").textContent = d.role === "admin" ? "Quản trị viên" : "Người dùng";
@@ -416,21 +411,21 @@ async function loadUsage() {
   const r = await fetch("/v1/usage", { headers: H(), credentials: "same-origin" });
   if (!r.ok) return;
   const d = await r.json();
-  const used = d.used, total = Math.max(d.free_quota, used);
-  const pct = total ? Math.min(100, used / total * 100) : 0;
-  $("donut").setAttribute("stroke-dasharray", (pct/100*302).toFixed(1) + " 302");
-  $("donut-used").textContent = fmt(used);
-  $("donut-total").textContent = "/ " + fmt(d.free_quota);
+  const total = d.total_jobs || 0;
+  // Donut = share số job theo loại (không có hạn mức — self-host miễn phí).
+  $("donut").setAttribute("stroke-dasharray", (total ? Math.min(302, 302*0.999) : 0).toFixed(1) + " 302");
+  $("donut-used").textContent = fmt(total);
+  $("st-jobs").textContent = fmt(total);
   // Màu đọc từ CSS var -> tự đổi theo theme (không hardcode hex ở đây).
   const colors = chartColors();
   const names = { tts:"TTS", stt:"STT", translate:"Dịch thuật", dub:"Dub video", subtitle:"Phụ đề", other:"Khác" };
   let html = "";
   for (const [t, n] of Object.entries(d.by_type)) {
     const c = colors[t.split("_")[0]] || vvCssVar("--chart-other");
-    html += `<div><i style="background:${c}"></i>${esc(names[t.split("_")[0]]||t)} — <b>${fmt(n)}</b>
+    html += `<div><i style="background:${c}"></i>${esc(names[t.split("_")[0]]||t)} — <b>${fmt(n)} job</b>
       <div class="usagebar"><i style="width:${total?n/total*100:0}%;background:${c}"></i></div></div>`;
   }
-  $("legend").innerHTML = html || '<span class="mut">Chưa sử dụng — tạo job đầu tiên!</span>';
+  $("legend").innerHTML = html || '<span class="mut">Chưa có job nào — tạo job đầu tiên!</span>';
 }
 
 function chartColors() {
@@ -499,7 +494,7 @@ async function submitDub() {
       target_lang: $("tgtlang").value, background_mode: $("bgmode").value }) });
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || r.status);
-    flash("✔ Job " + d.job_id + " đã tạo (−" + d.credits_charged + " credits). Xem tab Jobs.");
+    flash("✔ Job " + d.job_id + " đã tạo. Xem tab Jobs.");
     go("jobs");
   } catch (e) { flash("✗ " + e.message, "err"); }
 }

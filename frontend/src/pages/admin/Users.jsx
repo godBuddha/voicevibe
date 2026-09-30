@@ -5,8 +5,7 @@ export default function AdminUsers() {
   const { api } = useApi();
   const [users, setUsers] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newUser, setNewUser] = useState({ email: '', password: '', role: 'user', credits: 0 });
-  const [selectedUser, setSelectedUser] = useState(null);
+  const [newUser, setNewUser] = useState({ email: '', password: '', role: 'user' });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -15,7 +14,7 @@ export default function AdminUsers() {
 
   const fetchUsers = async () => {
     try {
-      // Backend trả {users: [{user_id, email, role, is_active, credits, ...}]} —
+      // Backend trả {users: [{user_id, email, role, is_active, ...}]} —
       // trang đọc {id, status}. Chuyển tại đây, một điểm duy nhất.
       const data = await api.get('/v1/admin/users');
       setUsers((data.users || []).map(u => ({
@@ -32,12 +31,11 @@ export default function AdminUsers() {
     try {
       // Backend CreateUserIn bắt buộc password (tối thiểu theo chính sách) —
       // bản mock không cần nên form đầu tiên thiếu ô này, đã thêm.
-      const res = await api.post('/v1/admin/users', {
+      await api.post('/v1/admin/users', {
         body: {
           email: newUser.email,
           password: newUser.password,
           role: newUser.role,
-          credits: newUser.credits || undefined,
         },
       });
       const data = await api.get('/v1/admin/users');
@@ -45,7 +43,7 @@ export default function AdminUsers() {
         ...u, id: u.user_id, status: u.is_active ? 'active' : 'suspended',
       })));
       setShowCreateModal(false);
-      setNewUser({ email: '', password: '', role: 'user', credits: 0 });
+      setNewUser({ email: '', password: '', role: 'user' });
     } catch (err) {
       alert('Lỗi khi tạo user: ' + err.message);
     } finally {
@@ -66,20 +64,6 @@ export default function AdminUsers() {
     }
   };
 
-  const updateCredits = async (user, newCredits) => {
-    try {
-      // Backend nhận CHÊNH LỆCH {delta, reason}, không nhận giá trị tuyệt đối.
-      const delta = Number(newCredits) - Number(user.credits || 0);
-      if (!delta) return;
-      await api.post(`/v1/admin/users/${user.id}/credits`, {
-        body: { delta, reason: 'admin_grant' },
-      });
-      setUsers(users.map(u => u.id === user.id ? { ...u, credits: newCredits } : u));
-    } catch (err) {
-      alert('Lỗi khi cập nhật credits: ' + err.message);
-    }
-  };
-
   const toggleStatus = async (id, active) => {
     try {
       await api.post(`/v1/admin/users/${id}/${active ? 'activate' : 'deactivate'}`, {});
@@ -87,17 +71,6 @@ export default function AdminUsers() {
     } catch (err) {
       alert('Lỗi khi thay đổi trạng thái: ' + err.message);
     }
-  };
-
-  const editUser = (user) => {
-    setSelectedUser({ ...user, tempCredits: user.credits });
-  };
-
-  const saveEdit = () => {
-    if (selectedUser.tempCredits !== selectedUser.credits) {
-      updateCredits(selectedUser, selectedUser.tempCredits);
-    }
-    setSelectedUser(null);
   };
 
   return (
@@ -220,26 +193,6 @@ export default function AdminUsers() {
                   <option value="admin">Admin</option>
                 </select>
               </div>
-              <div>
-                <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '8px', fontWeight: 600 }}>
-                  Credits ban đầu
-                </label>
-                <input
-                  type="number"
-                  value={newUser.credits}
-                  onChange={(e) => setNewUser({ ...newUser, credits: parseInt(e.target.value) || 0 })}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    borderRadius: 'var(--radius)',
-                    border: '1px solid var(--border)',
-                    fontSize: 'var(--text-base)',
-                    background: 'var(--bg)',
-                    color: 'var(--text)',
-                  }}
-                  min={0}
-                />
-              </div>
             </div>
             <div style={{ display: 'flex', gap: '12px', marginTop: '24px' }}>
               <button
@@ -263,7 +216,7 @@ export default function AdminUsers() {
                 onClick={() => {
                   if (!loading) {
                     setShowCreateModal(false);
-                    setNewUser({ email: '', role: 'user', credits: 0 });
+                    setNewUser({ email: '', role: 'user' });
                   }
                 }}
                 style={{
@@ -291,7 +244,6 @@ export default function AdminUsers() {
               <tr>
                 <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)' }}>Email</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)' }}>Vai trò</th>
-                <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)' }}>Credits</th>
                 <th style={{ padding: '16px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)' }}>Trạng thái</th>
                 <th style={{ padding: '16px', textAlign: 'center', fontWeight: 600, color: 'var(--text-dim)' }}>Hành động</th>
               </tr>
@@ -313,23 +265,6 @@ export default function AdminUsers() {
                     </span>
                   </td>
                   <td style={{ padding: '16px' }}>
-                    {selectedUser?.id === user.id ? (
-                      <input
-                        type="number"
-                        value={selectedUser.tempCredits}
-                        onChange={(e) => setSelectedUser({ ...selectedUser, tempCredits: parseInt(e.target.value) || 0 })}
-                        style={{
-                          padding: '4px 8px',
-                          borderRadius: 'var(--radius-xs)',
-                          border: '1px solid var(--border)',
-                          width: '120px',
-                        }}
-                      />
-                    ) : (
-                      user.credits.toLocaleString('vi-VN')
-                    )}
-                  </td>
-                  <td style={{ padding: '16px' }}>
                     <span style={{
                       padding: '4px 12px',
                       borderRadius: 'var(--radius-xs)',
@@ -343,83 +278,34 @@ export default function AdminUsers() {
                   </td>
                   <td style={{ padding: '16px' }}>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                      {selectedUser?.id === user.id ? (
-                        <>
-                          <button
-                            onClick={saveEdit}
-                            style={{
-                              background: 'var(--success-light)',
-                              color: 'var(--success)',
-                              border: 'none',
-                              padding: '4px 8px',
-                              borderRadius: 'var(--radius-xs)',
-                              fontSize: 'var(--text-xs)',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Lưu
-                          </button>
-                          <button
-                            onClick={() => setSelectedUser(null)}
-                            style={{
-                              background: 'var(--bg)',
-                              color: 'var(--text-dim)',
-                              border: '1px solid var(--border)',
-                              padding: '4px 8px',
-                              borderRadius: 'var(--radius-xs)',
-                              fontSize: 'var(--text-xs)',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Huỷ
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => resetPassword(user.id)}
-                            style={{
-                              background: 'var(--info-light)',
-                              color: 'var(--info)',
-                              border: 'none',
-                              padding: '4px 8px',
-                              borderRadius: 'var(--radius-xs)',
-                              fontSize: 'var(--text-xs)',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Reset mật khẩu
-                          </button>
-                          <button
-                            onClick={() => editUser(user)}
-                            style={{
-                              background: 'var(--warning-light)',
-                              color: 'var(--warning)',
-                              border: 'none',
-                              padding: '4px 8px',
-                              borderRadius: 'var(--radius-xs)',
-                              fontSize: 'var(--text-xs)',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            Sửa credit
-                          </button>
-                          <button
-                            onClick={() => toggleStatus(user.id, user.status !== 'active')}
-                            style={{
-                              background: user.status === 'active' ? 'var(--danger-light)' : 'var(--success-light)',
-                              color: user.status === 'active' ? 'var(--danger)' : 'var(--success)',
-                              border: 'none',
-                              padding: '4px 8px',
-                              borderRadius: 'var(--radius-xs)',
-                              fontSize: 'var(--text-xs)',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            {user.status === 'active' ? 'Chặn' : 'Mở lại'}
-                          </button>
-                        </>
-                      )}
+                      <button
+                        onClick={() => resetPassword(user.id)}
+                        style={{
+                          background: 'var(--info-light)',
+                          color: 'var(--info)',
+                          border: 'none',
+                          padding: '4px 8px',
+                          borderRadius: 'var(--radius-xs)',
+                          fontSize: 'var(--text-xs)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Reset mật khẩu
+                      </button>
+                      <button
+                        onClick={() => toggleStatus(user.id, user.status !== 'active')}
+                        style={{
+                          background: user.status === 'active' ? 'var(--danger-light)' : 'var(--success-light)',
+                          color: user.status === 'active' ? 'var(--danger)' : 'var(--success)',
+                          border: 'none',
+                          padding: '4px 8px',
+                          borderRadius: 'var(--radius-xs)',
+                          fontSize: 'var(--text-xs)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {user.status === 'active' ? 'Chặn' : 'Mở lại'}
+                      </button>
                     </div>
                   </td>
                 </tr>

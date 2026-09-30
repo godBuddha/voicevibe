@@ -83,7 +83,7 @@ export default function AdminSettings() {
     }
   };
 
-  // Nhóm theo ĐOẠN TRƯỚC DẤU CHẤM (`pricing.tts` → nhóm `pricing`) — trước đây
+  // Nhóm theo ĐOẠN TRƯỚC DẤU CHẤM (`translate.backend` → nhóm `translate`) — trước đây
   // tách theo `_` nên từng key thành một nhóm riêng lẻ, trang dài lê thê.
   const grouped = rows.reduce((acc, row) => {
     const category = row.key.split('.')[0] || 'khác';

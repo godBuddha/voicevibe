@@ -54,7 +54,6 @@ const SHOTS = [
   ['16-translate-audio', '/translate-audio', true],
   ['07-jobs', '/jobs', true],
   ['08-api-keys', '/api-keys', true],
-  ['09-pricing', '/pricing', true],
   ['10-admin-users', '/admin/users', true],
   ['11-admin-model-hub', '/admin/model-hub', true],
   ['12-admin-settings', '/admin/settings', true],
@@ -72,7 +71,7 @@ await page.setCookie(sessionCookie);
 
 // Chrome headless mặc định `prefers-color-scheme: dark` — useTheme đọc matchMedia
 // lúc mount nên mọi ảnh "sáng" thành ra dark y hệt ảnh dark (đã gặp thật: cả bộ
-// 15 ảnh F5 đều dark, 00=01=13 và 02=14 trùng byte). Ép sáng làm mặc định; ảnh
+// ảnh F5 đều dark, 00=01=13 và 02=14 trùng byte). Ép sáng làm mặc định; ảnh
 // dark đặt riêng ở dưới.
 await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: 'light' }]);
 

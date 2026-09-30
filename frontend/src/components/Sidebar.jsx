@@ -40,7 +40,6 @@ const navigation = [
 const bottomLinks = [
   { label: 'Lịch sử Jobs', to: '/jobs' },
   { label: 'API cho nhà phát triển', to: '/api-keys' },
-  { label: 'Gói dịch vụ & Giá', to: '/pricing' },
 ];
 
 const adminLinks = [
@@ -72,7 +71,7 @@ export default function Sidebar() {
         transition: 'width 0.3s',
         zIndex: 'var(--z-sidebar)',
         // Cả cột cuộn một khối: trước đây vùng menu có cuộn riêng (flex:1 +
-        // overflow:auto) còn phần cuối (Jobs/API/Giá/Quản trị/thẻ khuyến mãi)
+        // overflow:auto) còn phần cuối (Jobs/API/Quản trị)
         // chiếm gần nửa chiều cao -> vùng menu còn ~5 dòng, "Chuyển giọng nói
         // thành văn bản", "Dịch video"... bị giấu dưới cuộn không ai thấy.
       }}
@@ -216,38 +215,6 @@ export default function Sidebar() {
             {expanded ? link.label : link.label.charAt(0)}
           </Link>
         ))}
-
-        {expanded && (
-          <div
-            style={{
-              background: 'linear-gradient(135deg, var(--gradient-start), var(--gradient-end))',
-              borderRadius: 'var(--radius)',
-              padding: '16px',
-              color: '#fff',
-            }}
-          >
-            <h5 style={{ fontSize: 'var(--text-sm)', fontWeight: 700, marginBottom: '4px' }}>
-              Miễn phí 50.000 Credits
-            </h5>
-            <p style={{ fontSize: 'var(--text-xs)', opacity: 0.9, marginBottom: '12px' }}>
-              Bắt dùng ngay các tính năng AI
-            </p>
-            <button
-              style={{
-                background: '#fff',
-                color: 'var(--primary)',
-                borderRadius: 'var(--radius-full)',
-                padding: '8px 16px',
-                fontSize: 'var(--text-xs)',
-                fontWeight: 600,
-                width: '100%',
-                border: 'none',
-              }}
-            >
-              Nâng cấp
-            </button>
-          </div>
-        )}
       </div>
     </aside>
   );

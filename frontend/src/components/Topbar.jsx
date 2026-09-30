@@ -48,22 +48,6 @@ export default function Topbar() {
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '6px 12px',
-            borderRadius: 'var(--radius-full)',
-            background: 'var(--info-light)',
-            color: 'var(--info)',
-            fontSize: 'var(--text-sm)',
-            fontWeight: 600,
-          }}
-        >
-          <span>💎 Credits: {(user?.credits ?? 0).toLocaleString('vi-VN')}</span>
-        </div>
-
         <button
           onClick={toggle}
           title={theme === 'dark' ? 'Chuyển sang sáng' : 'Chuyển sang tối'}

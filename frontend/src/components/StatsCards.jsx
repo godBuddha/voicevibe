@@ -1,11 +1,10 @@
 export function StatsCards({ usage }) {
+  // Self-host miễn phí: thống kê ĐẾM JOB, không có đơn vị tiền tệ.
   const stats = [
-    { label: 'Tổng credit đã dùng', value: usage?.used.toLocaleString('vi-VN') ?? 0, color: 'var(--primary)' },
-    // BẪY NaN: khi usage chưa load (null) phép trừ cho NaN, và `?? 0` không
-    // cứu được vì NaN là giá trị TRUTHY — đã từng hiển thị "NaN" ra màn hình.
-    { label: 'Credit còn lại', value: (usage ? usage.limit - usage.used : 0).toLocaleString('vi-VN'), color: 'var(--success)' },
-    { label: 'Tổng jobs đã xử lý', value: usage?.totalJobs || 0, color: 'var(--info)' },
-    { label: 'Jobs đang chạy', value: usage?.runningJobs || 0, color: 'var(--warning)' },
+    { label: 'Tổng jobs', value: usage?.totalJobs || 0, color: 'var(--primary)' },
+    { label: 'Hoàn thành', value: usage?.byStatus?.done || 0, color: 'var(--success)' },
+    { label: 'Jobs đang chạy', value: usage?.running || 0, color: 'var(--warning)' },
+    { label: 'Thất bại', value: usage?.byStatus?.failed || 0, color: 'var(--danger)' },
   ];
 
   return (

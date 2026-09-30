@@ -59,7 +59,7 @@ export default function Dashboard() {
             Bắt đầu ngay
           </button>
           <button
-            onClick={() => navigate('/pricing')}
+            onClick={() => navigate('/tts')}
             style={{
               background: 'rgba(255,255,255,0.2)',
               color: '#fff',
@@ -71,7 +71,7 @@ export default function Dashboard() {
               cursor: 'pointer',
             }}
           >
-            Xem gói dịch vụ
+            Tạo giọng nói đầu tiên
           </button>
         </div>
       </div>
@@ -89,7 +89,7 @@ export default function Dashboard() {
 
         {/* Right sidebar */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-          {/* Usage donut */}
+          {/* Usage donut — đếm theo JOB (self-host miễn phí, không có đơn vị tiền) */}
           <div
             style={{
               background: 'var(--surface)',
@@ -99,43 +99,9 @@ export default function Dashboard() {
             }}
           >
             <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: '20px', fontWeight: 700 }}>
-              Mức sử dụng của bạn
+              Job theo loại
             </h3>
             <DonutChart usage={usage} />
-          </div>
-
-          {/* Upgrade card */}
-          <div
-            style={{
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '24px',
-              marginTop: '24px',
-            }}
-          >
-            <h3 style={{ fontSize: 'var(--text-lg)', marginBottom: '12px', fontWeight: 700 }}>
-              Nâng cấp gói Yêu Thương
-            </h3>
-            <p style={{ color: 'var(--text-dim)', fontSize: 'var(--text-sm)', marginBottom: '20px' }}>
-              Nhận đến 2 triệu credits mỗi tháng và các tính năng ưu tiên
-            </p>
-            <button
-              onClick={() => navigate('/pricing')}
-              style={{
-                background: 'var(--gradient)',
-                color: '#fff',
-                border: 'none',
-                width: '100%',
-                padding: '12px 20px',
-                borderRadius: 'var(--radius)',
-                fontWeight: 600,
-                cursor: 'pointer',
-                fontSize: 'var(--text-base)',
-              }}
-            >
-              Xem gói nâng cấp
-            </button>
           </div>
         </div>
       </div>

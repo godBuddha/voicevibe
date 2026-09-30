@@ -1,7 +1,7 @@
 """Day 2 self-test — runs fully offline on SQLite, no Redis/GPU needed.
 
-Verifies: ORM roundtrip, Celery task registration, credit metering (402 path),
-full API loop with inline dispatch (queued -> running -> done).
+Verifies: ORM roundtrip, Celery task registration, full API loop with inline
+dispatch (queued -> running -> done), cancel/delete job, usage = job counts.
 
 Run:  cd backend && python tests/test_day2.py
 """
@@ -20,7 +20,7 @@ os.environ.pop("VOICEVIBE_API_KEYS", None)  # force DB-key auth path
 pathlib.Path("voicevibe_test.db").unlink(missing_ok=True)
 
 from app.db import Base, SessionLocal, engine  # noqa: E402
-from app.models import ApiKey, CreditLedger, User, Voice  # noqa: E402
+from app.models import ApiKey, User, Voice  # noqa: E402
 
 # API keys are stored SHA-256 hashed (DB dump exposes no usable keys).
 TEST_KEY = "test-key-123"
@@ -40,7 +40,9 @@ with SessionLocal() as db:
 # 1) ORM roundtrip
 with SessionLocal() as db:
     u = db.get(User, uid)
-    assert u.credits == 50_000, u.credits
+    # Hệ thống credits đã gỡ: model User KHÔNG còn cột `credits` — attribute cũ
+    # sót lại là dấu hiệu schema lệch.
+    assert not hasattr(u, "credits"), "User.credits phải đã bị gỡ"
     assert len(u.api_keys) == 1 and len(u.voices) == 1
 
 # 2) Celery task registered (no broker connection needed for this)
@@ -95,7 +97,9 @@ r = c.post("/v1/jobs", json={
 assert r.status_code == 202, r.text
 body = r.json()
 jid = body["job_id"]
-assert body["credits_charged"] == 2 and body["dispatch"] == "inline"
+assert body["dispatch"] == "inline", body
+# Self-host miễn phí: response tạo job KHÔNG còn field `credits_charged`.
+assert "credits_charged" not in body, body
 
 r = c.get(f"/v1/jobs/{jid}", headers=h)
 assert r.status_code == 200 and r.json()["status"] == "done", r.text
@@ -111,8 +115,8 @@ res = r.json()
 assert res["kind"] == "text" and res["filename"].endswith(".txt"), res
 assert res["content"] == "TRANSLATED", res
 
-# 3b) dub job with missing media -> status failed + FULL REFUND (failed jobs
-#     are free; regression guard for the JobStatus NameError + refund logic).
+# 3b) dub job with missing media -> status failed, KHÔNG trừ/hoàn gì (job miễn
+#     phí — guard hồi quy cho JobStatus NameError từng gặp).
 r = c.post("/v1/jobs", json={
     "type": "dub",
     "media_url": "s3://inbox/does-not-exist.mp4",
@@ -126,7 +130,7 @@ assert r.status_code == 200 and r.json()["status"] == "failed", r.text
 assert "media not found" in r.json()["error"], r.text
 
 # 3c) subtitle: ĐÃ có pipeline thật (trước đây 501). Cấu hình sai phải bị chặn
-#     bằng 422 TRƯỚC khi trừ credit — cùng nguyên tắc với quyền sở hữu voice.
+#     bằng 422 TRƯỚC khi tạo job — job hỏng không được phép sinh ra.
 r = c.post("/v1/jobs", json={"type": "subtitle", "text": "hi"}, headers=h)
 assert r.status_code == 422, r.text
 assert "media_url" in r.json()["detail"], r.text
@@ -141,19 +145,16 @@ r = c.post("/v1/jobs", json={"type": "subtitle", "media_url": "media/x.wav",
 assert r.status_code == 422, r.text
 assert "target_lang" in r.json()["detail"], r.text
 
-# cấu hình hợp lệ -> nhận job (202) và TRỪ credit như mọi job thật
-_before = c.get("/v1/me", headers=h).json()["credits"]
+# cấu hình hợp lệ -> nhận job (202), pipeline hỏng (thiếu media) -> failed
 r = c.post("/v1/jobs", json={"type": "subtitle", "media_url": "media/khong-co.wav",
                              "source_lang": "vi"}, headers=h)
 assert r.status_code == 202, r.text
-assert r.json()["credits_charged"] > 0, r.text
-# pipeline hỏng (thiếu media) -> hoàn đủ credit
+assert "credits_charged" not in r.json(), r.text
 import time as _t  # noqa: E402
 
 _t.sleep(1)
 r = c.get(f"/v1/jobs/{r.json()['job_id']}", headers=h)
 assert r.json()["status"] == "failed", r.text
-assert c.get("/v1/me", headers=h).json()["credits"] == _before, "phải hoàn đủ credit"
 
 # 3d) signup: TẮT mặc định (chính sách Phase 2 — hệ thống self-host chỉ Admin tạo
 #     tài khoản). Bật công tắc thì mới tạo được, và KHÔNG bao giờ tạo admin.
@@ -213,24 +214,17 @@ assert r.status_code == 404, r.text
 r = c.get("/v1/me", headers={"X-API-Key": raw_key})
 assert r.status_code == 401, "key đã thu hồi mà vẫn dùng được?"
 
-# 4) credit metering + ledger: translate -2 stays; dub -60 và subtitle -8 hoàn lại
-#    vì cả hai đều fail (thiếu media thật) — mỗi lần trừ đều phải có dòng ledger.
-r = c.get("/v1/me", headers=h)
-assert r.json()["credits"] == 50_000 - 2, r.json()
-
-with SessionLocal() as db:
-    from sqlalchemy import select
-    rows = db.scalars(select(CreditLedger).where(CreditLedger.user_id == uid)).all()
-    got = sorted((r.reason, r.delta) for r in rows)
-    assert got == [
-        ("job:dub", -60), ("job:subtitle", -8), ("job:translate", -2),
-        ("refund:job:dub", 60), ("refund:job:subtitle", 8),
-    ], got
-    # mọi lần trừ/hoàn đều phải gắn job_id — không có dòng ledger mồ côi.
-    # (Trước đây là so khớp cứng `== {jid, djid}`; cách đó vỡ ngay khi thêm một
-    # loại job mới, mà không nói lên điều gì về tính đúng đắn.)
-    assert all(r.job_id for r in rows), [r.reason for r in rows if not r.job_id]
-    assert {jid, djid} <= {r.job_id for r in rows}
+# 4) /v1/usage = ĐẾM JOB (hệ thống credits đã gỡ). Lúc điểm này đã có: 1 job
+#    translate done + 1 dub failed + 1 subtitle failed.
+r = c.get("/v1/usage", headers=h)
+assert r.status_code == 200, r.text
+u_out = r.json()
+assert u_out["total_jobs"] == 3, u_out
+assert u_out["by_type"] == {"translate": 1, "dub": 1, "subtitle": 1}, u_out
+assert u_out["by_status"] == {"done": 1, "failed": 2}, u_out
+assert u_out["running"] == 0, u_out
+# field của hệ thống cũ không được quay lại
+assert "free_quota" not in u_out and "used" not in u_out and "total" not in u_out, u_out
 
 # 3g) speaker_voices: JobIn phải GIỮ được map người-nói→giọng. Trước đây
 #     pydantic ÂM THẦM bỏ field này → pipeline luôn xoay vòng preset bất kể
@@ -250,21 +244,17 @@ _t.sleep(1)
 r = c.get(f"/v1/jobs/{sv_jid}", headers=h)
 assert r.json()["status"] == "failed", r.text
 
-# 5) insufficient credits -> 402
-with SessionLocal() as db:
-    u = db.get(User, uid)
-    u.credits = 1
-    db.commit()
-r = c.post("/v1/jobs", json={"type": "dub"}, headers=h)
-assert r.status_code == 402, r.text
+# 5) /v1/me KHÔNG còn `credits` (response schema đã thu gọn)
+r = c.get("/v1/me", headers=h)
+assert r.status_code == 200 and "credits" not in r.json(), r.text
 
-# 6) invalid type -> 422
+# 6) invalid type -> 422 (validation, không còn đường 402-theo-credit)
 r = c.post("/v1/jobs", json={"type": "hack"}, headers=h)
-assert r.status_code == 402 or r.status_code == 401 or r.status_code == 422
+assert r.status_code == 422, r.text
 
-# 7) HỦY job + HOÀN credit. Trước đây không có endpoint hủy: job kẹt
-#    running/queued mãi mãi, credit bị treo theo (đã gặp thật với job TTS
-#    "running" suốt nhiều giờ sau khi worker rớt giữa đường).
+# 7) HỦY job (miễn phí — không còn hoàn credit). Trước đây không có endpoint
+#    hủy: job kẹt running/queued mãi mãi (đã gặp thật với job TTS "running"
+#    suốt nhiều giờ sau khi worker rớt giữa đường).
 #    7a) hủy job QUEUED (dựng trực tiếp trong DB — inline mode chạy xong ngay
 #        nên không tạo được job chờ bằng API):
 from sqlalchemy import select  # noqa: E402
@@ -274,28 +264,16 @@ from app.storage import get_storage  # noqa: E402
 
 with SessionLocal() as db:
     q = Job(user_id=uid, type="dub", status=JobStatus.queued,
-            params={"media_url": "s3://inbox/x.mp4"}, credits_charged=60,
-            task_id="fake-task-id")
+            params={"media_url": "s3://inbox/x.mp4"}, task_id="fake-task-id")
     db.add(q)
     db.commit()
     qid = q.id
-    u0 = db.get(User, uid)
-    before = u0.credits
-    # mô phỏng đúng 1 lần charge: -60 cả số dư lẫn ledger
-    u0.credits -= 60
-    db.add(CreditLedger(user_id=uid, delta=-60, reason="job:dub", job_id=qid))
-    db.commit()
 r = c.post(f"/v1/jobs/{qid}/cancel", headers=h)
 assert r.status_code == 200, r.text
-assert r.json()["status"] == "cancelled" and r.json()["refunded"] == 60, r.text
+body = r.json()
+assert body == {"job_id": qid, "status": "cancelled"}, body  # hết `refunded`
 with SessionLocal() as db:
     assert db.get(Job, qid).status == JobStatus.cancelled
-    # hoàn đúng 60: số dư về nguyên状态 trước lúc trừ
-    assert db.get(User, uid).credits == before, "hoàn sai lệch so với đã trừ"
-    led = [x for x in db.scalars(select(CreditLedger)
-            .where(CreditLedger.job_id == qid)).all()]
-    assert sorted((x.reason, x.delta) for x in led) == [
-        ("job:dub", -60), ("refund:job:dub", 60)], led
 #    7b) hủy lần nữa -> 409; hủy job đã done -> 409
 r = c.post(f"/v1/jobs/{qid}/cancel", headers=h)
 assert r.status_code == 409, r.text
@@ -309,7 +287,7 @@ with SessionLocal() as db:
     db.commit()
     oid = other.id
     oj = Job(user_id=oid, type="tts", status=JobStatus.queued,
-             params={"text": "x"}, credits_charged=10)
+             params={"text": "x"})
     db.add(oj)
     db.commit()
     ojid = oj.id
@@ -321,7 +299,7 @@ assert r.status_code == 404, r.text
 #        thay ở phần 3a, không còn là bản thật để test guard).
 with SessionLocal() as db:
     cc = Job(user_id=uid, type="tts", status=JobStatus.cancelled,
-             params={"type": "tts", "text": "abc"}, credits_charged=0)
+             params={"type": "tts", "text": "abc"})
     db.add(cc)
     db.commit()
     ccid = cc.id
@@ -334,7 +312,7 @@ with SessionLocal() as db:
 #    8a) xóa job đang chạy -> 409 (phải hủy trước)
 with SessionLocal() as db:
     rr = Job(user_id=uid, type="tts", status=JobStatus.running,
-             params={"text": "x"}, credits_charged=10)
+             params={"text": "x"})
     db.add(rr)
     db.commit()
     rid = rr.id
@@ -356,7 +334,7 @@ assert not storage.exists(f"jobs/{qid}/output.wav"), "file rác không được 
 #    8c) file DÙNG CHUNG (jobs/tts/...) KHÔNG được đụng khi xóa job
 with SessionLocal() as db:
     jj2 = Job(user_id=uid, type="tts", status=JobStatus.done,
-              params={"text": "x"}, credits_charged=10,
+              params={"text": "x"},
               result_s3_key="jobs/tts/shared-hash.wav")
     db.add(jj2)
     db.commit()
@@ -376,6 +354,6 @@ print("Voices GET/DELETE ..... OK")
 print("Keys prefix revoke ... OK")
 print("speaker_voices field .. OK")
 print("Result payload shape .. OK")
-print("Credit metering 402 ... OK")
-print("Ledger row ............ OK")
+print("Usage = job counts .... OK")
+print("Cancel/delete job ..... OK")
 print("DAY 2 SELFTEST PASSED")

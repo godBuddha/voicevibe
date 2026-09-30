@@ -2,9 +2,8 @@ import { useEffect, useRef } from 'react';
 
 export function DonutChart({ usage }) {
   const canvasRef = useRef(null);
-  const total = usage?.limit || 100;
-  const used = usage?.used || 0;
-  const percent = total > 0 ? (used / total) * 100 : 0;
+  // Đếm JOB theo loại (self-host miễn phí — không có đơn vị tiền tệ).
+  const total = usage?.totalJobs || 0;
 
   const breakdown = usage?.breakdown || {};
   // Đủ màu cho MỌI loại job (trước đây thiếu stt/dub/subtitle → vẽ không màu
@@ -17,6 +16,14 @@ export function DonutChart({ usage }) {
     dub: '#8b5cf6',
     subtitle: '#14b8a6',
     other: '#f59e0b',
+  };
+  const labels = {
+    tts: 'TTS',
+    translate: 'Dịch thuật',
+    video: 'Video AI',
+    stt: 'STT',
+    dub: 'Lồng tiếng',
+    subtitle: 'Phụ đề',
   };
 
   useEffect(() => {
@@ -39,12 +46,12 @@ export function DonutChart({ usage }) {
     ctx.lineWidth = lineWidth;
     ctx.stroke();
 
-    // Draw segments
+    // Draw segments — mỗi loại chiếm phần của TỔNG job
     let currentAngle = -Math.PI / 2;
     for (const key of Object.keys(breakdown)) {
       const val = breakdown[key] || 0;
-      if (val === 0) continue;
-      const segAngle = (val / used) * (Math.PI * 2 * (used / total));
+      if (val === 0 || total === 0) continue;
+      const segAngle = (val / total) * Math.PI * 2;
       ctx.beginPath();
       ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + segAngle);
       ctx.strokeStyle = colors[key];
@@ -53,16 +60,16 @@ export function DonutChart({ usage }) {
       currentAngle += segAngle;
     }
 
-    // Center text
+    // Center text — tổng số job
     ctx.fillStyle = 'var(--text)';
     ctx.font = 'bold 24px Inter';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`${percent.toFixed(1)}%`, centerX, centerY - 10);
+    ctx.fillText(`${total.toLocaleString('vi-VN')}`, centerX, centerY - 10);
     ctx.font = '14px Inter';
     ctx.fillStyle = 'var(--text-dim)';
-    ctx.fillText('Đã sử dụng', centerX, centerY + 16);
-  }, [usage, colors, used, total]);
+    ctx.fillText('Jobs', centerX, centerY + 16);
+  }, [usage, colors, total]);
 
   if (!usage) return null;
 
@@ -86,13 +93,18 @@ export function DonutChart({ usage }) {
               }}
             />
             <div style={{ flex: 1, fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
-              { {tts: 'TTS', translate: 'Dịch thuật', video: 'Video AI', stt: 'STT', dub: 'Lồng tiếng', subtitle: 'Phụ đề'}[key] || 'Khác' }
+              {labels[key] || 'Khác'}
             </div>
             <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
               {val.toLocaleString('vi-VN')}
             </div>
           </div>
         ))}
+        {total === 0 && (
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
+            Chưa có job nào — tạo job đầu tiên từ menu bên trái.
+          </div>
+        )}
       </div>
     </div>
   );

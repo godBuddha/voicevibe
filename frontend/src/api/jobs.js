@@ -39,7 +39,7 @@ export async function pollJob(jobId, { onUpdate, timeoutMs = 600000, intervalMs 
   }
 }
 
-// Hủy job đang chờ/đang chạy — server hoàn credit (job hủy thì không tính tiền).
+// Hủy job đang chờ/đang chạy — job miễn phí (self-host), không trừ, không hoàn gì.
 export async function cancelJob(jobId) {
   return api.post(`/v1/jobs/${jobId}/cancel`);
 }

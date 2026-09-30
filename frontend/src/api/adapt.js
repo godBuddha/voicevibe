@@ -6,14 +6,15 @@
 // sót; chuyển ở MỘT điểm (useApi khi không dùng mock) là bề mặt duy nhất phải
 // giữ đồng bộ. Ghi chú bên mỗi hàm: field thật ← field trang mong đợi.
 
-// GET /v1/usage: {free_quota, used, total, by_type}
-//   → {used, limit, breakdown}  (totalJobs/runningJobs tính từ danh sách jobs)
+// GET /v1/usage: {total_jobs, by_type, by_status, running} — ĐẾM JOB (self-host
+//   miễn phí, không có đơn vị tiền tệ).
 export function adaptUsage(u) {
-  if (!u || typeof u !== 'object') return { used: 0, limit: 0, breakdown: {} };
+  if (!u || typeof u !== 'object') return { totalJobs: 0, running: 0, breakdown: {}, byStatus: {} };
   return {
-    used: Number(u.used) || 0,
-    limit: Number(u.free_quota) || 0,
+    totalJobs: Number(u.total_jobs) || 0,
+    running: Number(u.running) || 0,
     breakdown: u.by_type && typeof u.by_type === 'object' ? u.by_type : {},
+    byStatus: u.by_status && typeof u.by_status === 'object' ? u.by_status : {},
   };
 }
 
@@ -41,11 +42,10 @@ export function adaptJob(j) {
     resultKey: j.result_key || null,
     error: j.error || null,
     createdAt: j.created_at ? new Date(j.created_at * 1000) : undefined,
-    // Mới: đủ dữ liệu thật cho panel chi tiết (file/credit/hoàn thành) —
-    // trước đây job.file/creditsUsed/completedAt không bao giờ có.
+    // Mới: đủ dữ liệu thật cho panel chi tiết (file/hoàn thành) — trước đây
+    // job.file/completedAt không bao giờ có.
     params: p,
     label: label || typeLabel,
-    credits: j.credits_charged ?? 0,
     updatedAt: j.updated_at ? new Date(j.updated_at * 1000) : undefined,
   };
 }
@@ -66,7 +66,7 @@ export function adaptVoice(v) {
 }
 
 // GET /v1/auth/me | POST /v1/auth/login | /v1/auth/setup
-//   {user_id, email, role, credits, ...} → {id, name, email, role, credits}
+//   {user_id, email, role, ...} → {id, name, email, role}
 export function adaptUser(u) {
   if (!u || typeof u !== 'object') return null;
   return {
@@ -74,6 +74,5 @@ export function adaptUser(u) {
     name: (u.email || 'user').split('@')[0],
     email: u.email,
     role: u.role,
-    credits: Number(u.credits) || 0,
   };
 }

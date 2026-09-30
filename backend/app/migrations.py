@@ -127,10 +127,20 @@ def ensure_schema(engine: Engine, verbose: bool = False) -> list[str]:
                 cols = {c["name"]: c for c in insp2.get_columns(table.name)}
                 for col in table.columns:
                     info = cols.get(col.name)
-                    if not info or info.get("nullable", True):
-                        continue
+                    # CHỈ siết khi DB còn nullable mà model yêu cầu NOT NULL —
+                    # tức cột vừa ADD COLUMN + backfill ở bước 3/4.
+                    # Bẫy đã gặp thật: điều kiện cũ kiểm ngược (`info.get("nullable",
+                    # True)` -> continue khi cột ĐANG nullable) khiến bước này chạy
+                    # `ALTER ... SET NOT NULL` LẠI trên mọi cột đã NOT NULL trong
+                    # MỌI lần boot. ALTER no-op vẫn lấy AccessExclusiveLock toàn
+                    # bảng -> boot đụng request đang chạy -> Postgres giết một
+                    # bên vì deadlock -> POST /v1/jobs trả 500 ngẫu nhiên
+                    # (đã gặp thật 2 lần trên deployment thật, "ALTER TABLE
+                    # sessions ALTER COLUMN user_id SET NOT NULL" trong pg log).
+                    if not info or not info.get("nullable", True):
+                        continue  # DB đã NOT NULL (hoặc không thấy cột) -> không đụng
                     if col.primary_key or col.nullable:
-                        continue
+                        continue  # PK tự nhiên NOT NULL; model cho NULL thì bỏ qua
                     conn.execute(text(
                         f"ALTER TABLE {_q(engine, table.name)} "
                         f"ALTER COLUMN {_q(engine, col.name)} SET NOT NULL"))

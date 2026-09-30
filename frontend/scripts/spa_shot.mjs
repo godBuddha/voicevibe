@@ -50,6 +50,8 @@ const SHOTS = [
   ['04-voices', '/voices', true],
   ['05-stt', '/stt', true],
   ['06-subtitle', '/subtitle', true],
+  ['15-translate-text', '/translate-text', true],
+  ['16-translate-audio', '/translate-audio', true],
   ['07-jobs', '/jobs', true],
   ['08-api-keys', '/api-keys', true],
   ['09-pricing', '/pricing', true],

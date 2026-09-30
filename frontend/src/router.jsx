@@ -9,6 +9,8 @@ import TTS from './pages/TTS.jsx';
 import Voices from './pages/Voices.jsx';
 import STT from './pages/STT.jsx';
 import Subtitle from './pages/Subtitle.jsx';
+import TranslateText from './pages/TranslateText.jsx';
+import TranslateAudio from './pages/TranslateAudio.jsx';
 import Jobs from './pages/Jobs.jsx';
 import ApiKeys from './pages/ApiKeys.jsx';
 import AdminUsers from './pages/admin/Users.jsx';
@@ -68,6 +70,8 @@ export default createBrowserRouter([
       { path: 'voices', element: <Voices /> },
       { path: 'stt', element: <STT /> },
       { path: 'subtitle', element: <Subtitle /> },
+      { path: 'translate-text', element: <TranslateText /> },
+      { path: 'translate-audio', element: <TranslateAudio /> },
       { path: 'jobs', element: <Jobs /> },
       { path: 'api-keys', element: <ApiKeys /> },
       { path: 'pricing', element: <Pricing /> },

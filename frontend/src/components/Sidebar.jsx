@@ -20,11 +20,9 @@ const navigation = [
   {
     heading: 'DỊCH THUẬT',
     items: [
-      // Dịch văn bản/âm thanh có trong API (type=translate) nhưng chưa có trang
-      // riêng — giữ '#' thay vì trỏ nhầm.
-      { label: 'Dịch văn bản', to: '#' },
+      { label: 'Dịch văn bản', to: '/translate-text' },
       { label: 'Dịch phụ đề', to: '/subtitle' },
-      { label: 'Dịch âm thanh', to: '#' },
+      { label: 'Dịch âm thanh', to: '/translate-audio' },
       { label: 'Dịch video', to: '/dub' },
     ],
   },
@@ -32,8 +30,9 @@ const navigation = [
     heading: 'AI GIỌI NÓI & VIDEO',
     items: [
       { label: 'Chuyển giọng nói thành văn bản', to: '/stt' },
-      { label: 'Tạo video bằng AI', to: '#' },
-      { label: 'Thay đổi giọng nói', to: '#' },
+      // Hai mục mock "Tạo video bằng AI" và "Thay đổi giọng nói" đã bỏ —
+      // backend không có pipeline nào cho chúng, giữ lại chỉ tạo link chết
+      // (đã gặp thật với "Chuyển phụ đề thành giọng nói").
     ],
   },
 ];

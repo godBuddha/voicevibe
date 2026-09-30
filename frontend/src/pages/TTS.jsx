@@ -69,10 +69,10 @@ export default function TTS() {
   return (
     <div style={{ padding: '40px', maxWidth: '1200px', margin: '0 auto' }}>
       <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '24px', fontWeight: 700 }}>
-        TTS Studio
+        Chuyển văn bản thành giọng nói
       </h1>
       <p style={{ color: 'var(--text-dim)', marginBottom: '48px' }}>
-        Chuyển văn bản thành giọng nói tự nhiên với giọng đọc tiếng Việt của bạn
+        Nhập văn bản, chọn giọng đọc (kể cả giọng bạn đã nhân bản ở trang Giọng Clone) và tạo file âm thanh tiếng Việt tự nhiên
       </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '40px' }}>
@@ -86,7 +86,7 @@ export default function TTS() {
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="Xin chào, đây là VoiceVibe TTS Studio. Hãy nhập văn bản bạn muốn chuyển đổi thành giọng nói tại đây..."
+              placeholder="Xin chào, đây là VoiceVibe. Hãy nhập văn bản bạn muốn chuyển đổi thành giọng nói tại đây..."
               rows={12}
               style={{
                 width: '100%',

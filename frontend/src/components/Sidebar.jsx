@@ -8,7 +8,9 @@ const navigation = [
     heading: 'TẠO NỘI DUNG VỚI AI',
     items: [
       { label: 'Chuyển văn bản thành giọng nói', to: '/tts' },
-      { label: 'TTS Studio', to: '/tts' },
+      // LƯU Ý: bản mock từng có thêm mục "TTS Studio" cũng trỏ /tts — hai mục
+      // cùng một trang nên bấm vào đâu cũng sáng cả hai. Hệ thống chỉ có MỘT
+      // tính năng TTS, mục thừa đã bỏ.
       // Chưa có pipeline phụ-đề→giọng-nói: để '#' (hạng mục bị khoá) thay vì
       // trỏ /dub — bản mock trỏ bừa khiến highlight nhầm trên /dub.
       { label: 'Chuyển phụ đề thành giọng nói', to: '#' },
@@ -59,6 +61,7 @@ export default function Sidebar() {
 
   return (
     <aside
+      className="scrollbar-thin"
       style={{
         width: expanded ? 'var(--sidebar-w)' : '64px',
  minWidth: '64px',
@@ -69,6 +72,10 @@ export default function Sidebar() {
         flexDirection: 'column',
         transition: 'width 0.3s',
         zIndex: 'var(--z-sidebar)',
+        // Cả cột cuộn một khối: trước đây vùng menu có cuộn riêng (flex:1 +
+        // overflow:auto) còn phần cuối (Jobs/API/Giá/Quản trị/thẻ khuyến mãi)
+        // chiếm gần nửa chiều cao -> vùng menu còn ~5 dòng, "Chuyển giọng nói
+        // thành văn bản", "Dịch video"... bị giấu dưới cuộn không ai thấy.
       }}
     >
       <div style={{ marginBottom: '32px' }}>
@@ -104,7 +111,7 @@ export default function Sidebar() {
         )}
       </div>
 
-      <div style={{ flex: 1, overflow: 'auto' }} className="scrollbar-thin">
+      <div className="scrollbar-thin">
         {navigation.map((group) => (
           <div key={group.heading} style={{ marginBottom: expanded ? '24px' : '12px' }}>
             {expanded && (

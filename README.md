@@ -108,6 +108,16 @@ mặc định, chế độ tối lật ngay trên thanh trên cùng và được
 |---|---|
 | ![dashboard dark](docs/screenshots/08-dashboard-dark.png) | ![dub dark](docs/screenshots/09-dub-dark.png) |
 
+## Chọn model & phần cứng (local vs cloud)
+
+Chức năng nào nên chạy trên **máy bạn**, chức năng nào nên **thuê mây** — bảng
+quyết định nhanh, rà soát nhà cung cấp từng khâu (kèm giá thật), và đề xuất GPU
+từ dòng RTX 2000: **[docs/models-and-hardware.md](docs/models-and-hardware.md)**.
+
+> Tóm tắt: mây cho **dịch** (tùy chọn cả STT/TTS giá lẻ); 4 khâu **nhân bản
+> giọng, phân biệt ai nói, tách nhạc nền, canh thời gian** bắt buộc chạy local —
+> chuẩn API mây không bán khâu đó. Không có GPU vẫn chạy đủ 5 luồng (CPU mode).
+
 ## Kiểm thử & CI
 
 Mọi push chạy **15 suite offline** trên GitHub Actions — không cần GPU, không tải model:

@@ -224,6 +224,7 @@ class JobStatus(str, enum.Enum):
     running = "running"
     done = "done"
     failed = "failed"
+    cancelled = "cancelled"
 
 
 class Job(Base):
@@ -238,6 +239,9 @@ class Job(Base):
     result_s3_key: Mapped[str | None] = mapped_column(String(512), nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     credits_charged: Mapped[int] = mapped_column(Integer, default=0)
+    # Celery task id — cần để HỦY được job đang chờ/đang chạy (revoke theo id).
+    # KHÔNG có cột này thì không có cách nào ra lệnh cho Celery quăng task.
+    task_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[int] = mapped_column(BigInteger, default=_now)
     updated_at: Mapped[int] = mapped_column(BigInteger, default=_now, onupdate=_now)
 

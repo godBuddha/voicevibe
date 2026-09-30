@@ -222,7 +222,10 @@ def create_job(
     cost = _charge(db, user, j.id, job.type)
     j.credits_charged = cost
     db.commit()
-    mode = dispatch(j.id, j.params)
+    mode, task_id = dispatch(j.id, j.params)
+    # task_id để HỦY được sau này — lưu ngay cả khi dispatch inline (None).
+    j.task_id = task_id
+    db.commit()
     return {"job_id": j.id, "status": j.status.value, "credits_charged": cost, "dispatch": mode}
 
 
@@ -611,7 +614,79 @@ def list_jobs(limit: int = 20, user: User = Depends(auth),
     return {"jobs": [{"job_id": j.id, "type": j.type, "status": j.status.value,
                       "progress": j.progress, "result_key": j.result_s3_key,
                       "error": j.error, "created_at": j.created_at,
+                      "credits_charged": j.credits_charged,
                       "params": j.params, "updated_at": j.updated_at} for j in rows]}
+
+
+def _own_job(job_id: str, user: User, db: Session) -> Job:
+    """Fetch job + kiểm quyền sở hữu (chủ job hoặc admin) — dùng chung cho
+    cancel/delete. IDOR đã là lớp bắt buộc ở mọi endpoint nhận id."""
+    job = db.get(Job, job_id)
+    if job is None or (job.user_id != user.id and user.role != "admin"):
+        raise HTTPException(status_code=404, detail="job not found")
+    return job
+
+
+@app.post("/v1/jobs/{job_id}/cancel")
+def cancel_job(job_id: str, user: User = Depends(auth),
+               db: Session = Depends(get_db)) -> dict:
+    """Hủy job đang chờ/đang chạy + HOÀN credit (job hủy thì không tính tiền).
+
+    - Hủy = gạch trên DB luôn (nhanh, chắc chắn đổi trạng thái) KÈM revoke
+      task Celery theo task_id nếu có: đang chờ → bị vứt không bao giờ chạy;
+      đang chạy → worker dừng giữa đường. Guard `_aborted` trong tasks.py
+      chặn trường hợp task vẫn nhặt được sau hủy (requeue) — nó tự thoát mà
+      không ghi đè trạng thái.
+    - Job đã done/failed/cancelled → 409: không còn gì để hủy.
+    """
+    job = _own_job(job_id, user, db)
+    if job.status in (JobStatus.done, JobStatus.failed, JobStatus.cancelled):
+        raise HTTPException(status_code=409,
+                            detail=f"job {job.status.value} rồi — không hủy được nữa")
+    if job.task_id:
+        try:
+            from .tasks import celery_app
+            # terminate=True: task đang chạy cũng bị dừng; task chờ → bị vứt.
+            celery_app.control.revoke(job.task_id, terminate=True)
+        except Exception:  # noqa: BLE001 — broker chết vẫn phải hủy được trên DB
+            pass
+    job.status = JobStatus.cancelled
+    job.error = "Đã hủy bởi người dùng"
+    job.progress = 100
+    charged = job.credits_charged or 0
+    if charged:
+        owner = db.get(User, job.user_id)
+        if owner is not None:
+            owner.credits += charged
+            db.add(CreditLedger(user_id=owner.id, delta=charged,
+                                reason=f"refund:job:{job.type}", job_id=job.id))
+            job.credits_charged = 0
+    db.commit()
+    return {"job_id": job.id, "status": "cancelled", "refunded": charged}
+
+
+@app.delete("/v1/jobs/{job_id}")
+def delete_job(job_id: str, user: User = Depends(auth),
+               db: Session = Depends(get_db)) -> dict:
+    """Xóa job khỏi lịch sử (chỉ job đã kết thúc — đang chờ/chạy phải HỦY trước).
+
+    Dọn file kết quả RIÊNG của job (nằm trong thư mục `jobs/<id>/`). File TTS
+    dùng chung (`jobs/tts/<hash>.wav`) KHÔNG đụng — có thể đang được job khác
+    tham chiếu, xóa là gãy kết quả của người khác.
+    """
+    job = _own_job(job_id, user, db)
+    if job.status in (JobStatus.queued, JobStatus.running):
+        raise HTTPException(status_code=409,
+                            detail="job đang chờ/chạy — hãy HỦY trước khi xóa")
+    key = job.result_s3_key
+    if key and key.startswith(f"jobs/{job_id}/"):
+        try:
+            get_storage().delete(key)
+        except Exception:  # noqa: BLE001 — thiếu file không chặn việc xóa row
+            pass
+    db.delete(job)
+    db.commit()
+    return {"deleted": job_id}
 
 
 @app.get("/v1/usage")

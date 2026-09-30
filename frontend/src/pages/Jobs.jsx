@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useApi } from '../hooks/useApi.jsx';
-import { getResult } from '../api/jobs.js';
+import { cancelJob, deleteJob, getResult } from '../api/jobs.js';
 import { BASE } from '../api/client.js';
 
 export default function Jobs() {
@@ -109,6 +109,11 @@ export default function Jobs() {
       bg: 'var(--danger-light)',
       label: 'Thất bại',
     },
+    cancelled: {
+      color: 'var(--text-muted)',
+      bg: 'var(--bg)',
+      label: 'Đã hủy',
+    },
   };
 
   const mapType = {
@@ -121,6 +126,47 @@ export default function Jobs() {
 
   // % hiển thị an toàn (trước đây toFixed trên giá trị lạ → NaN% trên UI).
   const fmtPercent = (p) => (Number.isFinite(Number(p)) ? Number(p).toFixed(1) : '0.0');
+
+  // HỦY / XÓA. Hủy = job còn hoạt động (server hoàn credit); Xóa = job đã
+  // kết thúc (dọn khỏi lịch sử + file kết quả riêng). Hành động trên hàng nào
+  // phải stopPropagation — hàng là vùng bấm chọn chi tiết.
+  const [actionError, setActionError] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+
+  const doCancel = async (job, e) => {
+    e.stopPropagation();
+    if (!window.confirm(`Hủy job này? Credit đã trừ sẽ được hoàn lại (${job.credits || 0} credits).`)) return;
+    setBusyId(job.id);
+    setActionError(null);
+    try {
+      await cancelJob(job.id);
+      await fetchJobs();
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const doDelete = async (job, e) => {
+    e.stopPropagation();
+    if (!window.confirm('Xóa vĩnh viễn job này khỏi lịch sử? File kết quả riêng của job cũng bị dọn.')) return;
+    setBusyId(job.id);
+    setActionError(null);
+    try {
+      await deleteJob(job.id);
+      if (selectedIdRef.current === job.id) {
+        selectedIdRef.current = null;
+        setSelectedJob(null);
+      }
+      delete resultCache.current[job.id];
+      await fetchJobs();
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const formatDate = (date) => {
     const d = date ? new Date(date) : null;
@@ -158,6 +204,7 @@ export default function Jobs() {
             <option value="running">Đang chạy</option>
             <option value="done">Hoàn thành</option>
             <option value="failed">Thất bại</option>
+            <option value="cancelled">Đã hủy</option>
           </select>
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -183,8 +230,9 @@ export default function Jobs() {
       </div>
 
       {/* Results count */}
-      <div style={{ marginBottom: '16px', fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
-        Hiển thị {filteredJobs.length} / {jobs.length} job
+      <div style={{ marginBottom: '16px', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>Hiển thị {filteredJobs.length} / {jobs.length} job</span>
+        {actionError && <span style={{ color: 'var(--danger)', fontWeight: 600 }}>{actionError}</span>}
       </div>
 
       {/* Job list */}
@@ -201,10 +249,14 @@ export default function Jobs() {
                 const status = mapStatus[job.status] || { color: 'var(--text-dim)', bg: 'var(--bg)', label: job.status };
                 const type = mapType[job.type] || { label: job.type, icon: '📄' };
                 const isActive = job.status === 'queued' || job.status === 'running';
+                const isBusy = busyId === job.id;
                 return (
-                  <button
+                  <div
                     key={job.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => selectJob(job)}
+                    onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && selectJob(job)}
                     style={{
                       background: selectedJob?.id === job.id ? 'var(--primary-light)' : 'var(--surface)',
                       border: '1px solid var(--border)',
@@ -271,9 +323,42 @@ export default function Jobs() {
                             {job.error}
                           </div>
                         )}
+                        {/* Hành động: Hủy (còn hoạt động) / Xóa (đã kết thúc).
+                            Nút phải stopPropagation — hàng là vùng chọn chi tiết. */}
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                          {isActive && (
+                            <button
+                              disabled={isBusy}
+                              onClick={(e) => doCancel(job, e)}
+                              style={{
+                                background: 'var(--warning-light)', color: 'var(--warning)',
+                                border: 'none', padding: '6px 14px', borderRadius: 'var(--radius)',
+                                fontSize: 'var(--text-xs)', fontWeight: 600,
+                                cursor: isBusy ? 'wait' : 'pointer', opacity: isBusy ? 0.6 : 1,
+                              }}
+                            >
+                              {isBusy ? 'Đang hủy...' : 'Hủy job'}
+                            </button>
+                          )}
+                          {!isActive && (
+                            <button
+                              disabled={isBusy}
+                              onClick={(e) => doDelete(job, e)}
+                              style={{
+                                background: 'var(--bg)', color: 'var(--danger)',
+                                border: '1px solid var(--border)', padding: '6px 14px',
+                                borderRadius: 'var(--radius)', fontSize: 'var(--text-xs)',
+                                fontWeight: 600, cursor: isBusy ? 'wait' : 'pointer',
+                                opacity: isBusy ? 0.6 : 1,
+                              }}
+                            >
+                              {isBusy ? 'Đang xóa...' : 'Xóa'}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>

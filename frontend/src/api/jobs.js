@@ -23,18 +23,30 @@ export async function createJob(payload) {
   return { ...res, jobId: res.job_id };
 }
 
-// Bước 3: chờ job chạy xong. resolve khi `done`/`failed` hoặc hết giờ —
-// KHÔNG ném lỗi khi failed (trang cần hiện `error` của job). Trả shape đã
-// adapt (id/progress{percent}/error) để trang không tự bóc JSON.
+// Bước 3: chờ job chạy xong. resolve khi `done`/`failed`/`cancelled` hoặc hết
+// giờ — KHÔNG ném lỗi khi failed (trang cần hiện `error` của job). Trả shape
+// đã adapt (id/progress{percent}/error) để trang không tự bóc JSON.
+// `cancelled` cũng phải dừng vòng: trước đây job bị hủy bên ngoài khiến vòng
+// poll chạy tới hết timeout vô ích.
 export async function pollJob(jobId, { onUpdate, timeoutMs = 600000, intervalMs = 2000 } = {}) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const job = adaptJob(await api.get(`/v1/jobs/${jobId}`));
     onUpdate?.(job);
-    if (job.status === 'done' || job.status === 'failed') return job;
+    if (job.status === 'done' || job.status === 'failed' || job.status === 'cancelled') return job;
     if (Date.now() > deadline) return job;
     await new Promise((r) => setTimeout(r, intervalMs));
   }
+}
+
+// Hủy job đang chờ/đang chạy — server hoàn credit (job hủy thì không tính tiền).
+export async function cancelJob(jobId) {
+  return api.post(`/v1/jobs/${jobId}/cancel`);
+}
+
+// Xóa job khỏi lịch sử (chỉ job đã kết thúc — server từ chối job còn hoạt động).
+export async function deleteJob(jobId) {
+  return api.del(`/v1/jobs/${jobId}`);
 }
 
 // Bước 4: kết quả. Text (SRT/TXT ≤64KB) → backend gửi kèm `content`. Media →

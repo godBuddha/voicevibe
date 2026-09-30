@@ -262,6 +262,113 @@ assert r.status_code == 402, r.text
 r = c.post("/v1/jobs", json={"type": "hack"}, headers=h)
 assert r.status_code == 402 or r.status_code == 401 or r.status_code == 422
 
+# 7) HỦY job + HOÀN credit. Trước đây không có endpoint hủy: job kẹt
+#    running/queued mãi mãi, credit bị treo theo (đã gặp thật với job TTS
+#    "running" suốt nhiều giờ sau khi worker rớt giữa đường).
+#    7a) hủy job QUEUED (dựng trực tiếp trong DB — inline mode chạy xong ngay
+#        nên không tạo được job chờ bằng API):
+from sqlalchemy import select  # noqa: E402
+
+from app.models import Job, JobStatus  # noqa: E402
+from app.storage import get_storage  # noqa: E402
+
+with SessionLocal() as db:
+    q = Job(user_id=uid, type="dub", status=JobStatus.queued,
+            params={"media_url": "s3://inbox/x.mp4"}, credits_charged=60,
+            task_id="fake-task-id")
+    db.add(q)
+    db.commit()
+    qid = q.id
+    u0 = db.get(User, uid)
+    before = u0.credits
+    # mô phỏng đúng 1 lần charge: -60 cả số dư lẫn ledger
+    u0.credits -= 60
+    db.add(CreditLedger(user_id=uid, delta=-60, reason="job:dub", job_id=qid))
+    db.commit()
+r = c.post(f"/v1/jobs/{qid}/cancel", headers=h)
+assert r.status_code == 200, r.text
+assert r.json()["status"] == "cancelled" and r.json()["refunded"] == 60, r.text
+with SessionLocal() as db:
+    assert db.get(Job, qid).status == JobStatus.cancelled
+    # hoàn đúng 60: số dư về nguyên状态 trước lúc trừ
+    assert db.get(User, uid).credits == before, "hoàn sai lệch so với đã trừ"
+    led = [x for x in db.scalars(select(CreditLedger)
+            .where(CreditLedger.job_id == qid)).all()]
+    assert sorted((x.reason, x.delta) for x in led) == [
+        ("job:dub", -60), ("refund:job:dub", 60)], led
+#    7b) hủy lần nữa -> 409; hủy job đã done -> 409
+r = c.post(f"/v1/jobs/{qid}/cancel", headers=h)
+assert r.status_code == 409, r.text
+done_jid = jid  # job translate đã done ở phần 3
+r = c.post(f"/v1/jobs/{done_jid}/cancel", headers=h)
+assert r.status_code == 409, r.text
+#    7c) job người khác -> 404 (không hủy hộ được)
+with SessionLocal() as db:
+    other = User(email="other@local")
+    db.add(other)
+    db.commit()
+    oid = other.id
+    oj = Job(user_id=oid, type="tts", status=JobStatus.queued,
+             params={"text": "x"}, credits_charged=10)
+    db.add(oj)
+    db.commit()
+    ojid = oj.id
+r = c.post(f"/v1/jobs/{ojid}/cancel", headers=h)
+assert r.status_code == 404, r.text
+#    7d) GUARD worker: pipeline gặp job đã hủy phải TỰ THOÁT, không ghi đè
+#        trạng thái (resurrect). Dùng _run_tts qua dispatch_inline — guard nằm
+#        TRƯỚC mọi engine nên không đụng model; (_run_translate đã bị fake
+#        thay ở phần 3a, không còn là bản thật để test guard).
+with SessionLocal() as db:
+    cc = Job(user_id=uid, type="tts", status=JobStatus.cancelled,
+             params={"type": "tts", "text": "abc"}, credits_charged=0)
+    db.add(cc)
+    db.commit()
+    ccid = cc.id
+out = _tasks.dispatch_inline(ccid, {"type": "tts", "text": "abc"})
+assert out == {"ok": False, "error": "cancelled"}, out
+with SessionLocal() as db:
+    assert db.get(Job, ccid).status == JobStatus.cancelled, "guard bị ghi đè!"
+
+# 8) XÓA job khỏi lịch sử: chỉ job đã kết thúc; dọn file riêng jobs/<id>/
+#    8a) xóa job đang chạy -> 409 (phải hủy trước)
+with SessionLocal() as db:
+    rr = Job(user_id=uid, type="tts", status=JobStatus.running,
+             params={"text": "x"}, credits_charged=10)
+    db.add(rr)
+    db.commit()
+    rid = rr.id
+r = c.delete(f"/v1/jobs/{rid}", headers=h)
+assert r.status_code == 409, r.text
+#    8b) xóa job đã hủy -> OK, row biến mất; file trong jobs/<id>/ cũng bị dọn
+with SessionLocal() as db:
+    jj = db.get(Job, qid)
+    jj.result_s3_key = f"jobs/{qid}/output.wav"
+    db.commit()
+storage = get_storage()
+storage.put(f"jobs/{qid}/output.wav", b"wav-data")
+assert storage.exists(f"jobs/{qid}/output.wav")
+r = c.delete(f"/v1/jobs/{qid}", headers=h)
+assert r.status_code == 200 and r.json()["deleted"] == qid, r.text
+with SessionLocal() as db:
+    assert db.get(Job, qid) is None
+assert not storage.exists(f"jobs/{qid}/output.wav"), "file rác không được dọn"
+#    8c) file DÙNG CHUNG (jobs/tts/...) KHÔNG được đụng khi xóa job
+with SessionLocal() as db:
+    jj2 = Job(user_id=uid, type="tts", status=JobStatus.done,
+              params={"text": "x"}, credits_charged=10,
+              result_s3_key="jobs/tts/shared-hash.wav")
+    db.add(jj2)
+    db.commit()
+    jj2id = jj2.id
+storage.put("jobs/tts/shared-hash.wav", b"shared")
+r = c.delete(f"/v1/jobs/{jj2id}", headers=h)
+assert r.status_code == 200, r.text
+assert storage.exists("jobs/tts/shared-hash.wav"), "xóa nhầm file dùng chung!"
+#    8d) xóa job người khác -> 404
+r = c.delete(f"/v1/jobs/{ojid}", headers=h)
+assert r.status_code == 404, r.text
+
 print("ORM roundtrip ......... OK")
 print("Celery registration ... OK")
 print("API 202/200/409/404 ... OK")

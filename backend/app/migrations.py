@@ -90,6 +90,40 @@ def ensure_schema(engine: Engine, verbose: bool = False) -> list[str]:
     insp = inspect(engine)
     existing_tables = set(insp.get_table_names())
 
+    # 1b) Postgres: THÊM GIÁ TRỊ ENUM còn thiếu. create_all KHÔNG đụng enum type
+    # đã tồn tại, nên thêm giá trị mới vào JobStatus (vd 'cancelled') trên DB cũ
+    # sẽ nổ "invalid input value for enum jobstatus" ở lần ghi đầu tiên (đã gặp
+    # thật: POST /v1/jobs/<id>/cancel -> HTTP 500). SQLite không có enum type
+    # riêng — bỏ qua.
+    if engine.dialect.name == "postgresql":
+        from sqlalchemy import Enum as SAEnum
+
+        with engine.begin() as conn:
+            for table in Base.metadata.sorted_tables:
+                if table.name not in existing_tables:
+                    continue
+                for col in table.columns:
+                    if not isinstance(col.type, SAEnum):
+                        continue
+                    enum_name = col.type.name
+                    wanted = ([v.value for v in col.type.enum_class]
+                              if col.type.enum_class else list(col.type.enums))
+                    have = set(conn.execute(text(
+                        "SELECT e.enumlabel FROM pg_enum e "
+                        "JOIN pg_type t ON t.oid = e.enumtypid "
+                        "WHERE t.typname = :n"), {"n": enum_name}).scalars())
+                    for v in wanted:
+                        if v in have:
+                            continue
+                        esc = str(v).replace("'", "''")
+                        # IF NOT EXISTS: idempotent; ADD VALUE chạy được trong
+                        # transaction từ PG 12 (giá trị mới dùng ở transaction SAU
+                        # là hợp lệ — request ghi 'cancelled' là transaction riêng).
+                        conn.execute(text(
+                            f'ALTER TYPE {_q(engine, enum_name)} '
+                            f"ADD VALUE IF NOT EXISTS '{esc}'"))
+                        actions.append(f"add enum value {enum_name}.{v}")
+
     with engine.begin() as conn:
         for table in Base.metadata.sorted_tables:
             if table.name not in existing_tables:

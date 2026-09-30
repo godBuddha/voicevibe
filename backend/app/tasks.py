@@ -50,11 +50,14 @@ PIPELINES: dict[str, str] = {
 def _set_failed(job, exc: Exception, db) -> None:
     """Mark failed + REFUND charged credits — failed jobs are free.
 
-    Job.credits_charged is zeroed (history stays in the ledger rows); the
+   Job.credits_charged is zeroed (history stays in the ledger rows); the
     refund is a positive ledger row with reason `refund:job:<type>`.
     """
-    from .models import CreditLedger, JobStatus, User
+    from .models import CreditLedger, JobStatus, Job, User
 
+    if job.status == JobStatus.cancelled:
+        # Đã hủy — không ghi đè thành failed, credit đã hoàn ở bước hủy rồi.
+        return
     job.status = JobStatus.failed
     job.error = str(exc)[:500]
     job.progress = 100
@@ -149,6 +152,8 @@ def _run_dub(job_id: str, params: dict) -> dict:
         job = db.get(Job, job_id)
         if job is None:
             return {"ok": False, "error": "job not found"}
+        if _aborted(db, job_id):
+            return {"ok": False, "error": "cancelled"}
         job.status = JobStatus.running
         job.progress = 10
         db.commit()
@@ -194,6 +199,8 @@ def _run_stt(job_id: str, params: dict) -> dict:
         job = db.get(Job, job_id)
         if job is None:
             return {"ok": False, "error": "job not found"}
+        if _aborted(db, job_id):
+            return {"ok": False, "error": "cancelled"}
         job.status = JobStatus.running
         job.progress = 10
         db.commit()
@@ -245,6 +252,8 @@ def _run_subtitle(job_id: str, params: dict) -> dict:
         job = db.get(Job, job_id)
         if job is None:
             return {"ok": False, "error": "job not found"}
+        if _aborted(db, job_id):
+            return {"ok": False, "error": "cancelled"}
         job.status = JobStatus.running
         job.progress = 10
         db.commit()
@@ -319,6 +328,8 @@ def _run_tts(job_id: str, params: dict) -> dict:
         job = db.get(Job, job_id)
         if job is None:
             return {"ok": False, "error": "job not found"}
+        if _aborted(db, job_id):
+            return {"ok": False, "error": "cancelled"}
         job.status = JobStatus.running
         job.progress = 10
         db.commit()
@@ -354,6 +365,8 @@ def _run_translate(job_id: str, params: dict) -> dict:
         job = db.get(Job, job_id)
         if job is None:
             return {"ok": False, "error": "job not found"}
+        if _aborted(db, job_id):
+            return {"ok": False, "error": "cancelled"}
         job.status = JobStatus.running
         job.progress = 10
         db.commit()
@@ -395,6 +408,8 @@ def _run_stub(job_id: str, params: dict) -> dict:
         job = db.get(Job, job_id)
         if job is None:
             return {"ok": False, "error": "job not found"}
+        if _aborted(db, job_id):
+            return {"ok": False, "error": "cancelled"}
         job.status = JobStatus.running
         job.progress = 10
         db.commit()
@@ -427,13 +442,34 @@ def dispatch_inline(job_id: str, params: dict) -> dict:
     return _run_stub(job_id, params)
 
 
-def dispatch(job_id: str, params: dict) -> str:
-    """Send to Celery; inline fallback when VOICEVIBE_INLINE=1 (dev, no Redis)."""
+def dispatch(job_id: str, params: dict) -> tuple[str, str | None]:
+    """Send to Celery; inline fallback when VOICEVIBE_INLINE=1 (dev, no Redis).
+
+    Trả (mode, task_id) — task_id để HỦY được job sau này (revoke theo id).
+    Không có id thì hủy chỉ có thể gạch trên DB, không ra lệnh được cho Celery.
+    """
     if os.getenv("VOICEVIBE_INLINE") == "1":
         dispatch_inline(job_id, params)
-        return "inline"
+        return "inline", None
     try:
-        celery_app.send_task("pipeline.run", args=[job_id, params])
-        return "celery"
+        res = celery_app.send_task("pipeline.run", args=[job_id, params])
+        return "celery", getattr(res, "id", None)
     except Exception as exc:  # broker down — job stays queued, logged for ops
-        return f"no-broker:{exc.__class__.__name__}"
+        return f"no-broker:{exc.__class__.__name__}", None
+
+
+def _aborted(db, job_id: str) -> bool:
+    """Job đã bị HỦY thì pipeline phải DỪNG ĐÚNG Ở ĐÂU — không đụng model.
+
+    Mỗi `_run_*` gọi ngay sau khi fetch job, TRƯỚC khi set status=running:
+    nếu không có gate này, worker nhặt được task (requeue sau terminate, hoặc
+    task đã vào hàng đợi trước lúc hủy) sẽ set running lại và ghi đè trạng thái
+    `cancelled` + tiền hoàn của người dùng (resurrect — đã gặp kiểu bug ngược
+    chiều này ở code khác). Trả kết quả bỏ qua: message được ack, không lặp.
+    """
+    from .models import Job, JobStatus
+
+    job = db.get(Job, job_id)
+    if job is not None and job.status == JobStatus.cancelled:
+        return True
+    return False

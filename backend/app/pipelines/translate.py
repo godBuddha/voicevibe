@@ -85,8 +85,11 @@ class CloudChatTranslator:
         return self._chat.complete("", prompt, max_tokens=512).strip()
 
 
-def stage_translator(source: str, target: str):
+def stage_translator(source: str, target: str, system_prompt: str | None = None):
     """Translator dựng từ cấu hình công đoạn trong /admin (nếu có).
+
+    `system_prompt` (Thư viện Prompt) được truyền vào MỌI entry của chuỗi —
+    entry fallback hỏng thì qua entry kế với CÙNG prompt người dùng chọn.
 
     Trả None khi công đoạn 'translate' chưa được gán — caller rơi về đường cũ
     (`translate.*` settings / opus-mt local).
@@ -110,7 +113,8 @@ def stage_translator(source: str, target: str):
         if entry["kind"] != "openai":
             # Ollama cũng nói được chuẩn OpenAI ở /v1 — quy về cùng một provider.
             base = base + "/v1"
-        return CloudChatTranslator(base, entry["api_key"], entry["model"], source, target)
+        return CloudChatTranslator(base, entry["api_key"], entry["model"], source, target,
+                                   system_prompt=system_prompt)
 
     first = _make(chain[0])
     if len(chain) == 1:
@@ -170,15 +174,20 @@ def _pick_backend(source: str, target: str) -> str:
     )
 
 
-def build_translator(source: str, target: str):
-    """Translator cho một cặp ngôn ngữ, theo thứ tự: công đoạn → settings → local."""
-    staged = stage_translator(source, target)
+def build_translator(source: str, target: str, system_prompt: str | None = None):
+    """Translator cho một cặp ngôn ngữ, theo thứ tự: công đoạn → settings → local.
+
+    `system_prompt` (Thư viện Prompt) áp cho bộ dịch CHAT (stage + settings cloud);
+    LocalMarianTranslator không có system prompt — override bị BỎ QUA im lặng
+    (prompt cá nhân chỉ có ý nghĩa với bộ dịch LLM; caller không cần biết)."""
+    staged = stage_translator(source, target, system_prompt)
     if staged is not None:
         return staged
     backend = _pick_backend(source, target)
     if backend == "cloud":
         base, key, model = _cloud_cfg()  # type: ignore[misc]
-        return CloudChatTranslator(base, key, model, source, target)
+        return CloudChatTranslator(base, key, model, source, target,
+                                   system_prompt=system_prompt)
     return LocalMarianTranslator(source, target)
 
 

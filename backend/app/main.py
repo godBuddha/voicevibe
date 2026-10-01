@@ -35,12 +35,14 @@ from .models import (
     Job,
     JobStatus,
     MediaObject,
+    PromptLibrary,
     ROLE_ADMIN,
     ROLE_USER,
     User,
     Voice,
 )
 from .pipelines.subtitle import FORMATS as SUBTITLE_FORMATS
+from .prompt_library import router as prompt_library_router
 from .prompts import seed_prompts
 from .providers_api import router as ai_admin_router
 from .ratelimit import check_rate as _check_rate
@@ -114,6 +116,7 @@ seed_prompts()
 
 # Nhóm endpoint quản trị AI (nhà cung cấp / công đoạn / prompt) — xem app/providers_api.py
 app.include_router(ai_admin_router)
+app.include_router(prompt_library_router)
 
 
 def _hash_key(raw: str) -> str:
@@ -135,6 +138,8 @@ class JobIn(BaseModel):
     source_lang: str | None = None
     target_lang: str | None = None
     voice_id: str | None = None
+    prompt_id: str | None = Field(
+        None, description="translate: id prompt cá nhân (thư viện prompt) thay system prompt")
     max_speed: float = 1.35
     webhook_url: str | None = None
     # --- riêng cho type=dub
@@ -201,6 +206,17 @@ def create_job(
         voice = db.get(Voice, job.voice_id)
         if voice is None or voice.user_id != user.id:
             raise HTTPException(status_code=404, detail="voice not found")
+
+    # Quyền sở hữu prompt cá nhân — cùng nguyên tắc voice: chặn TRƯỚC khi tạo
+    # job thay vì để worker fail. Chỉ type translate dùng được (prompt cá nhân
+    # thay system prompt của bộ dịch chat); type khác + prompt_id → 422.
+    if job.prompt_id:
+        if job.type != "translate":
+            raise HTTPException(
+                status_code=422, detail="prompt_id hiện chỉ dùng cho job translate")
+        prompt = db.get(PromptLibrary, job.prompt_id)
+        if prompt is None or prompt.user_id != user.id:
+            raise HTTPException(status_code=404, detail="prompt not found")
 
     j = Job(user_id=user.id, type=job.type, params=job.model_dump(exclude_none=True))
     db.add(j)

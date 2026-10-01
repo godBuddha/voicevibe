@@ -355,6 +355,7 @@ def _run_translate(job_id: str, params: dict) -> dict:
             return {"ok": False, "error": "job not found"}
         if _aborted(db, job_id):
             return {"ok": False, "error": "cancelled"}
+        owner_id = job.user_id   # chụp TRƯỚC session đóng — prompt override cần nó
         job.status = JobStatus.running
         job.progress = 10
         db.commit()
@@ -364,7 +365,32 @@ def _run_translate(job_id: str, params: dict) -> dict:
         text = params.get("text") or ""
         if not text.strip():
             raise ValueError("text is required for translate jobs")
-        tr = build_translator(source, target)
+        # Thư viện prompt: params.prompt_id = prompt cá nhân của CHỦ job, thay
+        # system prompt của bộ dịch chat. Prompt bị xoá/đổi chủ giữa lúc tạo job
+        # và lúc chạy → resolve None → fallback prompt hệ thống (ghi chú vào
+        # params để UI/audit thấy được — không im lặng).
+        override = None
+        prompt_id = params.get("prompt_id")
+        if prompt_id:
+            from .prompt_library import resolve_prompt_override
+            from .prompts import render_template
+            override = resolve_prompt_override(prompt_id, owner_id)
+            if override is None:
+                # `params` ở đây là dict in-memory — ghi chú fallback phải lưu DB
+                # (pattern _record_stt_stats) nếu không GET /jobs sẽ không thấy.
+                try:
+                    from .db import SessionLocal as _SL
+                    from .models import Job as _Job
+                    with _SL() as _db:
+                        _job = _db.get(_Job, job_id)
+                        if _job is not None:
+                            _job.params = {**(_job.params or {}), "prompt_fallback": "not found"}
+                            _db.commit()
+                except Exception:  # noqa: BLE001 — thông tin phụ, không chết job
+                    pass
+            else:
+                override = render_template(override, source=source, target=target)
+        tr = build_translator(source, target, system_prompt=override)
         out = tr.translate(text)
         key = f"jobs/{job_id}/translated.txt"
         get_storage().put(key, out.encode("utf-8"))

@@ -138,6 +138,28 @@ def reset_prompt(task_key: str) -> dict:
     return {"task_key": task_key, "content": d["content"], "is_default": True}
 
 
+def scan_variables(template: str) -> list[str]:
+    """Danh sách {token} unique trong template, THEO THỨ TỪ xuất hiện.
+
+    Dùng chung: `render()` nội bộ và Thư viện Prompt (server re-scan biến khi
+    lưu — client không được khai báo biến thay server).
+    """
+    seen: dict[str, None] = {}
+    for m in _PLACEHOLDER.finditer(template or ""):
+        seen.setdefault(m.group(1), None)
+    return list(seen)
+
+
+def render_template(template: str, **kwargs) -> str:
+    """Điền biến vào template THÔ — chỉ thay biến ĐÃ truyền, giữ nguyên `{tên}` của
+    biến thiếu. Thân của `render()` (tách ra để Thư viện Prompt dùng cùng quy tắc
+    khi render prompt cá nhân — không lặp regex ở module khác).
+    """
+    return _PLACEHOLDER.sub(
+        lambda m: str(kwargs[m.group(1)]) if m.group(1) in kwargs else m.group(0),
+        template or "")
+
+
 def render(task_key: str, **kwargs) -> str:
     """Prompt đã điền biến: chỉ thay biến ĐÃ truyền, giữ nguyên `{tên}` của biến thiếu.
 
@@ -150,7 +172,4 @@ def render(task_key: str, **kwargs) -> str:
     Thay bằng một lượt regex (không lặp lại) để giá trị vừa thay không bị thay
     tiếp — ví dụ bản dịch có chứa `{source}`.
     """
-    template = get_prompt(task_key)
-    return _PLACEHOLDER.sub(
-        lambda m: str(kwargs[m.group(1)]) if m.group(1) in kwargs else m.group(0),
-        template)
+    return render_template(get_prompt(task_key), **kwargs)

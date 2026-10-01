@@ -7,6 +7,7 @@ import {
   AudioLines,
   Clapperboard,
   FileText,
+  Sparkles,
   History,
   KeyRound,
   UsersRound,
@@ -39,6 +40,7 @@ const navigation = [
       { label: 'Dịch phụ đề', to: '/subtitle', Icon: Captions },
       { label: 'Dịch âm thanh', to: '/translate-audio', Icon: AudioLines },
       { label: 'Dịch video', to: '/dub', Icon: Clapperboard },
+      { label: 'Prompt của tôi', to: '/prompts', Icon: Sparkles },
     ],
   },
   {

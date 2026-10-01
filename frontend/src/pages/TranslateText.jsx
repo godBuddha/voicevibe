@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { createJob, pollJob, getResult } from '../api/jobs.js';
 
 // Bảng ngôn ngữ dùng chung kiểu hiển thị với các trang khác (Subtitle.jsx) —
@@ -18,6 +19,31 @@ export default function TranslateText() {
   const [error, setError] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Thư viện Prompt: dropdown chọn prompt cá nhân thay system prompt bộ dịch.
+  // vv_prompt_pick = "Dùng cho dịch" ở trang Prompt gắn sẵn lựa chọn (đọc 1 lần).
+  const [prompts, setPrompts] = useState([]);
+  const [promptId, setPromptId] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/v1/prompts?limit=100', { credentials: 'include' });
+        if (res.ok) {
+          const d = await res.json();
+          const list = d.prompts || [];
+          setPrompts(list);
+          let pick = null;
+          try { pick = localStorage.getItem('vv_prompt_pick'); } catch {}
+          if (pick) {
+            try { localStorage.removeItem('vv_prompt_pick'); } catch {}
+            if (list.some((p) => p.id === pick)) setPromptId(pick);
+          }
+        }
+      } catch (e) {
+        console.error('tải thư viện prompt thất bại', e);
+      }
+    })();
+  }, []);
 
   const startTranslate = async () => {
     if (!text.trim()) {
@@ -35,6 +61,7 @@ export default function TranslateText() {
         text,
         source_lang: sourceLang,
         target_lang: targetLang,
+        ...(promptId ? { prompt_id: promptId } : {}),
       });
       const done = await pollJob(created.jobId, { onUpdate: setJob });
       if (done.status === 'failed') {
@@ -114,6 +141,32 @@ export default function TranslateText() {
               </select>
             </label>
           </div>
+
+          {/* Chọn prompt cá nhân (Thư viện Prompt) — để trống = prompt hệ thống */}
+          {prompts.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
+                Prompt
+                <select
+                  value={promptId}
+                  onChange={(e) => setPromptId(e.target.value)}
+                  style={{
+                    padding: '8px 10px', borderRadius: 'var(--radius)',
+                    border: '1px solid var(--border)', fontSize: 'var(--text-sm)',
+                    background: 'var(--bg)', color: 'var(--text)', maxWidth: '320px',
+                  }}
+                >
+                  <option value="">Mặc định hệ thống</option>
+                  {prompts.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </label>
+              <Link to="/prompts" style={{ fontSize: 'var(--text-xs)', fontWeight: 600 }}>
+                Quản lý prompt →
+              </Link>
+            </div>
+          )}
 
           {/* Văn bản nguồn */}
           <div>

@@ -5,6 +5,7 @@ import ModelsTab from './modelhub/ModelsTab.jsx';
 import StagesTab from './modelhub/StagesTab.jsx';
 import FeaturesTab from './modelhub/FeaturesTab.jsx';
 import PromptsTab from './modelhub/PromptsTab.jsx';
+import PromptLibrary from '../prompts/PromptLibrary.jsx';
 
 // AI Model Hub — Provider → Models → Capabilities → Compatibility.
 // Shell 5 tab: Providers (card gọn + sync), Models (registry + filter +
@@ -15,7 +16,8 @@ const TABS = [
   ['models', 'Mô hình'],
   ['stages', 'Công đoạn'],
   ['features', 'Chức năng'],
-  ['prompts', 'Prompts'],
+  ['library', 'Prompt của tôi'],
+  ['prompts', 'Prompt hệ thống'],
 ];
 
 export default function AdminModelHub() {
@@ -114,6 +116,9 @@ export default function AdminModelHub() {
       )}
       {activeTab === 'prompts' && (
         <PromptsTab prompts={prompts} api={api} notify={notify} reload={loadCore} />
+      )}
+      {activeTab === 'library' && (
+        <PromptLibrary embedded />
       )}
 
       {toast && (

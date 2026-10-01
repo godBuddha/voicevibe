@@ -340,6 +340,21 @@ async function toggleModel(id, enabled) {
   } catch (e) { flash("Lỗi: " + e.message, "err"); }
 }
 
+async function loadUserPrompts() {
+  try {
+    const d = await api("/v1/admin/prompt-library?limit=20").then(r => r.json());
+    const el = $("user-prompts");
+    $("pl-count").textContent = d.total + " prompt";
+    el.innerHTML = (d.items || []).map(p => `
+      <div class="prov" style="padding:6px 10px">
+        <div class="meta"><b>${esc(p.name)}</b>
+          <div class="hint">${esc(p.user_email || "")} · v${p.version} · ${(p.tags || []).map(esc).join(", ") || "—"}</div>
+        </div>
+        <code style="font-size:11px">${esc((p.content_preview || "").slice(0, 60))}…</code>
+      </div>`).join("") || '<p class="hint">Chưa có prompt nào.</p>';
+  } catch (e) { flash("Lỗi tải thư viện prompt: " + e.message, "err"); }
+}
+
 async function syncProv(id) {
   try {
     const r = await api("/v1/admin/providers/" + id + "/sync", { method: "POST" });
@@ -458,6 +473,15 @@ function renderAi() {
     <div class="card"><h2>Prompt hệ thống</h2>
       <p class="hint">Sửa prompt dùng cho dịch/dịch lại. Nút Khôi phục mặc định trả về bản trong code.</p>
       <div class="grid2">${prompts}</div>
+    </div>
+    <div class="card"><h2>Prompt của người dùng (thư viện)</h2>
+      <p class="hint">Mỗi user có thư viện prompt riêng (xem đúng người dùng tại trang "Prompt của tôi").
+        Danh sách này CHỈ ĐỌC — admin không sửa/xoá hộ.</p>
+      <div class="row-actions">
+        <button class="ghost" onclick="loadUserPrompts()">Tải danh sách</button>
+        <span id="pl-count" class="hint"></span>
+      </div>
+      <div id="user-prompts" style="margin-top:8px"></div>
     </div>`;
 }
 

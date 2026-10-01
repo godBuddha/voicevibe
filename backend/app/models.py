@@ -248,6 +248,37 @@ class Prompt(Base):
     updated_at: Mapped[int] = mapped_column(BigInteger, default=_now, onupdate=_now)
 
 
+class PromptLibrary(Base):
+    """Thư viện prompt CÁ NHÂN của từng user — tách khỏi Prompt hệ thống.
+
+    Bảng `prompts` (class Prompt) là prompt HỆ THỐNG gắn với tác vụ pipeline
+    (task_key PK, admin sửa). Bảng này là prompt riêng của user — mỗi user chỉ
+    nhìn thấy prompt của mình; khi tạo job Dịch có thể chọn 1 prompt để thay
+    system prompt (xem tasks._run_translate).
+
+    Versioning nhẹ: KHÔNG bảng versions riêng — mỗi lần LƯU, nội dung CŨ được
+    chụp vào `history` (entry {v, content, note, updated_at, by}; mới nhất ở
+    ĐẦU mảng, tối đa 20 bản, tràn → bỏ bản cũ nhất). Đủ rollback nhanh, không
+    phức tạp hoá. BẪY SQLAlchemy: ghi `history`/`tags`/`variables` phải GÁN
+    object MỚI (`row.history = [entry, *old]`) — mutate list tại chỗ KHÔNG được
+    flush vì JSON column không track mutation (lỗi im lặng kinh điển).
+    """
+
+    __tablename__ = "prompt_library"
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=_uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    name: Mapped[str] = mapped_column(String(120), default="")
+    content: Mapped[str] = mapped_column(Text, default="")
+    description: Mapped[str] = mapped_column(String(255), default="")
+    # Biến tự dò từ content ({token}) — SERVER re-scan, client không gửi.
+    variables: Mapped[list] = mapped_column(JSON, default=list)
+    tags: Mapped[list] = mapped_column(JSON, default=list)
+    history: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[int] = mapped_column(BigInteger, default=_now)
+    updated_at: Mapped[int] = mapped_column(BigInteger, default=_now, onupdate=_now)
+
+
 class Voice(Base):
     """Zero-shot voice profile cloned from a 5-10s reference clip."""
 

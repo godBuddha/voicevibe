@@ -276,13 +276,13 @@ const STAGE_LABEL = { stt: "Nhận dạng giọng nói (STT)", translate: "Dịc
                       retranslate: "Dịch lại cho khớp timing", tts: "Tổng hợp giọng nói (TTS)",
                       dub: "Lồng tiếng (pipeline)" };
 const STAGE_NOTE = {
-  stt: "Cloud thay được (OpenAI/Groq…). Bỏ trống = faster-whisper local.",
-  translate: "Bỏ trống = dùng cấu hình translate.* hoặc opus-mt local.",
+  stt: "Gán model cloud → job STT gọi provider đó; bỏ gán = faster-whisper local.",
+  translate: "Model chat dịch qua prompt. Bỏ gán = cấu hình translate.* hoặc opus-mt local.",
   retranslate: "Dùng khi bản dịch quá dài so với thời lượng — cần model ngắn gọn.",
-  tts: "Chỉ thay được giọng PRESET. Clone giọng bắt buộc chạy local.",
-  dub: "Công đoạn tổng hợp — chạy pipeline local, không gọi model ngoài.",
+  tts: "Cloud TTS chỉ hỗ trợ giọng PRESET — giọng CLONE (voice profile) luôn chạy local.",
+  dub: "Pipeline lồng tiếng chạy engine local; model của công đoạn này phục vụ phần dịch.",
 };
-let AI = { providers: [], stages: {}, summary: {}, prompts: [] };
+let AI = { providers: [], stages: {}, summary: {}, prompts: [], models: null, modelFilter: {} };
 
 async function loadAi() {
   const [pr, st, pm] = await Promise.all([
@@ -290,8 +290,87 @@ async function loadAi() {
     api("/v1/admin/stages").then(r => r.json()),
     api("/v1/admin/prompts").then(r => r.json()),
   ]);
-  AI = { providers: pr.providers, stages: st.stages, summary: st.summary, prompts: pm.prompts };
+  AI = { providers: pr.providers, stages: st.stages, summary: st.summary,
+         prompts: pm.prompts, models: null, modelFilter: AI.modelFilter || {} };
   renderAi();
+}
+
+// ---- Model Registry (inline): filter + list + toggle + chi tiết
+async function loadModels() {
+  const f = AI.modelFilter;
+  const qs = new URLSearchParams({ limit: "100" });
+  if (f.provider_id) qs.set("provider_id", f.provider_id);
+  if (f.compatibility) qs.set("compatibility", f.compatibility);
+  if (f.q) qs.set("q", f.q);
+  const d = await api("/v1/admin/models?" + qs).then(r => r.json());
+  AI.models = d;
+  renderModels();
+}
+
+const COMP_LABEL = { compatible: "✓ Compatible", partial: "⚠ Một phần",
+                     unknown: "? Không rõ", incompatible: "✕ Không tương thích" };
+
+function renderModels() {
+  const el = $("models-list");
+  if (!el) return;
+  const d = AI.models;
+  if (!d) { el.innerHTML = '<p class="hint">Bấm "Tải mô hình" để xem registry.</p>'; return; }
+  const rows = (d.items || []).map(m => `
+    <div class="prov" style="padding:8px 10px">
+      <div class="meta">
+        <b><span class="badge">${esc(COMP_LABEL[m.compatibility?.status] || "?")}</span>
+          ${esc(m.display_name || m.model_id)}
+          ${m.enabled ? "" : '<span class="badge off">đã tắt</span>'}</b>
+        <code>${esc(m.model_id)}</code>
+        <div class="hint">${Object.entries(m.capabilities || {}).filter(([k, v]) => v === true)
+          .map(([k]) => esc(k)).join(" · ") || "không có capability nào"}</div>
+      </div>
+      <div class="row-actions">
+        <button class="ghost" onclick="modelDetail('${esc(m.id)}')">Chi tiết</button>
+        <button class="ghost" onclick="toggleModel('${esc(m.id)}', ${m.enabled ? "false" : "true"})">${m.enabled ? "Tắt" : "Bật"}</button>
+      </div>
+    </div>`).join("");
+  el.innerHTML = `<p class="hint">${d.total} model · ✓${d.breakdown.compatible} ⚠${d.breakdown.partial} ?${d.breakdown.unknown} ✕${d.breakdown.incompatible}</p>${rows}`;
+}
+
+async function toggleModel(id, enabled) {
+  try { await api("/v1/admin/models/" + id, { method: "PATCH",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }) });
+    await loadModels();
+  } catch (e) { flash("Lỗi: " + e.message, "err"); }
+}
+
+async function syncProv(id) {
+  try {
+    const r = await api("/v1/admin/providers/" + id + "/sync", { method: "POST" });
+    const d = await r.json();
+    if (!r.ok) { flash("Lỗi đồng bộ: " + (d.detail || r.status), "err"); return; }
+    flash(`Đồng bộ xong: ${d.synced} model (${d.added} thêm · ${d.updated} cập nhật · ${d.removed} gỡ) — ${d.duration_ms}ms`);
+    await loadAi();
+  } catch (e) { flash("Lỗi đồng bộ: " + e.message, "err"); }
+}
+
+async function modelDetail(id) {
+  const d = await api("/v1/admin/models/" + id).then(r => r.json());
+  const caps = Object.entries(d.capabilities || {}).map(([k, v]) =>
+    `<div>${v === true ? "✓" : v === false ? "✕" : "—"} <code>${esc(k)}</code></div>`).join("");
+  const feats = [
+    ...(d.compatibility?.supported_features || []).map(f => `<div style="color:var(--ok)">✓ ${esc(f)}</div>`),
+    ...(d.compatibility?.partial_features || []).map(f => `<div style="color:var(--warn)">⚠ ${esc(f)}</div>`),
+    ...(d.compatibility?.unsupported_features || []).map(f => `<div style="color:var(--err)">✕ ${esc(f)}</div>`),
+  ].join("");
+  openModal(`
+    <h2>${esc(d.display_name || d.model_id)} <span class="badge">${esc(COMP_LABEL[d.compatibility?.status] || "?")}</span></h2>
+    <p class="hint"><code>${esc(d.model_id)}</code> qua ${esc(d.provider_name || "")}</p>
+    ${d.description ? `<p class="hint">${esc(d.description.slice(0, 600))}</p>` : ""}
+    <label>Capabilities</label><div class="grid2" style="grid-template-columns:repeat(3,1fr)">${caps}</div>
+    <label>Chức năng hệ thống</label><div class="grid2" style="grid-template-columns:repeat(3,1fr)">${feats}</div>
+    ${(d.compatibility?.reasons || []).length ? `<p class="hint">${(d.compatibility.reasons || []).map(esc).join("<br>")}</p>` : ""}
+    <p class="hint">Context: ${d.context_window ?? "—"} · Nguồn capability: ${esc(d.capability_source || "—")}</p>
+    <div class="row-actions" style="margin-top:10px">
+      <button class="ghost" onclick="toggleModel('${esc(d.id)}', ${d.enabled ? "false" : "true"}); closeModal()">${d.enabled ? "Tắt model" : "Bật model"}</button>
+      <button onclick="closeModal()">Đóng</button>
+    </div>`);
 }
 
 function renderAi() {
@@ -303,10 +382,13 @@ function renderAi() {
           <span class="badge">${esc(KIND_LABEL[p.kind] || p.kind)}</span>
           ${p.enabled ? "" : '<span class="badge off">đang tắt</span>'}</b>
         <code>${esc(p.base_url)}</code>
-        <div class="hint">${p.api_key_set ? "API key: " + esc(p.api_key_hint) : "không dùng API key"}</div>
+        <div class="hint">${p.api_key_set ? "API key: " + esc(p.api_key_hint) : "không dùng API key"}
+          · <b>${p.models_count ?? 0} model</b>${p.last_synced_at ? " · đồng bộ " + new Date(p.last_synced_at * 1000).toLocaleString("vi-VN") : " · chưa đồng bộ"}</div>
+        <div class="hint">✓${p.breakdown?.compatible ?? 0} compatible · ⚠${p.breakdown?.partial ?? 0} một phần · ?${p.breakdown?.unknown ?? 0} không rõ · ✕${p.breakdown?.incompatible ?? 0} không tương thích</div>
       </div>
       <div class="row-actions">
         <button class="ghost" onclick="testProv('${esc(p.id)}')">Kiểm tra kết nối</button>
+        <button onclick="syncProv('${esc(p.id)}')">Đồng bộ</button>
         ${p.kind === "ollama" ? `<button class="ghost" onclick="manageModels('${esc(p.id)}')">Quản lý model</button>` : ""}
         <button class="ghost" onclick="editProv('${esc(p.id)}')">Sửa</button>
         <button class="ghost" onclick="delProv('${esc(p.id)}', '${esc(p.name)}')">Xoá</button>
@@ -349,7 +431,28 @@ function renderAi() {
       <div class="row-actions" style="margin-top:14px">
         <button onclick="editProv('')">＋ Thêm nhà cung cấp</button>
       </div>
-      <p class="hint">Ollama local thường là <code>http://localhost:11434</code> (không cần API key).</p>
+      <p class="hint">Ollama local thường là <code>http://localhost:11434</code> (không cần API key).
+        "Đồng bộ" nạp catalog model vào registry, đánh dấu capability và mức tương thích với hệ thống.</p>
+    </div>
+    <div class="card"><h2>Mô hình AI (registry)</h2>
+      <div class="row-actions">
+        <select id="mf-prov" style="min-width:180px" onchange="AI.modelFilter.provider_id=this.value; loadModels()">
+          <option value="">Mọi nhà cung cấp</option>
+          ${provs.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("")}
+        </select>
+        <select id="mf-comp" style="min-width:170px" onchange="AI.modelFilter.compatibility=this.value; loadModels()">
+          <option value="">Mọi mức tương thích</option>
+          <option value="compatible">✓ Compatible</option>
+          <option value="partial">⚠ Một phần</option>
+          <option value="unknown">? Không rõ</option>
+          <option value="incompatible">✕ Không tương thích</option>
+        </select>
+        <input id="mf-q" placeholder="tìm model…" style="min-width:160px"
+          onchange="AI.modelFilter.q=this.value; loadModels()">
+        <button onclick="loadModels()">Tải mô hình</button>
+      </div>
+      <div id="models-list" style="margin-top:10px"><p class="hint">Bấm "Tải mô hình" để xem registry.</p></div>
+      <p class="hint">Model tắt không hiện trong selector, không được gán công đoạn, và bị loại khỏi pipeline lúc chạy — tắt ≠ xoá.</p>
     </div>
     <div class="card"><h2>Công đoạn → model</h2>${stageRows}</div>
     <div class="card"><h2>Prompt hệ thống</h2>

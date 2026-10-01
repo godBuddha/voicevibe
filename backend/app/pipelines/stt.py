@@ -115,16 +115,59 @@ def drop_hallucinations(raw_segments: list) -> tuple[list, list[tuple[str, str]]
     return kept, dropped
 
 
+def _cloud_stt() -> tuple[str, str, str] | None:
+    """(base_url, api_key, model) của stage 'stt' khi admin đã gán model cloud —
+    None nếu không cấu hình/lỗi DB.
+
+    Đọc ở đây (không ở call sites) vì transcribe() là điểm đi qua duy nhất của
+    3 đường (_run_stt, _run_subtitle, dub). Bọc try/except rộng: worker không
+    được chết vì DB chưa migrate hay thiếu bảng — rơi về local là đúng.
+    """
+    try:
+        from ..db import SessionLocal
+        from ..providers_api import stage_entry
+
+        with SessionLocal() as db:
+            e = stage_entry("stt", db)
+    except Exception:  # noqa: BLE001
+        return None
+    if not e:
+        return None
+    return e["base_url"], e["api_key"], e["model"]
+
+
 def transcribe(audio_path: str, model_size: str = "large-v3",
                compute_type: str = "int8", language: str | None = None,
                device: str = "auto", filter_hallucinations: bool = True,
                stats: dict | None = None):
-    """faster-whisper transcription -> (segments, info).
+    """STT: stage 'stt' có model cloud → OpenAI-compatible /audio/transcriptions;
+    không có → faster-whisper local. Trả (segments, info) — cloud không trả info
+    whisper nên info=None.
 
-    `filter_hallucinations=True` (mặc định) loại các đoạn model bịa ra — xem
-    `segment_is_hallucination`. Truyền `stats={}` để nhận số đoạn đã bỏ và lý do;
-    cần thiết vì bỏ nội dung là việc phải NHÌN THẤY ĐƯỢC, không được im lặng.
+    Quy tắc lỗi: cloud ĐÃ cấu hình mà gọi hỏng → raise (job failed) — KHÔNG
+    lặng lẽ rơi về local: admin cấu hình cloud là ý định rõ ràng, tự chuyển
+    engine là giấu lỗi (và hoá đơn/latency khác nhau). OpenAIBase._post đã
+    retry 429/5xx trước khi buông.
     """
+    cloud = _cloud_stt()
+    if cloud is not None:
+        from ..providers.openai_compat import OpenAISTTProvider
+        base, api_key, model = cloud
+        raw = list(OpenAISTTProvider(base, api_key, model)
+                   .transcribe(audio_path, language=language))
+        # Filter chữ (câu bịa rỗng/annotation) vẫn chạy — không phụ thuộc thống
+        # kê; filter thống kê tự no-op vì segment cloud không có logprob
+        # (getattr default 0.0, xem segment_is_hallucination).
+        dropped: list[tuple[str, str]] = []
+        if filter_hallucinations:
+            raw, dropped = drop_hallucinations(raw)
+        out = [TranscriptSegment(start=s.start, end=s.end, text=(s.text or "").strip())
+               for s in raw]
+        if stats is not None:
+            stats["kept"] = len(out)
+            stats["dropped"] = [{"text": t[:120], "reason": r} for t, r in dropped]
+        return out, None
+
     from faster_whisper import WhisperModel
 
     model = WhisperModel(model_size, device=device, compute_type=compute_type)

@@ -71,6 +71,7 @@ jobs:
             "tests/test_auth.py"
             "tests/test_migrations.py"
             "tests/test_providers_admin.py"
+            "tests/test_model_hub.py"
             "tests/test_ci_config.py"
             "tests/test_ratelimit.py"
             "tests/test_subtitle.py"

@@ -29,6 +29,7 @@ from . import prompts as P
 from .auth import current_admin
 from .db import get_db
 from .models import (
+    AiModel,
     AiProvider,
     PROVIDER_KINDS,
     PROVIDER_OLLAMA,
@@ -77,6 +78,53 @@ def _out(p: AiProvider) -> dict:
     }
 
 
+def _provider_stats(db: Session) -> dict[str, dict]:
+    """Thống kê registry theo provider (1 query duy nhất — không N+1).
+
+    Trả {provider_id: {models_count, last_synced_at, breakdown{4 trạng thái}}}
+    cho `list_providers`. Đếm bằng Python trên tập đã SELECT: self-host 1 node,
+    vài nghìn row là quá nhỏ so với chi phí GROUP BY JSON cột phức tạp.
+    """
+    stats: dict[str, dict] = {}
+    for m in db.scalars(select(AiModel)).all():
+        s = stats.setdefault(m.provider_id, {
+            "models_count": 0, "last_synced_at": None,
+            "breakdown": {"compatible": 0, "partial": 0, "unknown": 0, "incompatible": 0},
+        })
+        s["models_count"] += 1
+        if m.last_synced_at and m.last_synced_at > (s["last_synced_at"] or 0):
+            s["last_synced_at"] = m.last_synced_at
+        status = (m.compatibility or {}).get("status", "unknown")
+        if status in s["breakdown"]:
+            s["breakdown"][status] += 1
+    return stats
+
+
+def _model_out(m: AiModel, provider: AiProvider | None = None,
+               full_description: bool = False) -> dict:
+    """Bản ghi model cho API. `full_description=True` ở endpoint chi tiết —
+    list chỉ trả 400 ký tự đầu để trang không phình khi có hàng nghìn model."""
+    desc = m.description or ""
+    if not full_description and len(desc) > 400:
+        desc = desc[:400] + "…"
+    return {
+        "id": m.id, "provider_id": m.provider_id,
+        "provider_name": provider.name if provider else None,
+        "provider_enabled": provider.enabled if provider else True,
+        "model_id": m.model_id, "display_name": m.display_name,
+        "description": desc or None, "org": m.org, "enabled": m.enabled,
+        "capabilities": m.capabilities or {},
+        "capability_source": m.capability_source,
+        "context_window": m.context_window,
+        "input_token_limit": m.input_token_limit,
+        "output_token_limit": m.output_token_limit,
+        "pricing": m.pricing, "metadata": m.metadata_ or {},
+        "compatibility": m.compatibility or {},
+        "last_synced_at": m.last_synced_at,
+        "created_at": m.created_at, "updated_at": m.updated_at,
+    }
+
+
 def _get(db: Session, provider_id: str) -> AiProvider:
     p = db.get(AiProvider, provider_id)
     if p is None:
@@ -93,6 +141,18 @@ def _chat_target(p: AiProvider) -> str:
     """Đích request thật — hiển thị làm helper text trong UI."""
     return f"{_norm_base(p.base_url)}/api/chat" if p.kind == PROVIDER_OLLAMA \
         else f"{_norm_base(p.base_url)}/chat/completions"
+
+
+def _out_full(db: Session, p: AiProvider) -> dict:
+    """`_out` + thống kê registry (dùng cho POST/PATCH — response đồng nhất shape
+    với list, UI cập nhật state không phải tự bồi thêm field)."""
+    s = _provider_stats(db).get(p.id)
+    d = _out(p)
+    d["models_count"] = s["models_count"] if s else 0
+    d["last_synced_at"] = s["last_synced_at"] if s else None
+    d["breakdown"] = (s or {"breakdown": {
+        "compatible": 0, "partial": 0, "unknown": 0, "incompatible": 0}})["breakdown"]
+    return d
 
 
 # ------------------------------------------------------------------- providers
@@ -118,7 +178,17 @@ class ProviderPatch(BaseModel):
 def list_providers(_: object = Depends(current_admin),
                    db: Session = Depends(get_db)) -> dict:
     rows = db.scalars(select(AiProvider).order_by(AiProvider.created_at)).all()
-    return {"providers": [_out(p) for p in rows]}
+    stats = _provider_stats(db)
+    out = []
+    for p in rows:
+        d = _out(p)
+        s = stats.get(p.id)
+        d["models_count"] = s["models_count"] if s else 0
+        d["last_synced_at"] = s["last_synced_at"] if s else None
+        d["breakdown"] = (s or {"breakdown": {
+            "compatible": 0, "partial": 0, "unknown": 0, "incompatible": 0}})["breakdown"]
+        out.append(d)
+    return {"providers": out}
 
 
 @router.post("/providers", status_code=201)
@@ -137,7 +207,7 @@ def create_provider(body: ProviderIn, _: object = Depends(current_admin),
     db.add(p)
     db.commit()
     db.refresh(p)
-    return _out(p)
+    return _out_full(db, p)
 
 
 @router.patch("/providers/{provider_id}")
@@ -169,7 +239,7 @@ def patch_provider(provider_id: str, body: ProviderPatch,
             p.api_key_hint = _hint(body.api_key)
     db.commit()
     db.refresh(p)
-    return _out(p)
+    return _out_full(db, p)
 
 
 @router.delete("/providers/{provider_id}")
@@ -179,6 +249,10 @@ def delete_provider(provider_id: str, _: object = Depends(current_admin),
     # Gỡ liên kết công đoạn trước khi xoá (FK có thể là NULL) để không còn trỏ vào hư không.
     for sm in db.scalars(select(StageModel).where(StageModel.provider_id == p.id)).all():
         db.delete(sm)
+    # Registry model của provider cũng xoá theo (model là dữ liệu phái sinh từ
+    # provider — provider biến mất thì catalog của nó không còn nghĩa).
+    for m in db.scalars(select(AiModel).where(AiModel.provider_id == p.id)).all():
+        db.delete(m)
     db.delete(p)
     db.commit()
     return {"id": provider_id, "deleted": True}
@@ -363,7 +437,15 @@ def clear_stage(stage: str, order: int = 0, _: object = Depends(current_admin),
 
 
 def stage_chain(stage: str, db: Session) -> list[dict]:
-    """Chuỗi fallback của một công đoạn, đã giải mã key — dùng cho pipeline."""
+    """Chuỗi fallback của một công đoạn, đã giải mã key — dùng cho pipeline.
+
+    Ba lọc mới (Model Registry): (1) row `model` rỗng bị bỏ — UI từng cho lưu
+    "(mặc định)" dưới dạng chuỗi rỗng và runtime gọi API với `model: ""` → 400
+    (lỗi đã gặp thật); (2) model có trong registry mà `enabled=False` bị bỏ —
+    Enable/Disable phải có hiệu lực RUNTIME, không chỉ đổi trạng thái trên UI;
+    (3) model KHÔNG có trong registry vẫn giữ — cấu hình tay cũ hoạt động như
+    trước (không có trong catalog thì không biết để chặn).
+    """
     rows = db.scalars(select(StageModel).where(StageModel.stage == stage)
                       .order_by(StageModel.order)).all()
     out: list[dict] = []
@@ -373,10 +455,232 @@ def stage_chain(stage: str, db: Session) -> list[dict]:
         p = db.get(AiProvider, r.provider_id)
         if p is None or not p.enabled:
             continue
+        model = (r.model or "").strip()
+        if not model:
+            continue
+        reg = db.scalar(select(AiModel).where(
+            AiModel.provider_id == p.id, AiModel.model_id == model))
+        if reg is not None and not reg.enabled:
+            continue
         out.append({"kind": p.kind, "base_url": _norm_base(p.base_url),
                     "api_key": _decrypt(p.api_key_enc) or "",
-                    "model": r.model, "params": r.params or {}})
+                    "model": model, "params": r.params or {},
+                    "provider_id": p.id})
     return out
+
+
+def stage_entry(stage: str, db: Session) -> dict | None:
+    """Entry CLOUD đầu tiên của công đoạn — dùng cho STT/TTS runtime.
+
+    Chỉ nhận kind=openai: Ollama không phục vụ /audio/* (không có STT/TTS HTTP
+    chuẩn), và audio pipeline nói chuẩn OpenAI. Không có entry hợp lệ → None
+    (pipeline rơi về engine local)."""
+    for e in stage_chain(stage, db):
+        if e["kind"] == PROVIDER_OPENAI and e["model"]:
+            return e
+    return None
+
+
+# ------------------------------------------------------- Model Registry (sync/list)
+@router.post("/providers/{provider_id}/sync")
+def sync_models(provider_id: str, _: object = Depends(current_admin),
+                db: Session = Depends(get_db)) -> dict:
+    """Đồng bộ model registry: fetch → chuẩn hoá → capability → upsert/xoá.
+
+    Lỗi fetch (mạng/JSON/HTTP) → 502 và KHÔNG ghi gì vào DB — bấm lại được,
+    không bao giờ rơi vào trạng thái nửa vời. Lỗi từng model (Ollama /api/show)
+    không làm chết sync — nằm trong `errors` của kết quả."""
+    from .model_sync import sync_provider, SyncError
+    p = _get(db, provider_id)
+    try:
+        return sync_provider(db, p)
+    except SyncError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"không lấy được danh sách model: {exc.__class__.__name__}") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="phản hồi không phải JSON hợp lệ") from exc
+
+
+def _filter_models(db: Session, provider: dict | None = None, **_ignored) -> list[AiModel]:
+    """Tất cả model của các provider (kèm provider lookup cho _model_out).
+
+    Filter JSON bằng SQL khác nhau giữa SQLite/Postgres — repo này chạy cả hai
+    dialect, nên lọc python-side sau MỘT SELECT. Self-host 1 node, vài nghìn
+    row: toàn bộ phép lọc + sort < 5ms — không phải tối ưu sớm."""
+    providers = {p.id: p for p in db.scalars(select(AiProvider)).all()}
+    rows = db.scalars(select(AiModel).order_by(AiModel.model_id)).all()
+    return rows, providers
+
+
+@router.get("/models")
+def list_models(_: object = Depends(current_admin),
+                db: Session = Depends(get_db),
+                limit: int = 50, offset: int = 0,
+                q: str | None = None,
+                provider_id: str | None = None,
+                org: str | None = None,
+                capability: str | None = None,
+                compatibility: str | None = None,
+                enabled: str | None = None,
+                feature: str | None = None) -> dict:
+    """Model Registry có filter + phân trang. `breakdown` tính trên TOÀN BỘ
+    registry (không theo filter) — chip đếm ở UI phải ổn định khi đang lọc."""
+    from .capabilities import CAPABILITIES, SYSTEM_FEATURES
+    from .compat import feature_eval
+    if limit < 1 or limit > 200:
+        limit = 50
+    if offset < 0:
+        offset = 0
+    rows, providers = _filter_models(db)
+    if provider_id:
+        rows = [m for m in rows if m.provider_id == provider_id]
+    if org:
+        rows = [m for m in rows if (m.org or "").lower() == org.lower()]
+    if capability:
+        if capability not in CAPABILITIES:
+            raise HTTPException(status_code=422, detail=f"capability phải thuộc {list(CAPABILITIES)}")
+        rows = [m for m in rows if (m.capabilities or {}).get(capability) is True]
+    if compatibility:
+        if compatibility not in {"compatible", "partial", "unknown", "incompatible"}:
+            raise HTTPException(status_code=422, detail="compatibility không hợp lệ")
+        rows = [m for m in rows
+                if (m.compatibility or {}).get("status") == compatibility]
+    if enabled is not None:
+        want = enabled.lower() in {"1", "true", "yes"}
+        rows = [m for m in rows if bool(m.enabled) == want]
+    if q:
+        needle = q.lower()
+        rows = [m for m in rows
+                if needle in (m.model_id or "").lower()
+                or needle in (m.display_name or "").lower()]
+    if feature:
+        fdef = SYSTEM_FEATURES.get(feature)
+        if fdef is None:
+            raise HTTPException(status_code=422, detail=f"feature '{feature}' không tồn tại")
+        rows = [m for m in rows
+                if feature_eval(m.capabilities or {}, fdef) == "supported"]
+    total = len(rows)
+    page = rows[offset:offset + limit]
+    breakdown = {"compatible": 0, "partial": 0, "unknown": 0, "incompatible": 0}
+    for m in db.scalars(select(AiModel)).all():
+        status = (m.compatibility or {}).get("status", "unknown")
+        if status in breakdown:
+            breakdown[status] += 1
+    return {
+        "items": [_model_out(m, providers.get(m.provider_id)) for m in page],
+        "total": total, "limit": limit, "offset": offset,
+        "breakdown": breakdown,
+        "providers": {pid: pr.name for pid, pr in providers.items()},
+    }
+
+
+@router.get("/models/{model_id}")
+def get_model(model_id: str, _: object = Depends(current_admin),
+              db: Session = Depends(get_db)) -> dict:
+    m = db.get(AiModel, model_id)
+    if m is None:
+        raise HTTPException(status_code=404, detail="không tìm thấy model")
+    return _model_out(m, db.get(AiProvider, m.provider_id), full_description=True)
+
+
+class ModelPatch(BaseModel):
+    enabled: bool | None = None
+
+
+@router.patch("/models/{model_id}")
+def patch_model(model_id: str, body: ModelPatch, _: object = Depends(current_admin),
+                db: Session = Depends(get_db)) -> dict:
+    """Bật/tắt model — trạng thái RIÊNG của registry, sync không đụng (xem
+    sync_provider). Disabled model: không hiện trong selector, không được gán
+    stage, bị stage_chain loại bỏ lúc runtime."""
+    m = db.get(AiModel, model_id)
+    if m is None:
+        raise HTTPException(status_code=404, detail="không tìm thấy model")
+    if body.enabled is not None:
+        m.enabled = body.enabled
+    db.commit()
+    db.refresh(m)
+    return _model_out(m, db.get(AiProvider, m.provider_id), full_description=True)
+
+
+@router.get("/features")
+def list_features(_: object = Depends(current_admin),
+                  db: Session = Depends(get_db)) -> dict:
+    """Feature registry + số model tương thích từng feature — dùng cho tab
+    Features và model selector. Đếm python-side trên 1 SELECT (xem _filter_models)."""
+    from .capabilities import SYSTEM_FEATURES, feature_stage
+    from .compat import feature_eval
+    rows = db.scalars(select(AiModel)).all()
+    providers = {p.id: p for p in db.scalars(select(AiProvider)).all()}
+    features = []
+    for key, fdef in SYSTEM_FEATURES.items():
+        compatible = partial = 0
+        for m in rows:
+            pr = providers.get(m.provider_id)
+            if pr is None or not pr.enabled or not m.enabled:
+                continue
+            verdict = feature_eval(m.capabilities or {}, fdef)
+            if verdict == "supported":
+                compatible += 1
+            elif verdict == "partial":
+                partial += 1
+        features.append({
+            "key": key, "label": fdef["label"], "stage": feature_stage(key),
+            "required": fdef["required"], "optional": fdef.get("optional", []),
+            "local_engine": bool(fdef.get("local_engine")),
+            "models_compatible": compatible, "models_partial": partial,
+        })
+    return {"features": features}
+
+
+@router.get("/features/{feature_key}/models")
+def feature_models(feature_key: str, _: object = Depends(current_admin),
+                   db: Session = Depends(get_db),
+                   limit: int = 50, offset: int = 0,
+                   include_disabled: str | None = None) -> dict:
+    """Tìm model tương thích cho một CHỨC NĂNG (yêu cầu: feature có thể tìm
+    model). Mặc định chỉ model enabled của provider enabled — disabled chỉ hiện
+    khi `include_disabled=1`."""
+    from .capabilities import SYSTEM_FEATURES, STAGE_FEATURES
+    from .compat import feature_eval
+    fdef = SYSTEM_FEATURES.get(feature_key)
+    if fdef is None:
+        raise HTTPException(status_code=404, detail=f"feature '{feature_key}' không tồn tại")
+    if limit < 1 or limit > 200:
+        limit = 50
+    rows, providers = _filter_models(db)
+    verdicts = {}
+    out = []
+    for m in rows:
+        pr = providers.get(m.provider_id)
+        if pr is None:
+            continue
+        verdict = feature_eval(m.capabilities or {}, fdef)
+        verdicts[m.id] = verdict
+        include = include_disabled in {"1", "true", "yes"}
+        if not include:
+            if not m.enabled or not pr.enabled:
+                continue
+        if verdict in {"supported", "partial"}:
+            out.append(m)
+    # supported trước, partial sau; trong cùng nhóm: official trước, score cao trước
+    def _rank(m):
+        v = verdicts[m.id]
+        comp = m.compatibility or {}
+        return (0 if v == "supported" else 1,
+                0 if m.capability_source == "official" else 1,
+                -comp.get("score", 0), m.model_id)
+    out.sort(key=_rank)
+    total = len(out)
+    page = out[offset:offset + limit]
+    return {
+        "feature": feature_key, "total": total, "limit": limit, "offset": offset,
+        "items": [{"verdict": verdicts[m.id],
+                   **_model_out(m, providers.get(m.provider_id))} for m in page],
+    }
 
 
 # ------------------------------------------------------------------------ prompt

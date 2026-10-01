@@ -63,17 +63,80 @@ const MOCK_V2USERS = [
   { id: 3, email: 'user2@example.com', role: 'user', status: 'suspended' },
 ];
 
+// Shape == BACKEND thật (_out_full): kind, enabled, api_key_set... (không có
+// "type"/"status" mock cũ) — trang admin đọc shape backend trực tiếp, mock phải
+// trả giống hệt để dev VITE_USE_MOCK=1 không vỡ.
 const MOCK_PROVIDERS = [
-  { id: 1, name: 'OpenAI', base_url: 'https://api.openai.com/v1', type: 'openai', status: 'active', models: ['gpt-4', 'gpt-4-turbo'] },
-  { id: 2, name: 'DeepSeek', base_url: 'https://api.deepseek.com/v1', type: 'openai', status: 'active', models: ['deepseek-coder', 'deepseek-chat'] },
-  { id: 3, name: 'Local Models', base_url: 'http://localhost:11434/v1', type: 'ollama', status: 'inactive', models: [] },
+  {
+    id: 'mock-or', name: 'OpenRouter', kind: 'openai', base_url: 'https://openrouter.ai/api/v1',
+    enabled: true, prefix_id: null, api_key_set: true, api_key_hint: '••••f41',
+    created_at: 1767200000, models_count: 464, last_synced_at: 1767225600,
+    breakdown: { compatible: 42, partial: 61, unknown: 348, incompatible: 13 },
+  },
+  {
+    id: 'mock-ollama', name: 'Ollama local', kind: 'ollama', base_url: 'http://127.0.0.1:11434',
+    enabled: true, prefix_id: null, api_key_set: false, api_key_hint: null,
+    created_at: 1767200100, models_count: 3, last_synced_at: 1767225500,
+    breakdown: { compatible: 2, partial: 0, unknown: 0, incompatible: 1 },
+  },
 ];
 
-const MOCK_STAGES = [
-  { stage: 'stt', models: ['whisper-large', 'whisper-base'], fallback: ['whisper-base'] },
-  { stage: 'translate', models: ['gpt-4', 'gpt-4-turbo'], fallback: ['gpt-3.5-turbo'] },
-  { stage: 'tts', models: ['natural-tts-hi'], fallback: ['microsoft-tts'] },
-];
+const MOCK_MODELS = {
+  items: [
+    {
+      id: 'mm1', provider_id: 'mock-or', provider_name: 'OpenRouter', provider_enabled: true,
+      model_id: 'openai/gpt-4o', display_name: 'OpenAI: GPT-4o', org: 'openai',
+      enabled: true, capability_source: 'official',
+      capabilities: { text: true, chat: true, vision: true, functionCalling: true, structuredOutput: true, reasoning: true, streaming: true, translation: null },
+      context_window: 128000, output_token_limit: 16384,
+      pricing: { input: 0.0000025, output: 0.00001, currency: 'USD' },
+      compatibility: { status: 'compatible', system_compatible: true, supported_features: ['text_generation', 'text_translation'], score: 47, reasons: [] },
+      description: 'Chat đa năng, đa phương thức.', metadata: {}, last_synced_at: 1767225600,
+    },
+    {
+      id: 'mm2', provider_id: 'mock-or', provider_name: 'OpenRouter', provider_enabled: true,
+      model_id: 'mistralai/mistral-7b', display_name: 'Mistral: 7B', org: 'mistralai',
+      enabled: true, capability_source: 'official',
+      capabilities: { text: true, chat: true, vision: null, functionCalling: false, streaming: true },
+      context_window: 32768, output_token_limit: null, pricing: null,
+      compatibility: { status: 'partial', system_compatible: false, supported_features: [], partial_features: ['text_translation'], score: 24, reasons: ['text_translation: chưa xác nhận translation'] },
+      description: '', metadata: {}, last_synced_at: 1767225600,
+    },
+    {
+      id: 'mm3', provider_id: 'mock-ollama', provider_name: 'Ollama local', provider_enabled: true,
+      model_id: 'qwen2.5:7b', display_name: 'qwen2.5:7b', org: null,
+      enabled: false, capability_source: 'official',
+      capabilities: { text: true, chat: true, tools: true, functionCalling: true },
+      context_window: 32768, output_token_limit: null, pricing: null,
+      compatibility: { status: 'compatible', system_compatible: true, supported_features: ['text_generation'], score: 29, reasons: [] },
+      description: '', metadata: { parameter_size: '7.6B' }, last_synced_at: 1767225500,
+    },
+  ],
+  total: 3, limit: 50, offset: 0,
+  breakdown: { compatible: 2, partial: 1, unknown: 0, incompatible: 0 },
+  providers: { 'mock-or': 'OpenRouter', 'mock-ollama': 'Ollama local' },
+};
+
+const MOCK_FEATURES = {
+  features: [
+    { key: 'text_generation', label: 'Sinh văn bản / Chat', stage: null, required: ['text', 'chat'], optional: [], local_engine: false, models_compatible: 2, models_partial: 0 },
+    { key: 'text_translation', label: 'Dịch văn bản', stage: 'translate', required: ['text', 'chat'], optional: ['translation'], local_engine: false, models_compatible: 1, models_partial: 1 },
+    { key: 'speech_to_text', label: 'Giọng nói → văn bản', stage: 'stt', required: ['speechToText'], optional: [], local_engine: false, models_compatible: 0, models_partial: 0 },
+    { key: 'text_to_speech', label: 'Văn bản → giọng nói', stage: 'tts', required: ['textToSpeech'], optional: [], local_engine: false, models_compatible: 0, models_partial: 0 },
+    { key: 'voice_cloning', label: 'Nhân bản giọng nói', stage: null, required: [], optional: [], local_engine: true, models_compatible: 0, models_partial: 0 },
+  ],
+};
+
+// Shape == BACKEND GET /v1/admin/stages: {stages: {stage: [rows]}, summary}
+const MOCK_STAGES = {
+  stages: {
+    stt: [], translate: [
+      { id: 1, provider_id: 'mock-or', model: 'openai/gpt-4o', params: {}, order: 0, provider_name: 'OpenRouter' },
+    ],
+    retranslate: [], tts: [], dub: [],
+  },
+  summary: { translate: 'openai/gpt-4o qua OpenRouter', stt: 'engine local mặc định' },
+};
 
 const MOCK_PROMPTS = [
   { task_key: 'translate', template: 'Dịch chính xác đoạn sau sang {target_lang}: {text}' },
@@ -165,18 +228,41 @@ export async function mockRequest(method, path, options) {
     return MOCK_V2USERS;
   }
 
+  // Shape admin == BACKEND thật (trang admin đọc shape backend trực tiếp, mock
+  // phải trả giống hệt để VITE_USE_MOCK=1 không vỡ — xem pages/admin/modelhub).
   if (path === '/v1/admin/providers' && method === 'GET') {
-    return MOCK_PROVIDERS;
+    return { providers: MOCK_PROVIDERS };
+  }
+
+  if (path === '/v1/admin/providers' && method === 'POST') {
+    return { ...MOCK_PROVIDERS[0], id: 'mock-new', name: body.name, base_url: body.base_url,
+             kind: body.kind || 'openai', models_count: 0, last_synced_at: null,
+             breakdown: { compatible: 0, partial: 0, unknown: 0, incompatible: 0 } };
   }
 
   if (path.startsWith('/v1/admin/providers/') && path.endsWith('/test') && method === 'POST') {
-    const id = parseInt(path.split('/')[3]);
-    const provider = MOCK_PROVIDERS.find(p => p.id === id);
-    return { success: true, status: 'ok', models: provider.models };
+    return { id: 'mock-or', ok: true, detail: '3 model khả dụng' };
   }
 
-  if (path.startsWith('/v1/admin/providers/') && path.endsWith('/pull') && method === 'POST') {
-    return { success: true, models: ['gpt-4', 'gpt-4-turbo', 'davinci-002'] };
+  if (path.startsWith('/v1/admin/providers/') && path.endsWith('/sync') && method === 'POST') {
+    return { provider_id: 'mock-or', kind: 'openai', synced: 464, added: 0, updated: 464,
+             removed: 0, duration_ms: 1200, errors: [] };
+  }
+
+  if (path.startsWith('/v1/admin/providers/') && path.endsWith('/models') && method === 'GET') {
+    return { provider_id: 'mock-or', kind: 'openai', models: [{ name: 'gpt-4' }, { name: 'qwen2.5' }] };
+  }
+
+  if (path === '/v1/admin/models' && method === 'GET') {
+    return MOCK_MODELS;
+  }
+
+  if (path.startsWith('/v1/admin/models/') && method === 'PATCH') {
+    return { ...MOCK_MODELS.items[0], enabled: !!body.enabled };
+  }
+
+  if (path === '/v1/admin/features' && method === 'GET') {
+    return MOCK_FEATURES;
   }
 
   if (path === '/v1/admin/stages' && method === 'GET') {
@@ -185,15 +271,20 @@ export async function mockRequest(method, path, options) {
 
   if (path.startsWith('/v1/admin/stages/') && method === 'PUT') {
     const stage = path.split('/').pop();
-    return { success: true };
+    return { stage, provider_id: body.provider_id || null, model: body.model || '',
+             order: body.order || 0 };
   }
 
   if (path === '/v1/admin/prompts' && method === 'GET') {
-    return MOCK_PROMPTS;
+    return { prompts: MOCK_PROMPTS };
   }
 
   if (path.startsWith('/v1/admin/prompts/') && method === 'PUT') {
-    return { success: true };
+    return { task_key: path.split('/').pop(), content: body.content || '' };
+  }
+
+  if (path.startsWith('/v1/admin/prompts/') && path.endsWith('/reset') && method === 'POST') {
+    return { task_key: path.split('/').pop(), is_default: true };
   }
 
   if (path.startsWith('/v1/admin/users/') && path.includes('/reset-password') && method === 'POST') {

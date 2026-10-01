@@ -104,12 +104,37 @@ def stage_translator(source: str, target: str):
         return None
     if not chain:
         return None
-    first = chain[0]
-    base = first["base_url"].rstrip("/")
-    if first["kind"] != "openai":
-        # Ollama cũng nói được chuẩn OpenAI ở /v1 — quy về cùng một provider.
-        base = base + "/v1"
-    return CloudChatTranslator(base, first["api_key"], first["model"], source, target)
+
+    def _make(entry: dict) -> "CloudChatTranslator":
+        base = entry["base_url"].rstrip("/")
+        if entry["kind"] != "openai":
+            # Ollama cũng nói được chuẩn OpenAI ở /v1 — quy về cùng một provider.
+            base = base + "/v1"
+        return CloudChatTranslator(base, entry["api_key"], entry["model"], source, target)
+
+    first = _make(chain[0])
+    if len(chain) == 1:
+        return first
+    # Chuỗi fallback (order>0): trước đây chỉ chain[0] được dùng, các entry dự
+    # phòng là cấu hình chết. ProviderChain thử lần lượt — hỏng entry nào thì
+    # qua entry kế, hết chuỗi thì job failed với lỗi gộp (đúng ngữ nghĩa
+    # "cấu hình xong nhưng chết thì phải fail rõ").
+    from ..providers.registry import ProviderChain
+    return ChainTranslator(ProviderChain([_make(e) for e in chain]))
+
+
+class ChainTranslator:
+    """Bọc ProviderChain theo interface của mọi translator (translate /
+    retranslate_shorter) — dùng được ở mọi nơi build_translator trả về."""
+
+    def __init__(self, chain):
+        self._chain = chain
+
+    def translate(self, text: str) -> str:
+        return self._chain.call("translate", text)
+
+    def retranslate_shorter(self, text: str, max_chars: int) -> str:
+        return self._chain.call("retranslate_shorter", text, max_chars)
 
 
 def _cloud_cfg() -> tuple[str, str, str] | None:

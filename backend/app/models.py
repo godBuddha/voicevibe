@@ -27,6 +27,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -183,6 +184,51 @@ class StageModel(Base):
     model: Mapped[str] = mapped_column(String(200), default="")
     params: Mapped[dict] = mapped_column(JSON, default=dict)
     order: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class AiModel(Base):
+    """Model Registry — mỗi model AI là MỘT entity độc lập (không phải chuỗi text).
+
+    Danh tính = (provider_id, model_id) — unique constraint; sync upsert theo cặp
+    này nên bấm Đồng bộ bao nhiêu lần cũng không tạo duplicate (idempotent).
+    Sync cập nhật metadata/capability/compatibility nhưng KHÔNG đụng `enabled` —
+    lựa chọn bật/tắt của admin là trạng thái riêng của registry, không bị
+    đồng bộ ghi đè.
+
+    `capabilities`: đủ 18 key (app.capabilities.CAPABILITIES), giá trị True/False/None.
+    None = "provider không khai báo" — KHÁC "khai báo không có" (False); gộp hai
+    cái thành một là tự suy đoán. `compatibility` là dữ liệu phái sinh tính lúc
+    sync (app.compat.compute_compatibility) — đọc lúc GET thì không phải tính lại.
+    """
+
+    __tablename__ = "ai_models"
+    __table_args__ = (
+        UniqueConstraint("provider_id", "model_id", name="uq_ai_models_provider_model"),
+    )
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=_uid)
+    provider_id: Mapped[str] = mapped_column(
+        ForeignKey("ai_providers.id"), index=True)
+    model_id: Mapped[str] = mapped_column(String(300))
+    display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Nhóm tổ chức trong provider ("openai/gpt-4o" → "openai") — để UI nhóm
+    # model theo OpenAI/Anthropic/Google... bên trong một provider.
+    org: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    capabilities: Mapped[dict] = mapped_column(JSON, default=dict)
+    # official = metadata chính thức của provider; heuristic = suy luận từ API
+    # (KHÔNG dùng với tên model); none = provider không khai báo gì.
+    capability_source: Mapped[str] = mapped_column(String(16), default="none")
+    context_window: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    input_token_limit: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    output_token_limit: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    pricing: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    metadata_: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
+    compatibility: Mapped[dict] = mapped_column(JSON, default=dict)
+    last_synced_at: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    created_at: Mapped[int] = mapped_column(BigInteger, default=_now)
+    updated_at: Mapped[int] = mapped_column(BigInteger, default=_now, onupdate=_now)
 
 
 class Prompt(Base):

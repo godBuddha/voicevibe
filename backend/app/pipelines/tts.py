@@ -30,6 +30,22 @@ def _clean_ref(provider: LocalVieneuTTSProvider, voice_id: str,
     return clean_tmp
 
 
+def _cloud_tts() -> tuple[str, str, str] | None:
+    """(base_url, api_key, model) của stage 'tts' khi admin đã gán model cloud —
+    None nếu không cấu hình/lỗi DB (cùng hình dạng _cloud_stt của STT)."""
+    try:
+        from ..db import SessionLocal
+        from ..providers_api import stage_entry
+
+        with SessionLocal() as db:
+            e = stage_entry("tts", db)
+    except Exception:  # noqa: BLE001
+        return None
+    if not e:
+        return None
+    return e["base_url"], e["api_key"], e["model"]
+
+
 def synthesize_with_voice(text: str, voice, storage, provider=None,
                           out_key: str | None = None) -> str:
     """Synthesize `text` using a Voice row (clone) or a preset name.
@@ -37,8 +53,27 @@ def synthesize_with_voice(text: str, voice, storage, provider=None,
     voice.ref_s3_key set -> zero-shot clone from the reference clip.
     otherwise            -> preset voice (voice.name), or engine default.
     Returns the storage key of the output WAV.
+
+    Chọn engine (chỉ khi caller KHÔNG truyền provider tường minh — selftest
+    truyền FakeProvider để test logic voice, không phải test engine):
+    - GIỌNG CLONE (ref_s3_key) → local ALWAYS: chuẩn OpenAI /audio/speech chỉ
+      có preset voice, không hỗ trợ zero-shot clone (docstring
+      providers/openai_compat.py).
+    - GIỌNG PRESET, stage 'tts' có model cloud → OpenAI-compatible cloud
+      provider (OpenAITTSProvider); hỏng → job failed (không fallback lặng lẽ,
+      cùng quy tắc của translate/stt).
+    - Không cloud → local VieNeu như cũ.
     """
-    provider = provider or LocalVieneuTTSProvider()
+    if provider is None:
+        if voice is not None and getattr(voice, "ref_s3_key", None):
+            provider = LocalVieneuTTSProvider()   # clone → local ALWAYS (rule trên)
+        else:
+            cloud = _cloud_tts()
+            if cloud is not None:
+                from ..providers.openai_compat import OpenAITTSProvider
+                provider = OpenAITTSProvider(*cloud)
+            else:
+                provider = LocalVieneuTTSProvider()
     if voice is not None and getattr(voice, "ref_s3_key", None):
         ref_path = _clean_ref(provider, str(voice.id), storage, voice.ref_s3_key)
         audio = provider.synthesize(text, ref_audio=ref_path, denoise=False)

@@ -71,7 +71,9 @@ export function adaptUser(u) {
   if (!u || typeof u !== 'object') return null;
   return {
     id: u.user_id ?? u.id,
-    name: (u.email || 'user').split('@')[0],
+    // Settings → Hồ sơ cho đặt TÊN hiển thị lưu DB (users.name). Chưa đặt thì
+    // fallback phần trước '@' của email — giữ đúng hành vi cũ cho user cũ.
+    name: u.name || (u.email || 'user').split('@')[0],
     email: u.email,
     role: u.role,
   };

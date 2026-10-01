@@ -26,6 +26,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import prompts as P
+from .audit import log_action
 from .auth import current_admin
 from .db import get_db
 from .models import (
@@ -192,7 +193,7 @@ def list_providers(_: object = Depends(current_admin),
 
 
 @router.post("/providers", status_code=201)
-def create_provider(body: ProviderIn, _: object = Depends(current_admin),
+def create_provider(body: ProviderIn, admin: object = Depends(current_admin),
                     db: Session = Depends(get_db)) -> dict:
     if body.kind not in PROVIDER_KINDS:
         raise HTTPException(status_code=422, detail=f"kind phải là {list(PROVIDER_KINDS)}")
@@ -207,12 +208,14 @@ def create_provider(body: ProviderIn, _: object = Depends(current_admin),
     db.add(p)
     db.commit()
     db.refresh(p)
+    log_action("provider.create", user_id=getattr(admin, "id", None), target=p.name,
+               detail=f"kind={p.kind} base_url={p.base_url}")
     return _out_full(db, p)
 
 
 @router.patch("/providers/{provider_id}")
 def patch_provider(provider_id: str, body: ProviderPatch,
-                   _: object = Depends(current_admin),
+                   admin: object = Depends(current_admin),
                    db: Session = Depends(get_db)) -> dict:
     p = _get(db, provider_id)
     if body.name is not None:
@@ -239,11 +242,12 @@ def patch_provider(provider_id: str, body: ProviderPatch,
             p.api_key_hint = _hint(body.api_key)
     db.commit()
     db.refresh(p)
+    log_action("provider.update", user_id=getattr(admin, "id", None), target=p.name)
     return _out_full(db, p)
 
 
 @router.delete("/providers/{provider_id}")
-def delete_provider(provider_id: str, _: object = Depends(current_admin),
+def delete_provider(provider_id: str, admin: object = Depends(current_admin),
                     db: Session = Depends(get_db)) -> dict:
     p = _get(db, provider_id)
     # Gỡ liên kết công đoạn trước khi xoá (FK có thể là NULL) để không còn trỏ vào hư không.
@@ -253,8 +257,10 @@ def delete_provider(provider_id: str, _: object = Depends(current_admin),
     # provider — provider biến mất thì catalog của nó không còn nghĩa).
     for m in db.scalars(select(AiModel).where(AiModel.provider_id == p.id)).all():
         db.delete(m)
+    name = p.name
     db.delete(p)
     db.commit()
+    log_action("provider.delete", user_id=getattr(admin, "id", None), target=name)
     return {"id": provider_id, "deleted": True}
 
 
@@ -405,7 +411,7 @@ def list_stages(_: object = Depends(current_admin),
 
 
 @router.put("/stages/{stage}")
-def set_stage(stage: str, body: StageIn, _: object = Depends(current_admin),
+def set_stage(stage: str, body: StageIn, admin: object = Depends(current_admin),
               db: Session = Depends(get_db)) -> dict:
     """Gán (provider, model) cho một công đoạn. order=0 ghi đè lựa chọn chính."""
     if stage not in STAGES:
@@ -421,18 +427,22 @@ def set_stage(stage: str, body: StageIn, _: object = Depends(current_admin),
     row.model = body.model.strip()
     row.params = body.params or {}
     db.commit()
+    log_action("stage.set", user_id=getattr(admin, "id", None),
+               target=f"{stage}#{row.order}", detail=row.model or "(mặc định)")
     return {"stage": stage, "provider_id": row.provider_id, "model": row.model,
             "order": row.order}
 
 
 @router.delete("/stages/{stage}")
-def clear_stage(stage: str, order: int = 0, _: object = Depends(current_admin),
+def clear_stage(stage: str, order: int = 0, admin: object = Depends(current_admin),
                 db: Session = Depends(get_db)) -> dict:
     row = db.scalar(select(StageModel).where(StageModel.stage == stage,
                                              StageModel.order == order))
     if row is not None:
         db.delete(row)
         db.commit()
+        log_action("stage.clear", user_id=getattr(admin, "id", None),
+                   target=f"{stage}#{order}")
     return {"stage": stage, "cleared": row is not None}
 
 
@@ -483,7 +493,7 @@ def stage_entry(stage: str, db: Session) -> dict | None:
 
 # ------------------------------------------------------- Model Registry (sync/list)
 @router.post("/providers/{provider_id}/sync")
-def sync_models(provider_id: str, _: object = Depends(current_admin),
+def sync_models(provider_id: str, admin: object = Depends(current_admin),
                 db: Session = Depends(get_db)) -> dict:
     """Đồng bộ model registry: fetch → chuẩn hoá → capability → upsert/xoá.
 
@@ -493,7 +503,7 @@ def sync_models(provider_id: str, _: object = Depends(current_admin),
     from .model_sync import sync_provider, SyncError
     p = _get(db, provider_id)
     try:
-        return sync_provider(db, p)
+        result = sync_provider(db, p)
     except SyncError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except httpx.HTTPError as exc:
@@ -502,6 +512,10 @@ def sync_models(provider_id: str, _: object = Depends(current_admin),
             detail=f"không lấy được danh sách model: {exc.__class__.__name__}") from exc
     except ValueError as exc:
         raise HTTPException(status_code=502, detail="phản hồi không phải JSON hợp lệ") from exc
+    log_action("provider.sync", user_id=getattr(admin, "id", None), target=p.name,
+               detail=f"added={result.get('added')} updated={result.get('updated')} "
+                      f"removed={result.get('removed')}")
+    return result
 
 
 def _filter_models(db: Session, provider: dict | None = None, **_ignored) -> list[AiModel]:
@@ -591,7 +605,7 @@ class ModelPatch(BaseModel):
 
 
 @router.patch("/models/{model_id}")
-def patch_model(model_id: str, body: ModelPatch, _: object = Depends(current_admin),
+def patch_model(model_id: str, body: ModelPatch, admin: object = Depends(current_admin),
                 db: Session = Depends(get_db)) -> dict:
     """Bật/tắt model — trạng thái RIÊNG của registry, sync không đụng (xem
     sync_provider). Disabled model: không hiện trong selector, không được gán
@@ -603,6 +617,8 @@ def patch_model(model_id: str, body: ModelPatch, _: object = Depends(current_adm
         m.enabled = body.enabled
     db.commit()
     db.refresh(m)
+    log_action("model.toggle", user_id=getattr(admin, "id", None),
+               target=m.model_id[:128], detail=f"enabled={m.enabled}")
     return _model_out(m, db.get(AiProvider, m.provider_id), full_description=True)
 
 
@@ -694,17 +710,21 @@ def list_prompts(_: object = Depends(current_admin)) -> dict:
 
 
 @router.put("/prompts/{task_key}")
-def put_prompt(task_key: str, body: PromptIn, _: object = Depends(current_admin)) -> dict:
+def put_prompt(task_key: str, body: PromptIn, admin: object = Depends(current_admin)) -> dict:
     try:
-        return P.set_prompt(task_key, body.content)
+        out = P.set_prompt(task_key, body.content)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    log_action("prompt.update", user_id=getattr(admin, "id", None), target=task_key)
+    return out
 
 
 @router.post("/prompts/{task_key}/reset")
-def reset_prompt(task_key: str, _: object = Depends(current_admin)) -> dict:
+def reset_prompt(task_key: str, admin: object = Depends(current_admin)) -> dict:
     try:
-        return P.reset_prompt(task_key)
+        out = P.reset_prompt(task_key)
     except KeyError as exc:
         raise HTTPException(status_code=404,
                             detail=f"'{task_key}' không có prompt mặc định để khôi phục") from exc
+    log_action("prompt.reset", user_id=getattr(admin, "id", None), target=task_key)
+    return out

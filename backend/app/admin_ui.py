@@ -102,10 +102,12 @@ __THEME_CSS__
     <button id="tab-ai" class="on" onclick="showTab('ai')">AI (nhà cung cấp &amp; model)</button>
     <button id="tab-settings" onclick="showTab('settings')">Cấu hình hệ thống</button>
     <button id="tab-users" onclick="showTab('users')">Người dùng</button>
+    <button id="tab-audit" onclick="showTab('audit')">Nhật ký kiểm toán</button>
   </div>
   <div id="pane-ai"><div id="ai"></div></div>
   <div id="pane-settings" style="display:none"><div id="content"></div></div>
   <div id="pane-users" style="display:none"><div id="users"></div></div>
+  <div id="pane-audit" style="display:none"><div id="audit"></div></div>
 </div>
 <div id="toast"></div>
 <div id="modal-bg" class="modal-bg"><div class="modal" id="modal"></div></div>
@@ -131,13 +133,14 @@ function flash(msg, cls) { const el = $("toast");
 function esc(s) { const d = document.createElement("div"); d.textContent = s == null ? "" : String(s); return d.innerHTML.replace(/"/g, "&quot;"); }
 
 function showTab(name) {
-  ["ai", "settings", "users"].forEach(n => {
+  ["ai", "settings", "users", "audit"].forEach(n => {
     $("pane-" + n).style.display = n === name ? "" : "none";
     $("tab-" + n).classList.toggle("on", n === name);
   });
   if (name === "users") loadUsers();
   if (name === "settings") load();
   if (name === "ai") loadAi();
+  if (name === "audit") loadAudit();
 }
 
 async function load() {
@@ -145,6 +148,29 @@ async function load() {
     const r = await api("/v1/admin/settings");
     render((await r.json()).settings);
   } catch (e) { /* api() đã điều hướng khi 401/403 */ }
+  loadSystem();
+}
+
+// Card TÌNH TRẠNG HỆ THỐNG (read-only) — GET /v1/admin/system, KHÔNG chứa secret.
+// Lưu ý thật: runtime đọc env MEDIA_ROOT; setting DB media_root chỉ hiển thị.
+async function loadSystem() {
+  try {
+    const r = await api("/v1/admin/system");
+    if (!r.ok) return;
+    const d = await r.json();
+    const el = $("sysinfo");
+    if (!el) return;
+    const fmtB = (n) => n == null ? "—" : (n > 1e9 ? (n / 1e9).toFixed(1) + " GB" : Math.round(n / 1e6) + " MB");
+    el.innerHTML = `
+      <div class="row"><div class="k"><b>Database</b><span>dialect + phiên bản</span></div>
+        <span class="tag">${esc(d.db?.dialect || "—")}</span><span class="mut">${esc((d.db?.version || "").slice(0, 40))}</span></div>
+      <div class="row"><div class="k"><b>Hàng đợi</b><span>chế độ chạy job</span></div>
+        <span class="tag">${esc(d.queue?.mode)}</span><span class="mut">${esc(d.queue?.broker)}</span></div>
+      <div class="row"><div class="k"><b>Lưu trữ media</b><span>runtime đọc env MEDIA_ROOT</span></div>
+        <span class="tag">${esc(d.storage?.mode)}</span><span class="mut">${esc(d.storage?.root || "")} · trống ${esc(fmtB(d.storage?.free_bytes))}</span></div>
+      <div class="row"><div class="k"><b>Job đang chạy</b><span>toàn hệ</span></div>
+        <span class="tag">${esc(String(d.jobs_running ?? "—"))}</span><span class="mut">phiên hết hạn chưa dọn: ${esc(String(d.sessions_expired ?? "—"))}</span></div>`;
+  } catch (e) { /* im lặng — card phụ không được phá trang settings */ }
 }
 
 function render(settings) {
@@ -165,6 +191,7 @@ function render(settings) {
     }
     html += "</div>";
   }
+  html += `<div class="card"><h2>Tình trạng hệ thống</h2><div id="sysinfo"><span class="mut">đang tải…</span></div></div>`;
   html += `<div class="card"><h2>custom key</h2><div class="row">
     <div class="k"><b>Key mới</b><span>key tuỳ ý, ví dụ provider.custom.url</span></div>
     <input id="new-key" placeholder="key"><input id="new-val" placeholder="value">
@@ -203,7 +230,7 @@ async function loadUsers() {
 
 function renderUsers(users) {
   const rows = users.map(u => `<tr>
-    <td><b>${esc(u.email)}</b>${u.has_password ? "" : ' <span class="mut">(chưa có mật khẩu)</span>'}</td>
+    <td>${u.name ? '<b>' + esc(u.name) + '</b><br>' : ''}<span class="mut">${esc(u.email)}</span>${u.has_password ? "" : ' (chưa có mật khẩu)'}</td>
     <td>${u.role === "admin" ? '<span class="badge admin">Quản trị</span>' : '<span class="badge">Người dùng</span>'}</td>
     <td>${u.is_active ? '<span class="badge">Hoạt động</span>' : '<span class="badge off">Đã khoá</span>'}</td>
     <td class="mut">${u.last_login_at ? new Date(u.last_login_at * 1000).toLocaleString("vi-VN") : "—"}</td>
@@ -226,7 +253,7 @@ function renderUsers(users) {
         <button onclick="createUser()">Tạo người dùng</button></div>
     </div>
     <div class="card"><h2>Người dùng (${users.length})</h2>
-      <table class="users"><thead><tr><th>Email</th><th>Vai trò</th><th>Trạng thái</th>
+      <table class="users"><thead><tr><th>Người dùng</th><th>Vai trò</th><th>Trạng thái</th>
         <th>Đăng nhập gần nhất</th><th></th></tr></thead>
         <tbody>${rows}</tbody></table>
       <p class="sub" style="margin-top:14px">Đăng ký công khai ${users.length ? "" : ""}do Admin bật/tắt
@@ -262,6 +289,54 @@ async function toggleActive(id, active) {
         r.ok ? "ok" : "err");
   loadUsers();
 }
+// NHẬT KÝ KIỂM TOÁN — GET /v1/admin/audit (filter q/action + phân trang).
+const AUDIT_LABELS = {
+  "auth.login": "Đăng nhập", "auth.login_failed": "Đăng nhập thất bại",
+  "auth.logout": "Đăng xuất", "auth.setup": "Khởi tạo", "auth.signup": "Đăng ký",
+  "me.password_change": "Đổi mật khẩu", "me.name_change": "Đổi tên",
+  "me.session_revoke": "Thu hồi phiên", "user.create": "Tạo user",
+  "user.reset_password": "Đặt lại mật khẩu", "user.deactivate": "Khoá tài khoản",
+  "user.activate": "Mở khoá", "provider.create": "Tạo provider",
+  "provider.update": "Sửa provider", "provider.delete": "Xoá provider",
+  "provider.sync": "Đồng bộ model", "stage.set": "Gán công đoạn",
+  "stage.clear": "Gỡ công đoạn", "model.toggle": "Bật/tắt model",
+  "setting.set": "Đổi setting", "setting.delete": "Xoá setting",
+  "key.create": "Tạo API key", "key.revoke": "Thu hồi key",
+  "prompt.update": "Sửa prompt", "prompt.reset": "Khôi phục prompt",
+  "job.cancel": "Hủy job", "job.delete": "Xoá job", "config.import": "Nhập cấu hình",
+};
+let AUDIT_OFFSET = 0;
+async function loadAudit(shift) {
+  if (shift !== undefined) AUDIT_OFFSET = Math.max(0, AUDIT_OFFSET + shift);
+  const q = encodeURIComponent($("audit-q") ? $("audit-q").value : "");
+  const r = await api(`/v1/admin/audit?limit=25&offset=${AUDIT_OFFSET}&q=${q}`);
+  if (!r.ok) return;
+  const d = await r.json();
+  const rows = (d.items || []).map(i => `<tr>
+    <td class="mut">${i.created_at ? new Date(i.created_at * 1000).toLocaleString("vi-VN") : "—"}</td>
+    <td><b>${esc(AUDIT_LABELS[i.action] || i.action)}</b></td>
+    <td class="mut">${esc(i.user_email || i.user_id || "—")}</td>
+    <td>${esc(i.target || "—")}</td>
+    <td class="mut">${esc(i.detail || "")}</td>
+    <td class="mut">${esc(i.ip || "—")}</td></tr>`).join("");
+  $("audit").innerHTML = `
+    <div class="card"><h2>Hành động gần đây <span class="mut">(${d.total} dòng)</span></h2>
+      <div class="row"><div class="k"><b>Tìm</b><span>trong hành động/đối tượng/chi tiết</span></div>
+        <input id="audit-q" placeholder="từ khoá…" value=""
+          onkeydown="if(event.key==='Enter'){AUDIT_OFFSET=0;loadAudit(-AUDIT_OFFSET)}">
+        <button onclick="AUDIT_OFFSET=0;loadAudit(-AUDIT_OFFSET)">Tìm</button></div>
+      <table class="users"><thead><tr><th>Thời gian</th><th>Hành động</th><th>Người</th>
+        <th>Đối tượng</th><th>Chi tiết</th><th>IP</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="6" class="mut">Chưa có hành động nào.</td></tr>'}</tbody></table>
+      <div class="row" style="margin-top:10px">
+        <button class="ghost" ${AUDIT_OFFSET === 0 ? "disabled" : ""}
+          onclick="loadAudit(-25)">← Trước</button>
+        <span class="mut">${d.offset + 1}–${Math.min(d.offset + d.limit, d.total)} / ${d.total}</span>
+        <button class="ghost" ${d.offset + d.limit >= d.total ? "disabled" : ""}
+          onclick="loadAudit(25)">Sau →</button>
+      </div></div>`;
+}
+
 async function logout() {
   try { await fetch("/v1/auth/logout", { method: "POST", credentials: "same-origin" }); } catch (e) {}
   location.href = "/login";

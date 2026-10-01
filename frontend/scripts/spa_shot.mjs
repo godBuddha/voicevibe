@@ -54,11 +54,17 @@ const SHOTS = [
   ['16-translate-audio', '/translate-audio', true],
   ['07-jobs', '/jobs', true],
   ['08-api-keys', '/api-keys', true],
-  ['10-admin-users', '/admin/users', true],
-  ['11-admin-model-hub', '/admin/model-hub', true],
-  ['12-admin-settings', '/admin/settings', true],
+  // SETTINGS HUB: route /admin/* cũ tự redirect về hub — chụp thẳng section mới.
+  ['10-admin-users', '/settings/members', true],
+  ['11-admin-model-hub', '/settings/ai-platform', true],
+  ['12-admin-settings', '/settings/config', true],
   ['13-dashboard-dark', '/', true, 'dark'],
   ['14-dub-dark', '/dub', true, 'dark'],
+  ['25-settings-profile', '/settings/profile', true],
+  ['26-settings-sessions', '/settings/sessions', true],
+  ['28-settings-system', '/settings/system', true],
+  ['29-settings-audit', '/settings/audit', true],
+  ['30-settings-advanced', '/settings/import-export', true],
 ];
 
 const browser = await launch({
@@ -103,8 +109,8 @@ for (const [name, route, authed, theme] of SHOTS) {
   // evaluateOnNewDocument để giá trị có sẵn trước khi app mount (đặt sau mount
   // chỉ đổi attribute DOM, React state vẫn cũ).
   await page.evaluateOnNewDocument((t) => {
-    if (t) localStorage.setItem('theme', t);
-  }, theme || null);
+    localStorage.setItem('theme', t || 'light');
+  }, theme);
   await page.goto(`${BASE}${route}`, { waitUntil: 'networkidle0', timeout: 30000 });
   if (authed) {
     // SPA không có server-render: mỗi goto là một app mới — đảm bảo cờ còn nằm

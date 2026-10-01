@@ -50,6 +50,9 @@ class User(Base):
 
     id: Mapped[str] = mapped_column(String(12), primary_key=True, default=_uid)
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    # Tên hiển thị tự do (Settings → Hồ sơ). NULL = chưa đặt — UI fallback về
+    # phần trước '@' của email như trước đây (không đổi hành vi người cũ).
+    name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     # NULL = user chỉ dùng API key / chưa được đặt mật khẩu (user tạo trước Phase 2).
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     # "user" | "admin" — String chứ không SAEnum: tránh phải tạo/ALTER kiểu enum
@@ -337,3 +340,24 @@ class Setting(Base):
     is_secret: Mapped[bool] = mapped_column(Boolean, default=False)
     category: Mapped[str] = mapped_column(String(32), default="general")
     updated_at: Mapped[int] = mapped_column(BigInteger, default=_now, onupdate=_now)
+
+
+class AuditLog(Base):
+    """Nhật ký hành động (Settings → Quan sát) — best-effort, không bao giờ gãy request.
+
+    CỐ Ý KHÔNG có ForeignKey tới users: nhật ký phải SỐNG SÓT khi tài khoản bị
+    xoá, còn mọi relationship của User đều cascade — FK thật sẽ xoá sạch lịch sử
+    (hoặc chặn việc xoá user sau này). `user_id` chỉ là chuỗi tham chiếu; hàng
+    nào người tạo không xác định được (gọi bằng X-Admin-Key) thì để NULL.
+    CHỈ GHI: endpoint đọc (GET) không được sinh dòng audit.
+    """
+
+    __tablename__ = "audit_logs"
+
+    id: Mapped[str] = mapped_column(String(12), primary_key=True, default=_uid)
+    user_id: Mapped[str | None] = mapped_column(String(12), nullable=True, index=True)
+    action: Mapped[str] = mapped_column(String(64), index=True)
+    target: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    detail: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[int] = mapped_column(BigInteger, default=_now, index=True)

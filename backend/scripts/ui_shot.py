@@ -44,6 +44,7 @@ PANELS = [  # (screenshot name, app router target, element that must be visible)
     ("05-jobs", "jobs", "#joblist"),
     ("06-api-keys", "api", "#keylist"),
     ("12-subtitle", "subtitle", "#subfile"),
+    ("13-settings", "settings", "#sesslist"),
 ]
 
 
@@ -220,6 +221,10 @@ def main() -> int:
             page.wait_for_selector("#users table.users", timeout=20000)
             page.wait_for_timeout(500)
             shot("10-admin-users")
+            page.click("#tab-audit")
+            page.wait_for_selector("#audit table.users", timeout=20000)
+            page.wait_for_timeout(500)
+            shot("14-admin-audit")
 
             # Chế độ tối: bật qua đúng hàm của UI rồi kiểm tra theme đã đổi thật.
             page.goto(f"{base}/")

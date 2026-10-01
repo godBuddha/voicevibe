@@ -45,6 +45,8 @@ from .pipelines.subtitle import FORMATS as SUBTITLE_FORMATS
 from .prompt_library import router as prompt_library_router
 from .prompts import seed_prompts
 from .providers_api import router as ai_admin_router
+from .settings_api import router as settings_hub_router
+from .audit import log_action as _audit
 from .ratelimit import check_rate as _check_rate
 from .ratelimit import _RATE  # noqa: F401 — giữ tên cũ cho test/ops
 from .ratelimit import backend as rate_limit_backend
@@ -117,6 +119,8 @@ seed_prompts()
 # Nhóm endpoint quản trị AI (nhà cung cấp / công đoạn / prompt) — xem app/providers_api.py
 app.include_router(ai_admin_router)
 app.include_router(prompt_library_router)
+# Settings Hub (hồ sơ/mật khẩu/phiên cá nhân + audit/overview/system/export-import)
+app.include_router(settings_hub_router)
 
 
 def _hash_key(raw: str) -> str:
@@ -353,6 +357,7 @@ def me(user: User = Depends(auth), db: Session = Depends(get_db)) -> dict:
     return {
         "user_id": user.id,
         "email": user.email,
+        "name": user.name,
         "role": user.role,
         "voices": [{"id": x.id, "name": x.name, "lang": x.lang} for x in voices],
     }
@@ -455,6 +460,8 @@ def setup(body: SetupIn, request: Request, response: Response,
     token = A.create_session(db, user, request)
     db.commit()
     A.set_session_cookie(response, token, request)
+    _audit("auth.setup", user_id=user.id, target=user.email,
+           ip=A._client_ip(request))
     return {"user_id": user.id, "email": user.email, "role": user.role,
             "redirect": "/"}
 
@@ -470,11 +477,15 @@ def login(body: LoginIn, request: Request, response: Response,
     user = A.authenticate(db, email, body.password)
     if user is None:
         # Một thông báo chung cho mọi trường hợp sai — không lộ email nào tồn tại.
+        # Audit GHI THẬT email đã thử (target) — log dò mật khẩu là mục đích chính
+        # của audit; dòng login_failed không tiết lộ gì cho kẻ dò (chỉ admin xem).
+        _audit("auth.login_failed", target=email, ip=A._client_ip(request))
         raise HTTPException(status_code=401, detail="Email hoặc mật khẩu không đúng")
     A.mark_login(db, user, body.password)
     token = A.create_session(db, user, request)
     db.commit()
     A.set_session_cookie(response, token, request)
+    _audit("auth.login", user_id=user.id, target=email, ip=A._client_ip(request))
     return {"user_id": user.id, "email": user.email, "role": user.role,
             "redirect": "/admin" if user.is_admin else "/"}
 
@@ -482,8 +493,17 @@ def login(body: LoginIn, request: Request, response: Response,
 @app.post("/v1/auth/logout")
 def logout(request: Request, response: Response,
            db: Session = Depends(get_db)) -> dict:
-    A.revoke_session(db, request.cookies.get(A.COOKIE_NAME))
+    token = request.cookies.get(A.COOKIE_NAME)
+    # Xác định chủ phiên TRƯỚC khi xoá (xong là mất dấu để lấy user_id).
+    owner_id = None
+    if token:
+        from .models import Session as DbSession
+        row = db.get(DbSession, A.hash_key(token))
+        owner_id = row.user_id if row else None
+    A.revoke_session(db, token)
     A.clear_session_cookie(response, request)
+    if owner_id:
+        _audit("auth.logout", user_id=owner_id, ip=A._client_ip(request))
     return {"ok": True, "redirect": "/login"}
 
 
@@ -491,8 +511,8 @@ def logout(request: Request, response: Response,
 def auth_me(user: User | None = Depends(auth_optional)) -> dict:
     if user is None:
         raise HTTPException(status_code=401, detail="chưa đăng nhập")
-    return {"user_id": user.id, "email": user.email, "role": user.role,
-            "is_admin": user.is_admin}
+    return {"user_id": user.id, "email": user.email, "name": user.name,
+            "role": user.role, "is_admin": user.is_admin}
 
 
 # ---------------------------------------------------------------- Day 6: admin
@@ -648,6 +668,7 @@ def cancel_job(job_id: str, user: User = Depends(auth),
     job.error = "Đã hủy bởi người dùng"
     job.progress = 100
     db.commit()
+    _audit("job.cancel", user_id=user.id, target=job.id)
     return {"job_id": job.id, "status": "cancelled"}
 
 
@@ -672,6 +693,7 @@ def delete_job(job_id: str, user: User = Depends(auth),
             pass
     db.delete(job)
     db.commit()
+    _audit("job.delete", user_id=user.id, target=job_id)
     return {"deleted": job_id}
 
 
@@ -707,7 +729,7 @@ def admin_list(_: None = Depends(admin_auth)) -> dict:
 
 
 @app.put("/v1/admin/settings/{key}")
-def admin_set(key: str, body: dict, _: None = Depends(admin_auth)) -> dict:
+def admin_set(key: str, body: dict, admin: User | None = Depends(admin_auth)) -> dict:
     value = body.get("value")
     if value is None or not isinstance(value, (str, int, float, bool)):
         raise HTTPException(status_code=422, detail='body must be {"value": str|number|bool}')
@@ -716,11 +738,15 @@ def admin_set(key: str, body: dict, _: None = Depends(admin_auth)) -> dict:
         else bool(d and d.get("secret"))
     set_setting(key, value, is_secret=is_secret,
                 category=d["category"] if d else "custom")
+    # detail KHÔNG bao giờ chứa giá trị secret — chỉ ghi kiểu dữ liệu.
+    _audit("setting.set", user_id=admin.id if admin else None, target=key,
+           detail=f"is_secret={is_secret}")
     return {"key": key, "ok": True}
 
 
 @app.delete("/v1/admin/settings/{key}")
-def admin_delete(key: str, _: None = Depends(admin_auth)) -> dict:
+def admin_delete(key: str, admin: User | None = Depends(admin_auth)) -> dict:
+    _audit("setting.delete", user_id=admin.id if admin else None, target=key)
     return {"key": key, "deleted": delete_setting(key)}
 
 
@@ -732,6 +758,8 @@ def create_api_key(user: User = Depends(auth), db: Session = Depends(get_db)) ->
     raw = "vv_" + _secrets.token_hex(16)
     db.add(ApiKey(key=_hash_key(raw), prefix=raw[:12], user_id=user.id))
     db.commit()
+    # Chỉ ghi PREFIX (12 ký tự hiển thị công khai) — raw key không bao giờ vào audit.
+    _audit("key.create", user_id=user.id, target=raw[:12])
     return {"key": raw, "rate_limit_per_min": 60,
             "note": "store it now — shown once (only a SHA-256 hash is stored)"}
 
@@ -760,6 +788,7 @@ def revoke_api_key(key: str, user: User = Depends(auth),
         raise HTTPException(status_code=404, detail="key not found")
     db.delete(row)
     db.commit()
+    _audit("key.revoke", user_id=user.id, target=row.prefix)
     return {"key": mask(row.prefix), "revoked": True}
 
 
@@ -804,6 +833,7 @@ def signup(body: SignupIn, request: Request,
     raw = "vv_" + _secrets.token_hex(16)
     db.add(ApiKey(key=_hash_key(raw), prefix=raw[:12], user_id=u.id))
     db.commit()
+    _audit("auth.signup", user_id=u.id, target=email, ip=ip)
     return {"user_id": u.id, "email": email, "role": u.role,
             "key": raw, "note": "store it now — shown once"}
 
@@ -827,7 +857,7 @@ def _admin_count(db: Session) -> int:
 
 
 def _user_out(u: User) -> dict:
-    return {"user_id": u.id, "email": u.email, "role": u.role,
+    return {"user_id": u.id, "email": u.email, "name": u.name, "role": u.role,
             "is_active": u.is_active,
             "has_password": bool(u.password_hash),
             "created_at": u.created_at, "last_login_at": u.last_login_at}
@@ -841,7 +871,7 @@ def admin_list_users(_: User | None = Depends(admin_auth),
 
 
 @app.post("/v1/admin/users", status_code=201)
-def admin_create_user(body: CreateUserIn, _: User | None = Depends(admin_auth),
+def admin_create_user(body: CreateUserIn, admin: User | None = Depends(admin_auth),
                       db: Session = Depends(get_db)) -> dict:
     """Admin tạo tài khoản cho người khác (đường tạo user chính khi signup đóng)."""
     email = body.email.strip().lower()
@@ -858,6 +888,7 @@ def admin_create_user(body: CreateUserIn, _: User | None = Depends(admin_auth),
              password_hash=hash_password(body.password))
     db.add(u)
     db.commit()
+    _audit("user.create", user_id=admin.id if admin else None, target=u.email)
     return _user_out(u)
 
 
@@ -877,7 +908,7 @@ def _guard_last_admin(db: Session, target: User) -> None:
 
 @app.post("/v1/admin/users/{user_id}/reset-password")
 def admin_reset_password(user_id: str, body: ResetPasswordIn,
-                         _: User | None = Depends(admin_auth),
+                         admin: User | None = Depends(admin_auth),
                          db: Session = Depends(get_db)) -> dict:
     u = _get_user_or_404(db, user_id)
     problem = password_problem(body.password)
@@ -886,11 +917,12 @@ def admin_reset_password(user_id: str, body: ResetPasswordIn,
     u.password_hash = hash_password(body.password)
     revoked = A.revoke_user_sessions(db, u.id)  # đổi mật khẩu -> đá mọi phiên cũ ra
     db.commit()
+    _audit("user.reset_password", user_id=admin.id if admin else None, target=u.email)
     return {"user_id": u.id, "sessions_revoked": revoked}
 
 
 @app.post("/v1/admin/users/{user_id}/deactivate")
-def admin_deactivate_user(user_id: str, _: User | None = Depends(admin_auth),
+def admin_deactivate_user(user_id: str, admin: User | None = Depends(admin_auth),
                           db: Session = Depends(get_db)) -> dict:
     u = _get_user_or_404(db, user_id)
     _guard_last_admin(db, u)
@@ -900,15 +932,17 @@ def admin_deactivate_user(user_id: str, _: User | None = Depends(admin_auth),
     for k in keys:
         k.active = False  # khoá tài khoản thì API key cũng phải chết
     db.commit()
+    _audit("user.deactivate", user_id=admin.id if admin else None, target=u.email)
     return {"user_id": u.id, "is_active": False,
             "sessions_revoked": revoked, "keys_disabled": len(keys)}
 
 
 @app.post("/v1/admin/users/{user_id}/activate")
-def admin_activate_user(user_id: str, _: User | None = Depends(admin_auth),
+def admin_activate_user(user_id: str, admin: User | None = Depends(admin_auth),
                         db: Session = Depends(get_db)) -> dict:
     u = _get_user_or_404(db, user_id)
     u.is_active = True
     db.commit()
+    _audit("user.activate", user_id=admin.id if admin else None, target=u.email)
     return {"user_id": u.id, "is_active": True,
             "note": "API key đã bị khoá trước đó cần được cấp lại"}

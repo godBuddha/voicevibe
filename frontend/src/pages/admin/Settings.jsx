@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../../hooks/useApi.jsx';
 
-export default function AdminSettings() {
+export default function AdminSettings({ embedded = false }) {
   const { api } = useApi();
   const [rows, setRows] = useState([]); // object gốc: {key,label,category,is_secret,value,source,set_in_db}
   const [editing, setEditing] = useState(null);
@@ -22,7 +22,11 @@ export default function AdminSettings() {
       // làm mất `is_secret` → người sửa secret nhận giá trị MẶT-NẠ ("••••1234")
       // prefilled và bấm Lưu là ghi đè token thật bằng rác (đã gặp thật).
       const data = await api.get('/v1/admin/settings');
-      setRows(data.settings || []);
+      // embedded (Settings Hub → Hệ thống › Cấu hình chung): ẨN nhóm security —
+      // auth.allow_signup / admin.api_key / webhook.secret đã có section riêng
+      // (Bảo mật / Webhooks); hiện lại ở đây là double-render 2 chỗ sửa 1 chỗ.
+      setRows((data.settings || [])
+        .filter((r) => !embedded || r.category !== 'security'));
     } catch (e) {
       console.error('tải cài đặt thất bại', e);
     }
@@ -104,14 +108,23 @@ export default function AdminSettings() {
   }[src] || { text: 'mặc định', bg: 'var(--bg)', color: 'var(--text-dim)' });
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1000px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '14px', fontWeight: 700 }}>
-        Cài đặt hệ thống
-      </h1>
-      <p style={{ color: 'var(--text-dim)', marginBottom: '20px' }}>
-        Quản lý các cấu hình và tham số hệ thống. Giá trị secret hiển thị dạng mặt-nạ;
-        muốn đổi thì nhập giá trị MỚI, để trống là giữ nguyên.
-      </p>
+    <div style={{ padding: embedded ? '0' : '20px', maxWidth: '1000px', margin: '0 auto' }}>
+      {!embedded ? (
+        <>
+          <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '14px', fontWeight: 700 }}>
+            Cài đặt hệ thống
+          </h1>
+          <p style={{ color: 'var(--text-dim)', marginBottom: '20px' }}>
+            Quản lý các cấu hình và tham số hệ thống. Giá trị secret hiển thị dạng mặt-nạ;
+            muốn đổi thì nhập giá trị MỚI, để trống là giữ nguyên.
+          </p>
+        </>
+      ) : (
+        <p style={{ color: 'var(--text-dim)', marginBottom: '14px', fontSize: 'var(--text-sm)' }}>
+          Secret hiển thị dạng mặt-nạ; muốn đổi thì nhập giá trị MỚI, để trống là giữ nguyên.
+          Công tắc đăng ký/admin key nằm ở section Bảo mật.
+        </p>
+      )}
 
       {/* Error */}
       {error && (

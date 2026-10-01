@@ -42,3 +42,27 @@ Cuối trang: form thêm custom key.
   user với badge vai trò/trạng thái, nút Đặt lại mật khẩu · Cấp credits · Vô hiệu hóa).
 - Thông báo dùng **toast dùng chung** (`#toast`) — trước đây `flash()` ghi vào phần tử
   `.status` có thể không tồn tại ở panel hiện tại.
+
+## Settings Hub SPA — `/settings` (30/09)
+
+Sidebar riêng trong trang, 8 nhóm theo scope (mỗi nhóm nhãn Cá nhân / Hệ thống):
+Cá nhân (Hồ sơ/Giao diện/Thông báo/Phiên) · AI Platform (Model Hub) · Workspace
+(Thành viên + placeholder "Sắp có") · Developer (API Keys/Webhooks) · Bảo mật ·
+Hệ thống (Tổng quan/Cấu hình chung) · Quan sát (Audit/Jobs) · Nâng cao (flags,
+import-export, backup docs, danger). Item "Sắp có" = disabled, không điều hướng.
+
+- Component: `pages/settings/SettingsHub.jsx` (+ `parts.jsx` dùng chung).
+  CHỜ `useAuth().loading` xong mới quyết redirect — quyết sớm là cả admin bị
+  đá về Hồ sơ (bug thật lần đầu).
+- Nhúng `embedded`: AdminUsers / AdminModelHub / AdminSettings / ApiKeys ẩn h1 +
+  padding; AdminSettings embedded LỌC category `security` (tránh double-render
+  với section Bảo mật/Webhooks).
+- Redirect một chiều: `/admin/users`→`/settings/members`, `/admin/model-hub`→
+  `/settings/ai-platform`, `/admin/settings`→`/settings/config`, `/api-keys`→
+  `/settings/api-keys`. Sidebar: mục "Cài đặt" cho mọi user.
+- Topbar: avatar → dropdown (Cài đặt + Đăng xuất); chuông THẬT (GET /v1/jobs
+  30s, badge đếm queued+running, bật Notification qua pref `vv_notify`).
+
+Inline UI: `app_ui.py` trang settings (PAGES + section — test_ui_js bắt bijection,
+raw fetch + H()); `admin_ui.py` tab "Nhật ký kiểm toán" + card Tình trạng hệ thống
+trong tab Cấu hình + cột Người dùng hiển thị tên.

@@ -50,9 +50,9 @@ Mock thuần UI (không cần backend): `VITE_USE_MOCK=1 npm run dev`.
 |---|---|---|
 | ![spa-dashboard](docs/screenshots-spa/01-dashboard.png) | ![spa-dub](docs/screenshots-spa/02-dub.png) | ![spa-modelhub](docs/screenshots-spa/11-admin-model-hub.png) |
 
-| Jobs | Admin Users | Dashboard dark |
+| Jobs | Settings Hub | Dashboard dark |
 |---|---|---|
-| ![spa-jobs](docs/screenshots-spa/07-jobs.png) | ![spa-users](docs/screenshots-spa/10-admin-users.png) | ![spa-dark](docs/screenshots-spa/13-dashboard-dark.png) |
+| ![spa-jobs](docs/screenshots-spa/07-jobs.png) | ![spa-settings](docs/screenshots-spa/25-settings-profile.png) | ![spa-dark](docs/screenshots-spa/13-dashboard-dark.png) |
 
 UI inline (HTML trong Python) **vẫn giữ nguyên** — bản self-host trỏ tunnel
 thẳng vào `api:8000` không cần build gì vẫn dùng được toàn bộ tính năng.
@@ -86,17 +86,41 @@ Kiểm chứng trên GPU thật: `docs/verification/subtitle.{srt,vtt,ass}` và
 `subtitle-bilingual.*` sinh từ file mẫu 2 người nói — xem
 `backend/scripts/subtitle_smoke.py`.
 
-### Trang quản trị — `/admin`
+### Cài đặt — Settings Hub `/settings`
 
-Ba tab: **AI** (nhà cung cấp + model + prompt) · **Cấu hình hệ thống** · **Người dùng**.
+**Control Center cho cả người dùng lẫn quản trị viên**, phân nhóm theo **scope** (mỗi
+nhóm gắn nhãn rõ setting nào chỉ tác động tới mình, setting nào tác động tới toàn
+bộ instance self-hosted):
+
+| Nhóm | Scope | Nội dung |
+|---|---|---|
+| **Cá nhân** | Cá nhân | Hồ sơ (tên hiển thị + đổi mật khẩu) · Giao diện · Thông báo · Phiên đăng nhập (thiết bị nào đang đăng nhập + đăng xuất từ xa) |
+| **AI Platform** | Hệ thống | AI Model Hub (providers → models → capabilities → công đoạn) |
+| **Workspace** | Hệ thống | Thành viên (tạo user, đặt lại mật khẩu, khoá/mở) · Teams/Vai trò: *sắp có* |
+| **Developer** | Cá nhân | API Keys · Webhooks (khóa ký HMAC `X-VoiceVibe-Signature`) |
+| **Bảo mật** | Hệ thống | Xác thực (đăng ký công khai, admin key) · SSO/LDAP/MFA: *sắp có* |
+| **Hệ thống** | Hệ thống | Tổng quan (DB/queue/storage — chỉ đọc) · Cấu hình chung |
+| **Quan sát** | Hệ thống | **Nhật ký kiểm toán** (audit log mọi hành động) · Tổng quan jobs toàn hệ |
+| **Nâng cao** | Hệ thống | Công tắc tính năng · **Xuất/nhập cấu hình JSON** (không kèm secret) · Hướng dẫn sao lưu · Vùng nguy hiểm |
+
+Mục *sắp có* hiển thị dạng mờ — không bấm được (không có menu chết). Route cũ
+`/admin/users`, `/admin/model-hub`, `/admin/settings`, `/api-keys` **tự chuyển hướng**
+về đúng section trong hub — link cũ không chết.
+
+| Nhật ký kiểm toán (SPA) | Hồ sơ cá nhân (SPA) |
+|---|---|
+| ![spa-audit](docs/screenshots-spa/29-settings-audit.png) | ![spa-profile](docs/screenshots-spa/25-settings-profile.png) |
+
+UI inline giữ tab **AI** · **Cấu hình** (kèm card Tình trạng hệ thống) · **Người dùng**
+· **Nhật ký kiểm toán**; ứng dụng user có trang **Cài đặt** (hồ sơ/phiên/thông báo).
 
 | AI — nhà cung cấp, công đoạn, prompt | Cấu hình hệ thống |
 |---|---|
 | ![admin ai](docs/screenshots/07-admin-ai.png) | ![admin settings](docs/screenshots/11-admin-settings.png) |
 
-| Người dùng | Đăng nhập |
+| Người dùng | Nhật ký kiểm toán (inline) |
 |---|---|
-| ![admin users](docs/screenshots/10-admin-users.png) | ![login](docs/screenshots/00-login.png) |
+| ![admin users](docs/screenshots/10-admin-users.png) | ![admin audit](docs/screenshots/14-admin-audit.png) |
 
 ### Chế độ tối (dark mode)
 
@@ -247,7 +271,7 @@ Selftest: `PYTHONPATH=. python tests/test_providers.py`
 chuẩn OpenAI: một clone "thuần cloud API" không thể tái tạo sản phẩm gốc. Kiến trúc
 local-first là bắt buộc; cloud chỉ tùy chọn cho các stage hàng hóa.
 
-### AI Model Hub — Model Registry (`/admin/model-hub`)
+### AI Model Hub — Model Registry (`/settings/ai-platform`)
 
 Model được quản lý như **entity độc lập** (bảng `ai_models`, danh tính
 `provider_id + model_id`) — không phải chuỗi text gắn trên provider:
@@ -402,7 +426,7 @@ openssl rand -hex 32   # dán vào SETTINGS_MASTER_KEY trong .env
 `huggingface.co/settings/tokens`, rồi accept điều khoản ở 4 repo:
 `pyannote/speaker-diarization-3.1` · `pyannote/segmentation-3.0` ·
 `pyannote/wespeaker-voxceleb-resnet34-LM` · `pyannote/speaker-diarization-community-1`.
-Token dán vào `.env` HOẶC set sau qua `/admin/settings` (khuyến nghị).
+Token dán vào `.env` HOẶC set sau qua `/settings/config` (khuyến nghị).
 
 > **Lần đầu truy cập:** mở `/` → tự chuyển tới **`/setup`** để tạo tài khoản **quản trị**
 > (chỉ hiện một lần duy nhất). Sau đó mọi người đăng nhập ở `/login`, và **chỉ Admin tạo

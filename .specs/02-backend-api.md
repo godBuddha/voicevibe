@@ -127,3 +127,34 @@ migrate KHÔNG làm chết pipeline — cứ rơi về đường cũ.
 ### Ghi chú vận hành
 Worker là tiến trình riêng, không đi qua `app.main` → `app/tasks.py` cũng gọi
 `ensure_schema` để tự migrate trước khi nhận job.
+
+## Settings Hub — hồ sơ / phiên / audit / config (30/09)
+
+Router riêng `app/settings_api.py` (mount trong `main.py`). CSRF tự bao phủ qua
+`auth_optional` (`_check_csrf`); KHÔNG cần code thêm. Sai mật khẩu hiện tại trả
+**403, KHÔNG 401** — `client.js` coi 401 là hết phiên (đá ra /login giữa lúc gõ).
+
+Cá nhân (`Depends(auth)`):
+- `PATCH /v1/me` `{name 1..120}` — tên hiển thị lưu `users.name` (nullable).
+- `POST /v1/me/password` `{current_password, new_password}` — rate 5/phút; sai
+  current → 403; yếu → 422 (`password_problem`); đổi xong thu hồi mọi phiên
+  KHÁC (giữ phiên hiện tại) → `{ok, sessions_revoked}`.
+- `GET /v1/me/sessions` — list `{token_hash, current, ip, user_agent…}`.
+- `DELETE /v1/me/sessions/{hash}` — khác chủ → **404**; `DELETE /v1/me/sessions` —
+  thu hồi mọi thiết bị khác.
+
+Hệ thống (`Depends(current_admin)`):
+- `GET /v1/admin/audit` `q/action/user_id/limit≤200/offset` + total (enrich user_email).
+- `GET /v1/admin/overview` — jobs by_type/by_status toàn hệ + users/voices/api_keys/providers/models.
+- `GET /v1/admin/system` — db/queue/storage/python/password_min_length. KHÔNG giá trị secret.
+  `storage.root` lấy từ ENV (`get_storage`) — setting DB `media_root` chỉ hiển thị.
+- `GET /v1/admin/config/export` — settings non-secret (source=db) + stub `{key, secret:true}`
+  cho secret; providers KHÔNG api_key; stages; prompts.
+- `POST /v1/admin/config/import` — shape xấu → 422; upsert idempotent (provider theo
+  name, stage theo stage+order); phần thiếu → `warnings`, không chết cả file.
+
+Audit (`app/audit.py`): `log_action()` best-effort (SessionLocal riêng, try/except —
+không bao giờ gãy request); bảng `audit_logs` **không FK users** (nhật ký sống sót
+khi user bị xoá); CHỈ GHI hành động, GET không sinh dòng. Danh sách action:
+`app.audit.ACTIONS` (auth.*, me.*, user.*, provider.*, stage.*, model.toggle,
+setting.*, key.*, prompt.*, job.*, config.import).

@@ -96,7 +96,10 @@ function summarize() {
   const unexpectedHttp = pagesHttp.filter(({ url, status }) => !isExpectedHttp(url, status));
   // Nhiễu "đúng kế hoạch": /v1/auth/me trả 401 khi chưa đăng nhập — trình duyệt
   // luôn ghi console "Failed to load resource 401", JS không chặn được.
-  const noise = (c) => c.type === 'error' && c.text.includes('401');
+  // 401 /v1/auth/me khi chưa đăng nhập + 502 provider audit (endpoint GIẢ chủ
+  // ý) — console trình duyệt luôn ghi "Failed to load resource", JS chặn không được.
+  const noise = (c) => c.type === 'error'
+    && (c.text.includes('401') || c.text.includes('502'));
   const pageErrors = report.pages.reduce((n, p) => n + p.pageErrors.length, 0)
     + report.flows.reduce((n, f) => n + f.pageErrors.length, 0);
   const consoleErrors = [...report.pages, ...report.flows]
@@ -118,10 +121,12 @@ function summarize() {
 }
 
 // 4xx "đúng kế hoạch": chưa đăng nhập thì /v1/auth/me 401; user thường vào
-// /admin thì các endpoint /v1/admin/* 403.
+// /admin thì các endpoint /v1/admin/* 403. Provider audit trỏ endpoint GIẢ
+// (api.example.com) — Test/Đồng bộ chủ ý trả 502 để chứng minh nút báo lỗi rõ.
 function isExpectedHttp(url, status) {
   if (status === 401 && url.includes('/v1/auth/me')) return true;
   if (status === 403 && url.includes('/v1/admin/')) return true;
+  if (status === 502 && /\/v1\/admin\/providers\/[^/]+\/(test|sync)$/.test(url)) return true;
   return false;
 }
 
@@ -609,15 +614,21 @@ const FLOWS = [
     await page.goto(`${BASE}/admin/model-hub`, { waitUntil: 'networkidle2', timeout: 30000 });
     await sleep(800);
     const name = `audit-provider-${RUN_ID}`;
-    promptQueue = [name, 'https://api.example.com/v1', 'openai', 'sk-audit-dummy'];
-    await clickText(page, '+ Thêm Provider');
-    await sleep(1500);
-    promptQueue = [];
+    // Modal Provider là FORM INPUT (không phải window.prompt): điền từng field
+    // theo placeholder, rồi bấm nút Lưu trong modal.
+    await clickText(page, 'Thêm Provider');
+    await sleep(500);
+    await page.type('input[placeholder="OpenRouter"]', name);
+    await page.type('input[placeholder="https://openrouter.ai/api/v1"]', 'https://api.example.com/v1');
+    await page.type('input[placeholder="sk-or-v1-..."]', 'sk-audit-dummy');
+    await clickText(page, 'Lưu', { exact: true });
+    await sleep(1200);
     const created = await page.evaluate((n) => document.body.innerText.includes(n), name);
-    rec.steps.push({ action: 'tạo provider (4 prompt)', detail: created ? 'card xuất hiện' : 'KHÔNG xuất hiện (bug luồng prompt?)', ok: created });
+    rec.steps.push({ action: 'tạo provider (modal form)', detail: created ? 'card xuất hiện' : 'KHÔNG xuất hiện', ok: created });
     if (created) {
-      // clickInCard: container NHỎ NHẤT chứa tên provider + nút đích — khớp div
-      // CHA (bao cả trang) đã từng làm luồng click trúng card sai/none.
+      // UI mới: nút action trả phản hồi bằng TOAST (không alert) — đợi toast
+      // xuất hiện trong #root/ dưới trang. Provider audit trỏ endpoint giả =>
+      // phản hồi LỖI cũng chứng minh nút hoạt động (báo lỗi rõ).
       const clickInCard = async (t) => {
         await page.evaluate((n, bt) => {
           const divs = [...document.querySelectorAll('div')].filter((d) => d.innerText && d.innerText.includes(n)
@@ -627,19 +638,33 @@ const FLOWS = [
           if (btn) btn.click();
         }, name, t);
       };
-      await clickInCard('Test kết nối');
-      await sleep(3000); // probe tới api.example.com sẽ timeout/fail — chấp nhận
-      const testAlert = rec.dialogs[rec.dialogs.length - 1];
-      rec.steps.push({ action: 'Test kết nối', detail: testAlert ? `alert: ${testAlert.message}` : 'không có phản hồi', ok: !!testAlert });
-      await clickInCard('Pull models');
-      await sleep(3000);
-      const pullAlert = rec.dialogs.slice(-1)[0];
-      // Provider audit trỏ tới endpoint giả nên "Lỗi lấy model: ConnectError"
-      // là phản hồi ĐÚNG (nút hoạt động, báo lỗi rõ). Ok = có phản hồi alert.
-      rec.steps.push({ action: 'Pull models', detail: pullAlert ? `alert: ${pullAlert.message}` : 'không có phản hồi', ok: !!pullAlert });
-      // Xoá (confirm tự accept)
-      await clickInCard('Xoá');
-      await sleep(1200);
+      const waitForToast = async (ms) => {
+        // toast ModelHub: div fixed bottom — nội dung nhảy lên khi notify()
+        const deadline = Date.now() + ms;
+        const before = await page.evaluate(() => document.body.innerText);
+        while (Date.now() < deadline) {
+          const now = await page.evaluate(() => document.body.innerText);
+          if (now !== before && (now.includes('kết nối') || now.includes('Lỗi') || now.includes('Đồng bộ'))) return true;
+          await sleep(250);
+        }
+        return false;
+      };
+      await clickInCard('Test');
+      const testToast = await waitForToast(6000); // probe api.example.com fail = phản hồi rõ
+      rec.steps.push({ action: 'Test', detail: testToast ? 'toast phản hồi xuất hiện' : 'không có phản hồi', ok: testToast });
+      await clickInCard('Đồng bộ');
+      const syncToast = await waitForToast(6000);
+      rec.steps.push({ action: 'Đồng bộ', detail: syncToast ? 'toast phản hồi xuất hiện' : 'không có phản hồi', ok: syncToast });
+      // Xoá: nút icon-only (Trash2, không chữ) — nút CUỐI trong card; confirm tự accept
+      await page.evaluate((n) => {
+        const divs = [...document.querySelectorAll('div')].filter((d) => d.innerText && d.innerText.includes(n)
+          && [...d.querySelectorAll('button')].length >= 5);
+        const card = divs.sort((a, b) => a.innerText.length - b.innerText.length)[0];
+        const btns = [...(card || {}).querySelectorAll('button')];
+        const del = btns.find((b) => b.textContent.trim() === '') || btns[btns.length - 1];
+        if (del) del.click();
+      }, name);
+      await sleep(1500);
       let gone = !(await page.evaluate((n) => document.body.innerText.includes(n), name));
       // Dọn dẹp chắc chắn qua API nếu UI-delete chưa trúng (provider test là
       // rác phải chết — không để tồn dĩ).
@@ -653,14 +678,15 @@ const FLOWS = [
         rec.steps.push({ action: 'xoá provider (UI)', detail: 'đã mất khỏi danh sách', ok: true });
       }
     }
-    // Tabs còn lại: Stages + Prompts (reset mặc định prompt đầu tiên)
-    await clickText(page, 'Stages', { exact: true });
+    // Tabs còn lại (label mới của ModelHub 6 tab): Công đoạn + Prompt hệ thống
+    await clickText(page, 'Công đoạn', { exact: true });
     await sleep(600);
     const stagesVisible = await page.evaluate(() => document.body.innerText.includes('Các công đoạn xử lý'));
-    await clickText(page, 'Prompts', { exact: true });
+    await clickText(page, 'Prompt hệ thống', { exact: true });
     await sleep(600);
-    const promptsVisible = await page.evaluate(() => document.body.innerText.includes('Prompt Templates'));
-    rec.steps.push({ action: 'tab Stages/Prompts', detail: `stages=${stagesVisible}, prompts=${promptsVisible}`, ok: stagesVisible && promptsVisible });
+    const promptsVisible = await page.evaluate(() => document.body.innerText.includes('task_key')
+      || document.body.innerText.toLowerCase().includes('prompt'));
+    rec.steps.push({ action: 'tab Công đoạn/Prompt hệ thống', detail: `stages=${stagesVisible}, prompts=${promptsVisible}`, ok: stagesVisible && promptsVisible });
     rec.ok = rec.steps.every((s) => s.ok);
   }),
 
@@ -707,9 +733,48 @@ const FLOWS = [
   }),
 
   // ---- 15. Logout: về /login + cờ localStorage gỡ sạch.
+  // ---- SETTINGS HUB: đổi tên hiển thị qua Hồ sơ → Topbar cập nhật ngay.
+  flow('f-settings-profile', { expect: true }, async (page, rec) => {
+    await page.goto(`${BASE}/settings/profile`, { waitUntil: 'networkidle2', timeout: 30000 });
+    await sleep(600);
+    const input = await page.$('input[maxlength="120"]');
+    if (!input) throw new Error('không thấy ô Tên hiển thị ở /settings/profile');
+    await input.click({ clickCount: 3 });
+    await input.type(`audit-${Date.now() % 100000}`);
+    await clickText(page, 'Lưu tên');
+    await waitText(page, 'Đã lưu tên hiển thị');
+    // Topbar hiện lại tên qua refreshUser (không F5) — đợi React render.
+    await sleep(800);
+    const topName = await page.evaluate(() => document.querySelector('header')?.innerText || '');
+    const ok = topName.includes('audit-');
+    rec.ok = ok;
+    rec.steps.push({ action: 'đổi tên hiển thị', detail: `Topbar cập nhật không reload: ${ok}`, ok });
+  }),
+
+  // ---- SETTINGS HUB: Nhật ký kiểm toán — sau các bước trên chắc chắn có dòng.
+  flow('f-settings-audit', { expect: true }, async (page, rec) => {
+    await page.goto(`${BASE}/settings/audit`, { waitUntil: 'networkidle2', timeout: 30000 });
+    await sleep(800);
+    const body = await page.evaluate(() => document.body.innerText);
+    const hasRows = body.includes('Đăng nhập') && body.includes('Hành động gần đây');
+    const noAdminLeak = !body.includes('SETTINGS_MASTER_KEY');
+    rec.ok = hasRows && noAdminLeak;
+    rec.steps.push({ action: 'xem nhật ký kiểm toán', detail: `có dòng: ${hasRows}, không lộ secret: ${noAdminLeak}`, ok: rec.ok });
+  }),
+
   flow('f-logout', { expect: true }, async (page, rec) => {
     await page.goto(`${BASE}/`, { waitUntil: 'networkidle2', timeout: 30000 });
     await sleep(500);
+    // Topbar mới: Đăng xuất nằm TRONG dropdown avatar — bấm nút avatar trong
+    // header (KHÔNG dùng clickText 'Cài đặt': sidebar có link cùng tên, bấm
+    // nhầm là điều hướng thay vì mở dropdown).
+    await page.evaluate(() => {
+      const btns = [...document.querySelectorAll('header button')];
+      const avatar = btns.find((b) => b.querySelector('div') && b.innerText.trim().length > 0
+        && !b.getAttribute('title'));
+      (avatar || btns[btns.length - 1]).click();
+    });
+    await sleep(400);
     await clickText(page, 'Đăng xuất', { exact: true });
     await page.waitForFunction(() => location.pathname === '/login', { timeout: 15000 });
     await sleep(500);
@@ -730,11 +795,16 @@ const NAV_ROUTES = [
   ['06-subtitle', '/subtitle', true, null],
   ['07-jobs', '/jobs', true, null],
   ['08-api-keys', '/api-keys', true, null],
-  ['10-admin-users', '/admin/users', true, null],
-  ['11-admin-model-hub', '/admin/model-hub', true, null],
-  ['12-admin-settings', '/admin/settings', true, null],
+  ['10-admin-users', '/settings/members', true, null],
+  ['11-admin-model-hub', '/settings/ai-platform', true, null],
+  ['12-admin-settings', '/settings/config', true, null],
   ['13-dashboard-dark', '/', true, 'dark'],
   ['14-dub-dark', '/dub', true, 'dark'],
+  ['25-settings-profile', '/settings/profile', true, null],
+  ['26-settings-sessions', '/settings/sessions', true, null],
+  ['28-settings-system', '/settings/system', true, null],
+  ['29-settings-audit', '/settings/audit', true, null],
+  ['30-settings-advanced', '/settings/import-export', true, null],
 ];
 
 async function navSweep(browser) {

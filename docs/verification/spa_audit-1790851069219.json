@@ -1,0 +1,392 @@
+{
+  "startedAt": "2026-10-01T10:37:49.961Z",
+  "base": "http://127.0.0.1:8801",
+  "api": "http://127.0.0.1:18080",
+  "mode": "flows",
+  "fast": true,
+  "pages": [],
+  "flows": [
+    {
+      "name": "f-login-wrong-password",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "sai mật khẩu",
+          "detail": "ở lại /login: true, lỗi hiện: có",
+          "ok": true
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:8801/v1/auth/login",
+          "status": 401,
+          "snippet": "{\"detail\":\"Email hoặc mật khẩu không đúng\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 2245
+    },
+    {
+      "name": "f-login",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "đăng nhập",
+          "detail": "hạ cánh ở /settings/members (admin kỳ vọng /admin: CHƯA — bug #14)",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 2154
+    },
+    {
+      "name": "f-permissions",
+      "expect": false,
+      "ok": true,
+      "steps": [
+        {
+          "action": "tạo/reuse user auditor",
+          "detail": "vv-auditor@local (status 409)",
+          "ok": true
+        },
+        {
+          "action": "user thường vào /admin/users",
+          "detail": "hạ cánh: /settings/profile; sidebar có QUẢN TRỊ: false; bảng trống lặng lẽ: true",
+          "ok": false
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:8801/v1/auth/me",
+          "status": 401,
+          "snippet": "{\"detail\":\"chưa đăng nhập\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 3222
+    },
+    {
+      "name": "f-voice-create",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "upload giọng mẫu",
+          "detail": "không có alert",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 5693
+    },
+    {
+      "name": "f-voice-delete",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "xoá giọng + tải lại",
+          "detail": "đã mất thật sau reload",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [
+        {
+          "type": "confirm",
+          "message": "Bạn có chắc muốn xoá giọng này?"
+        }
+      ],
+      "screenshots": [],
+      "durationMs": 3364
+    },
+    {
+      "name": "f-tts-generate",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "chờ job tts",
+          "detail": "status=done",
+          "ok": true
+        },
+        {
+          "action": "trình phát audio",
+          "detail": "thẻ <audio> xuất hiện",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [
+        "/home/jewking/Documents/voicevibe/docs/screenshots-spa/flow-tts-player.png"
+      ],
+      "durationMs": 15881
+    },
+    {
+      "name": "f-api-keys-create-revoke",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "mở trang",
+          "detail": "render bình thường",
+          "ok": true
+        },
+        {
+          "action": "tạo key",
+          "detail": "raw=vv_8102a…",
+          "ok": true
+        },
+        {
+          "action": "thu hồi key qua UI",
+          "detail": "key đã biến mất (xác minh qua API)",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [
+        {
+          "type": "confirm",
+          "message": "Bạn có chắc muốn thu hồi API key này?"
+        }
+      ],
+      "screenshots": [],
+      "durationMs": 2848
+    },
+    {
+      "name": "f-admin-users",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "nút Chặn có mặt",
+          "detail": "có nút Chặn",
+          "ok": true
+        },
+        {
+          "action": "chặn user",
+          "detail": "chuyển Chặn",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 3445
+    },
+    {
+      "name": "f-admin-modelhub",
+      "expect": true,
+      "ok": false,
+      "steps": [
+        {
+          "action": "tạo provider (modal form)",
+          "detail": "card xuất hiện",
+          "ok": true
+        },
+        {
+          "action": "Test kết nối",
+          "detail": "không có phản hồi",
+          "ok": false
+        },
+        {
+          "action": "Pull models",
+          "detail": "không có phản hồi",
+          "ok": false
+        },
+        {
+          "action": "xoá provider (API fallback)",
+          "detail": "đã xoá a5314d0ef2bb qua API sau khi UI click không trúng",
+          "ok": true
+        },
+        {
+          "action": "flow",
+          "detail": "TimeoutError: Waiting failed: 5000ms exceeded",
+          "ok": false
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "error": "TimeoutError: Waiting failed: 5000ms exceeded",
+      "durationMs": 17030
+    },
+    {
+      "name": "f-admin-settings",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "thêm setting",
+          "detail": "hàng xuất hiện",
+          "ok": true
+        },
+        {
+          "action": "xoá setting",
+          "detail": "đã mất",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [
+        {
+          "type": "confirm",
+          "message": "Xoá setting \"audit.1790851069219\" (quay về giá trị mặc định)?"
+        }
+      ],
+      "screenshots": [],
+      "durationMs": 5093
+    },
+    {
+      "name": "f-theme-toggle",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "đổi theme",
+          "detail": "light → dark",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 1957
+    },
+    {
+      "name": "f-settings-profile",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "đổi tên hiển thị",
+          "detail": "Topbar cập nhật không reload: true",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 2425
+    },
+    {
+      "name": "f-settings-audit",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "xem nhật ký kiểm toán",
+          "detail": "có dòng: true, không lộ secret: true",
+          "ok": true
+        }
+      ],
+      "http": [],
+      "requestFailed": [],
+      "console": [],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 1603
+    },
+    {
+      "name": "f-logout",
+      "expect": true,
+      "ok": true,
+      "steps": [
+        {
+          "action": "đăng xuất",
+          "detail": "về /login: đúng, cờ localStorage dọn: true",
+          "ok": true
+        }
+      ],
+      "http": [
+        {
+          "url": "http://127.0.0.1:8801/v1/auth/me",
+          "status": 401,
+          "snippet": "{\"detail\":\"chưa đăng nhập\"}"
+        }
+      ],
+      "requestFailed": [],
+      "console": [
+        {
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+        }
+      ],
+      "pageErrors": [],
+      "dialogs": [],
+      "screenshots": [],
+      "durationMs": 2200
+    }
+  ],
+  "summary": {
+    "pagesChecked": 0,
+    "pageErrors": 0,
+    "consoleErrors": 0,
+    "domFindings": 0,
+    "unexpectedHttp": 0,
+    "duplicateShots": 0,
+    "dialogs": 3,
+    "flowsRun": 14,
+    "failedFlows": 1,
+    "failedExpected": [
+      "f-admin-modelhub"
+    ]
+  },
+  "unexpectedHttpDetail": []
+}

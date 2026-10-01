@@ -45,6 +45,16 @@ export function AuthProvider({ children }) {
     return res;
   };
 
+  // Gọi lại /v1/auth/me sau khi người dùng đổi thông tin (Settings → Hồ sơ)
+  // để Topbar/Sidebar cập nhật ngay mà không phải F5.
+  const refreshUser = async () => {
+    try {
+      setUser(adaptUser(await api.get('/v1/auth/me')));
+    } catch {
+      // lỗi mạng/không đăng nhập: giữ nguyên user cũ — không redirect từ đây
+    }
+  };
+
   const logout = async () => {
     try {
       await api.post('/v1/auth/logout');
@@ -81,6 +91,7 @@ export function AuthProvider({ children }) {
     logout,
     signup,
     setupAccount,
+    refreshUser,
     isAuthenticated: !!user,
   };
 

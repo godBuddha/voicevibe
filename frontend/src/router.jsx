@@ -1,4 +1,4 @@
-import { createBrowserRouter, redirect, Navigate, Outlet } from 'react-router-dom';
+import { createBrowserRouter, redirect, Navigate } from 'react-router-dom';
 import Layout from './components/Layout.jsx';
 import { AuthProvider, useAuth } from './hooks/useAuth.jsx';
 import Login from './pages/Login.jsx';
@@ -13,10 +13,8 @@ import TranslateText from './pages/TranslateText.jsx';
 import TranslateAudio from './pages/TranslateAudio.jsx';
 import Jobs from './pages/Jobs.jsx';
 import ApiKeys from './pages/ApiKeys.jsx';
-import AdminUsers from './pages/admin/Users.jsx';
-import AdminModelHub from './pages/admin/ModelHub.jsx';
-import AdminSettings from './pages/admin/Settings.jsx';
 import Prompts from './pages/Prompts.jsx';
+import SettingsHub from './pages/settings/SettingsHub.jsx';
 
 function protectedLoader() {
   // BẪY: bản sinh đầu tiên viết `!localStorage.getItem(...) === 'true'` —
@@ -73,18 +71,17 @@ export default createBrowserRouter([
       { path: 'translate-text', element: <TranslateText /> },
       { path: 'translate-audio', element: <TranslateAudio /> },
       { path: 'jobs', element: <Jobs /> },
-      { path: 'api-keys', element: <ApiKeys /> },
       { path: 'prompts', element: <Prompts /> },
-      {
-        path: 'admin',
-        element: <RequireAdmin><Outlet /></RequireAdmin>,
-        children: [
-          { index: true, element: <Navigate to="/admin/users" replace /> },
-          { path: 'users', element: <AdminUsers /> },
-          { path: 'model-hub', element: <AdminModelHub /> },
-          { path: 'settings', element: <AdminSettings /> },
-        ],
-      },
+      // SETTINGS HUB — Control Center cho cả user thường lẫn admin. Sidebar
+      // riêng theo scope (Cá nhân / Hệ thống); section không hợp lệ → hồ sơ.
+      { path: 'settings', element: <SettingsHub /> },
+      { path: 'settings/:section', element: <SettingsHub /> },
+      // REDIRECT một chiều: link cũ không chết, mọi người đi qua hub.
+      { path: 'api-keys', element: <Navigate to="/settings/api-keys" replace /> },
+      { path: 'admin', element: <Navigate to="/settings/members" replace /> },
+      { path: 'admin/users', element: <Navigate to="/settings/members" replace /> },
+      { path: 'admin/model-hub', element: <Navigate to="/settings/ai-platform" replace /> },
+      { path: 'admin/settings', element: <Navigate to="/settings/config" replace /> },
     ],
   },
 ]);

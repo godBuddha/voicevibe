@@ -73,6 +73,7 @@ jobs:
             "tests/test_providers_admin.py"
             "tests/test_model_hub.py"
             "tests/test_prompt_library.py"
+            "tests/test_settings_hub.py"
             "tests/test_ci_config.py"
             "tests/test_ratelimit.py"
             "tests/test_subtitle.py"

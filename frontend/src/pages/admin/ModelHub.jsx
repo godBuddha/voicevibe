@@ -20,7 +20,7 @@ const TABS = [
   ['prompts', 'Prompt hệ thống'],
 ];
 
-export default function AdminModelHub() {
+export default function AdminModelHub({ embedded = false }) {
   const { api } = useApi();
   const [activeTab, setActiveTab] = useState('providers');
   const [providers, setProviders] = useState([]);
@@ -76,11 +76,15 @@ export default function AdminModelHub() {
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '10px', fontWeight: 700 }}>AI Model Hub</h1>
-      <p style={{ color: 'var(--text-dim)', marginBottom: '16px', fontSize: 'var(--text-sm)' }}>
-        Đồng bộ model từ providers → đánh dấu capability → đối chiếu chức năng hệ thống → gán vào công đoạn
-      </p>
+    <div style={{ padding: embedded ? '0' : '20px', maxWidth: '1400px', margin: '0 auto' }}>
+      {!embedded && (
+        <>
+          <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '10px', fontWeight: 700 }}>AI Model Hub</h1>
+          <p style={{ color: 'var(--text-dim)', marginBottom: '16px', fontSize: 'var(--text-sm)' }}>
+            Đồng bộ model từ providers → đánh dấu capability → đối chiếu chức năng hệ thống → gán vào công đoạn
+          </p>
+        </>
+      )}
 
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', marginBottom: '14px', gap: '2px' }}>
         {TABS.map(([key, label]) => (

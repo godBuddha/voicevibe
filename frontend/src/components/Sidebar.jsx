@@ -10,8 +10,6 @@ import {
   Sparkles,
   History,
   KeyRound,
-  UsersRound,
-  Boxes,
   Settings,
   AudioWaveform,
 } from 'lucide-react';
@@ -56,14 +54,15 @@ const navigation = [
 
 const bottomLinks = [
   { label: 'Lịch sử Jobs', to: '/jobs', Icon: History },
-  { label: 'API cho nhà phát triển', to: '/api-keys', Icon: KeyRound },
+  { label: 'API cho nhà phát triển', to: '/settings/api-keys', Icon: KeyRound },
+  // Cài đặt = Settings Hub cho MỌI người (Cá nhân); admin vào được thêm toàn bộ
+  // nhóm Hệ thống trong hub. Route /admin/* cũ tự redirect — link không chết.
+  { label: 'Cài đặt', to: '/settings', Icon: Settings },
 ];
 
-const adminLinks = [
-  { label: 'Quản lý Users', to: '/admin/users', Icon: UsersRound },
-  { label: 'AI Model Hub', to: '/admin/model-hub', Icon: Boxes },
-  { label: 'Cài đặt hệ thống', to: '/admin/settings', Icon: Settings },
-];
+// Nhóm QUẢN TRỊ đã gỡ: cả ba mục admin gom vào Settings Hub (AI Model Hub,
+// Thành viên, Cấu hình...). Ba link phẳng trước đây trùng lặp với hub và phải
+// cập nhật song song mọi lần thêm trang — nguồn lỗi "quên một danh sách".
 
 const itemStyle = (active) => ({
   display: 'flex',
@@ -95,8 +94,9 @@ const headingStyle = {
 export default function Sidebar() {
   const { user } = useAuth();
   const location = useLocation();
-  // Mục QUẢN TRỊ chỉ dành cho admin — trước đây hiện cho MỌI user, bấm vào thì
-  // API trả 403 và các trang nuốt lỗi lặng lẽ → bảng trống trơ (đã gặp thật).
+  // isAdmin giữ lại cho tương lai (lọc mục admin-only trong hub). Trước đây
+  // mục QUẢN TRỊ hiện cho MỌI user, bấm vào thì API trả 403 và trang nuốt lỗi
+  // lặng lẽ → bảng trống trơ (đã gặp thật) — bài học không lặp.
   const isAdmin = user?.role === 'admin';
 
   return (
@@ -173,16 +173,6 @@ export default function Sidebar() {
           </Link>
         ))}
 
-        {isAdmin && <h4 style={{ ...headingStyle, marginTop: '12px' }}>QUẢN TRỊ</h4>}
-        {isAdmin && adminLinks.map(({ label, to, Icon }) => {
-          const active = location.pathname === to;
-          return (
-            <Link key={to} to={to} style={itemStyle(active)} title={label}>
-              <Icon size={14} strokeWidth={2} style={{ flexShrink: 0, opacity: active ? 1 : 0.75 }} />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
-            </Link>
-          );
-        })}
       </div>
     </aside>
   );

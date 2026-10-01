@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../hooks/useApi.jsx';
 
-export default function ApiKeys() {
+export default function ApiKeys({ embedded = false }) {
   const { api } = useApi();
   const [keys, setKeys] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -63,15 +63,23 @@ export default function ApiKeys() {
   const hideCreated = () => setWasCreated(null);
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+    <div style={{ padding: embedded ? '0' : '20px', maxWidth: '1200px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
-          <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '8px', fontWeight: 700 }}>
-            API Keys
-          </h1>
-          <p style={{ color: 'var(--text-dim)' }}>
-            Quản lý khóa API để truy cập các dịch vụ VoiceVibe (60 req/phút mỗi key)
-          </p>
+          {!embedded ? (
+            <>
+              <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '8px', fontWeight: 700 }}>
+                API Keys
+              </h1>
+              <p style={{ color: 'var(--text-dim)' }}>
+                Quản lý khóa API để truy cập các dịch vụ VoiceVibe (60 req/phút mỗi key)
+              </p>
+            </>
+          ) : (
+            <p style={{ color: 'var(--text-dim)', margin: 0, fontSize: 'var(--text-sm)' }}>
+              Khóa API cho script/SDK gọi thay phiên đăng nhập (60 req/phút mỗi key)
+            </p>
+          )}
         </div>
         <button
           onClick={() => setShowCreateModal(true)}

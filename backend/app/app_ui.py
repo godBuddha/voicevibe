@@ -174,6 +174,7 @@ __THEME_CSS__
       <a class="soon" onclick="soon('Thay đổi giọng nói')">🎚️ Thay đổi giọng nói</a>
       <div class="group">Khác</div>
       <a data-page="api" onclick="go('api')">🔌 API cho nhà phát triển</a>
+      <a data-page="settings" onclick="go('settings')">⚙️ Cài đặt</a>
     </nav>
     <div class="sidecard">
       🚀 Chạy trên hạ tầng của chính bạn — không giới hạn
@@ -351,6 +352,42 @@ __THEME_CSS__
   -d '{"type":"dub","media_url":"&lt;media_key&gt;","source_lang":"vi","target_lang":"en"}'</pre>
       </div>
     </section>
+
+    <!-- SETTINGS (hồ sơ + giao diện + thông báo + phiên) -->
+    <section id="page-settings" class="page">
+      <div class="card">
+        <h2>⚙️ Hồ sơ</h2>
+        <label class="mut" for="setname">Tên hiển thị</label>
+        <div style="display:flex;gap:8px;align-items:center;margin:4px 0 8px">
+          <input id="setname" style="max-width:260px" maxlength="120" placeholder="Phần trước @ của email">
+          <button class="go" onclick="saveName()">Lưu tên</button>
+        </div>
+        <div id="setnamemsg" class="status"></div>
+        <h3>Đổi mật khẩu</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 8px">
+          <input id="setpw0" type="password" placeholder="Mật khẩu hiện tại" style="max-width:180px">
+          <input id="setpw1" type="password" placeholder="Mật khẩu mới (≥8 ký tự)" style="max-width:180px">
+          <button class="go" onclick="changePw()">Đổi mật khẩu</button>
+        </div>
+        <div id="setpwmsg" class="status"></div>
+        <p class="mut">Đổi xong, mọi thiết bị KHÁC bị đăng xuất; thiết bị này giữ nguyên.</p>
+      </div>
+
+      <div class="card">
+        <h2>🔔 Thông báo job hoàn thành</h2>
+        <p class="mut">Thông báo trình duyệt khi job xong (chỉ khi tab còn mở). Tắt thì không tốn yêu cầu nào.</p>
+        <button id="notifybtn" class="go" onclick="toggleNotify()">Bật thông báo</button>
+        <div id="notifymsg" class="status"></div>
+      </div>
+
+      <div class="card">
+        <h2>🖥️ Phiên đăng nhập</h2>
+        <p class="mut">Thiết bị nào đang đăng nhập bằng tài khoản của bạn.</p>
+        <button class="go" onclick="revokeOthers()">Đăng xuất mọi thiết bị khác</button>
+        <div id="sessmsg" class="status"></div>
+        <table class="keys" style="margin-top:10px"><tbody id="sesslist"></tbody></table>
+      </div>
+    </section>
   </main>
 </div>
 <div id="toast"></div>
@@ -361,7 +398,7 @@ const $ = (id) => document.getElementById(id);
 // Xác thực qua COOKIE PHIÊN do server đặt (HttpOnly) — JS không đọc/không lưu token.
 // `credentials:"same-origin"` để fetch gửi kèm cookie.
 const H = () => ({ "Content-Type": "application/json" });
-const PAGES = ["dashboard","dub","tts","voices","stt","subtitle","jobs","api"];
+const PAGES = ["dashboard","dub","tts","voices","stt","subtitle","jobs","api","settings"];
 let POLL = null, ME = {};
 
 function esc(s){ const d=document.createElement("div"); d.textContent=s==null?"":String(s); return d.innerHTML; }
@@ -382,6 +419,7 @@ function go(page) {
   if (page === "jobs") loadJobs();
   if (page === "voices") refreshMe();  // refreshMe() renders the voice list too
   if (page === "api") loadKeys();
+  if (page === "settings") loadSettingsPage();
   if (window.innerWidth < 920) $("sidebar").style.display = "none";
 }
 function toggleSide() {
@@ -476,6 +514,7 @@ async function loadDashJobs() {
         <span>${esc(j.type.toUpperCase())} <span class="mut">${esc(j.job_id)}</span></span>
         <span class="pill ${esc(j.status)}">${esc(j.status)}</span></div>`).join("")
     : '<span class="mut">Chưa có dự án nào — bắt đầu ở "Công cụ nhanh"!</span>';
+  notifyJobDone(d.jobs);  // pref vv_notify=1: bắn Notification khi job chuyển trạng thái
 }
 
 async function loadJobs() {
@@ -599,6 +638,108 @@ async function createKey() {
   if (!r.ok) { flash("✗ " + (d.detail||r.status), "err"); return; }
   $("keymsg").innerHTML = '<span class="ok">✔ Key mới (LƯU NGAY — chỉ hiện 1 lần):</span><br><code>' + esc(d.key) + '</code>';
   loadKeys();
+}
+
+// ------------------------------------------------ Settings (hồ sơ/phiên/thông báo)
+async function loadSettingsPage() {
+  if (ME && ME.email) $("setname").value = ME.name || "";
+  toggleNotifyLabel();
+  loadSessions();
+}
+
+async function saveName() {
+  const name = $("setname").value.trim();
+  const r = await fetch("/v1/me", { method:"PATCH", headers:H(), credentials:"same-origin",
+    body: JSON.stringify({ name }) });
+  const d = await r.json();
+  $("setnamemsg").innerHTML = r.ok
+    ? '<span class="ok">✔ Đã lưu tên hiển thị.</span>'
+    : '<span class="err">✗ ' + esc(d.detail || r.status) + '</span>';
+  if (r.ok) { ME.name = d.name; $("whoemail").textContent = d.name || d.email; }
+}
+
+async function changePw() {
+  const r = await fetch("/v1/me/password", { method:"POST", headers:H(), credentials:"same-origin",
+    body: JSON.stringify({ current_password: $("setpw0").value, new_password: $("setpw1").value }) });
+  const d = await r.json();
+  // 403 = sai mật khẩu hiện tại (KHÔNG phải hết phiên) — hiện inline, không đá về login.
+  $("setpwmsg").innerHTML = r.ok
+    ? '<span class="ok">✔ Đã đổi mật khẩu' + (d.sessions_revoked ? ' — ' + d.sessions_revoked + ' phiên khác đã đăng xuất' : '') + '.</span>'
+    : '<span class="err">✗ ' + esc(d.detail || r.status) + '</span>';
+  if (r.ok) { $("setpw0").value = ""; $("setpw1").value = ""; }
+}
+
+function toggleNotifyLabel() {
+  let on = false;
+  try { on = localStorage.getItem("vv_notify") === "1"; } catch (e) {}
+  $("notifybtn").textContent = on ? "Tắt thông báo" : "Bật thông báo";
+}
+
+async function toggleNotify() {
+  if (typeof Notification === "undefined") {
+    $("notifymsg").innerHTML = '<span class="err">✗ Trình duyệt không hỗ trợ thông báo.</span>'; return;
+  }
+  let on = false;
+  try { on = localStorage.getItem("vv_notify") === "1"; } catch (e) {}
+  if (on) {
+    try { localStorage.setItem("vv_notify", "0"); } catch (e) {}
+    toggleNotifyLabel();
+    $("notifymsg").innerHTML = '<span class="ok">Đã tắt.</span>';
+    return;
+  }
+  let perm = Notification.permission;
+  if (perm === "default") perm = await Notification.requestPermission();
+  if (perm !== "granted") {
+    $("notifymsg").innerHTML = '<span class="err">✗ Bạn đã chặn thông báo trong trình duyệt.</span>';
+    return;
+  }
+  try { localStorage.setItem("vv_notify", "1"); } catch (e) {}
+  toggleNotifyLabel();
+  $("notifymsg").innerHTML = '<span class="ok">✔ Đã bật — job hoàn thành sẽ hiện thông báo.</span>';
+}
+
+async function loadSessions() {
+  const r = await fetch("/v1/me/sessions", { credentials: "same-origin" });
+  if (!r.ok) return;
+  const d = await r.json();
+  const cur = d.current;
+  $("sesslist").innerHTML = (d.sessions || []).map(s => {
+    const when = s.last_seen_at ? new Date(s.last_seen_at * 1000).toLocaleString("vi-VN") : "—";
+    const dev = s.current ? "Thiết bị này" : esc(s.user_agent ? s.user_agent.split(" ")[0].slice(0, 18) : "Không rõ");
+    const btn = s.current ? '<span class="mut">đang dùng</span>'
+      : '<button class="mini" onclick="revokeSession(\'' + s.token_hash + '\')">Thu hồi</button>';
+    return '<tr><td>' + dev + '</td><td class="mut">' + esc(s.ip || "—") + '</td><td class="mut">' + when + '</td><td>' + btn + '</td></tr>';
+  }).join("") || '<tr><td class="mut">Không có phiên nào.</td></tr>';
+}
+
+async function revokeSession(hash) {
+  const r = await fetch("/v1/me/sessions/" + hash, { method:"DELETE", credentials:"same-origin" });
+  if (r.ok) { flash("✔ Đã đăng xuất thiết bị đó."); loadSessions(); }
+  else flash("✗ " + ((await r.json()).detail || r.status), "err");
+}
+
+async function revokeOthers() {
+  const r = await fetch("/v1/me/sessions", { method:"DELETE", credentials:"same-origin" });
+  const d = await r.json();
+  if (r.ok) { flash("✔ Đã đăng xuất " + d.revoked + " thiết bị khác."); loadSessions(); }
+  else flash("✗ " + (d.detail || r.status), "err");
+}
+
+// Thông báo khi job CHUYỂN trạng thái (đang chạy → xong/thất bại) — so trạng
+// thái cũ của loadDashJobs, chỉ bắn khi pref bật (vv_notify=1) + đã được phép.
+let _prevJobStatus = {};
+function notifyJobDone(list) {
+  let allowed = false;
+  try { allowed = localStorage.getItem("vv_notify") === "1"; } catch (e) {}
+  if (!allowed || typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  (list || []).forEach(j => {
+    const before = _prevJobStatus[j.job_id];
+    if (before && before !== j.status && (j.status === "done" || j.status === "failed")) {
+      const label = j.status === "done" ? "hoàn thành" : "thất bại";
+      try { new Notification("VoiceVibe — job " + label, { body: String((j.params && (j.params.media_url || j.params.text)) || j.type).slice(0, 60) }); } catch (e) {}
+    }
+    _prevJobStatus[j.job_id] = j.status;
+  });
 }
 
 // Server chỉ trả trang này khi đã có phiên hợp lệ, nên không cần gate ở client nữa.

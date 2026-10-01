@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useApi } from '../../hooks/useApi.jsx';
 
-export default function AdminUsers() {
+export default function AdminUsers({ embedded = false }) {
   const { api } = useApi();
   const [users, setUsers] = useState([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -74,15 +74,24 @@ export default function AdminUsers() {
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '1400px', margin: '0 auto' }}>
+    <div style={{ padding: embedded ? '0' : '20px', maxWidth: '1400px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
-          <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '8px', fontWeight: 700 }}>
-            Quản lý Users
-          </h1>
-          <p style={{ color: 'var(--text-dim)' }}>
-            Thêm, sửa, xoá và quản lý tài khoản người dùng
-          </p>
+          {!embedded && (
+            <>
+              <h1 style={{ fontSize: 'var(--text-4xl)', marginBottom: '8px', fontWeight: 700 }}>
+                Quản lý Users
+              </h1>
+              <p style={{ color: 'var(--text-dim)' }}>
+                Thêm, sửa, xoá và quản lý tài khoản người dùng
+              </p>
+            </>
+          )}
+          {embedded && (
+            <p style={{ color: 'var(--text-dim)', margin: 0, fontSize: 'var(--text-sm)' }}>
+              Thêm tài khoản, đặt lại mật khẩu, khoá/mở tài khoản
+            </p>
+          )}
         </div>
         <button
           onClick={() => setShowCreateModal(true)}

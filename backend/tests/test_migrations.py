@@ -98,7 +98,9 @@ assert actions, "ensure_schema không làm gì trên DB cũ — migration hỏng
 insp = inspect(engine)
 cols = {c["name"] for c in insp.get_columns("users")}
 added = cols - before_cols
-assert added == {"password_hash", "role", "is_active", "last_login_at", "updated_at"}, added
+# Settings Hub thêm `users.name` (nullable, Settings → Hồ sơ).
+assert added == {"password_hash", "role", "is_active", "last_login_at", "updated_at",
+                 "name"}, added
 print(f"thêm cột users ({len(added)}) ............... OK")
 
 # 1c) DROP di sản credits: cột cũ biến mất khỏi users/jobs, bảng ledger biến mất.
@@ -116,8 +118,8 @@ print("drop di sản credits (bảng + 2 cột) ....... OK")
 # 2) bảng mới của Phase 2 có mặt (create_all cũng tạo các bảng khác còn thiếu —
 #    DB test chỉ có users+api_keys+jobs+ledger, nên đó là hành vi đúng)
 new_tables = after_tables - before_tables
-need = {"sessions", "system_flags", "media_objects"}
-assert need <= new_tables, f"thiếu bảng Phase 2: {need - new_tables}"
+need = {"sessions", "system_flags", "media_objects", "audit_logs"}
+assert need <= new_tables, f"thiếu bảng mới: {need - new_tables}"
 print(f"tạo bảng mới {sorted(need)} ... OK")
 
 # 3) cột api_keys.prefix (Phase 2 thêm cho key đã băm) cũng được thêm

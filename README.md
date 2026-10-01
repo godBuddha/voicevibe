@@ -247,6 +247,28 @@ Selftest: `PYTHONPATH=. python tests/test_providers.py`
 chuẩn OpenAI: một clone "thuần cloud API" không thể tái tạo sản phẩm gốc. Kiến trúc
 local-first là bắt buộc; cloud chỉ tùy chọn cho các stage hàng hóa.
 
+### AI Model Hub — Model Registry (`/admin/model-hub`)
+
+Model được quản lý như **entity độc lập** (bảng `ai_models`, danh tính
+`provider_id + model_id`) — không phải chuỗi text gắn trên provider:
+
+1. **Đồng bộ** — pull catalog từ provider (OpenRouter/OpenAI-compatible: metadata
+   modality + pricing + context; Ollama: `capabilities` từ /api/tags). Nhận diện
+   capability CHỈ từ metadata chính thức — thiếu → `unknown`, không suy đoán theo tên.
+2. **Đối chiếu** — 16 chức năng hệ thống (`app/capabilities.py`) khai capability
+   bắt buộc; engine (`app/compat.py`) tính 4 trạng thái: Compatible / Một phần /
+   Không rõ / Không tương thích.
+3. **Bật/tắt từng model** — trạng thái riêng của registry, sync không ghi đè.
+   Model tắt: không hiện trong selector, không được gán công đoạn, bị loại khỏi
+   pipeline lúc chạy (đã kiểm `stage_chain`).
+4. **Gán công đoạn** — selector lọc theo chức năng (vd stage translate chỉ gợi ý
+   model đủ [text, chat]), nhóm Đề xuất / Compatible / Một phần; chuỗi fallback
+   order>0 được runtime dùng thật (first-success-wins).
+
+Quy tắc runtime: STT/TTS stage có model cloud → job gọi provider đó; giọng
+CLONE luôn local (chuẩn OpenAI /audio/speech chỉ có preset); model bị provider
+gỡ khỏi catalog bị XOÁ khỏi registry khi đồng bộ, kèm gỡ gán an toàn.
+
 ```yaml
 # providers.yaml (ví dụ)
 translation:

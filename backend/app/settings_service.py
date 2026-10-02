@@ -55,6 +55,16 @@ SETTING_DEFS: list[dict] = [
      "env": "VOICEVIBE_ADMIN_KEY", "default": ""},
     {"key": "webhook.secret", "category": "security", "secret": True,
      "label": "Webhook HMAC secret (X-VoiceVibe-Signature)", "default": ""},
+    # B1 — nhập từ URL (yt-dlp). cookies_file là ĐƯỜNG DẪN file cookies.txt
+    # định dạng Netscape do operator mount vào container (ví dụ
+    # /run/secrets/youtube-cookies.txt) — NỘI DUNG cookie mới là secret, đường
+    # dẫn không phải. proxy có thể chứa user:pass → secret thật.
+    {"key": "download.cookies_file", "category": "download", "secret": False,
+     "label": "File cookies.txt (Netscape) cho link cần đăng nhập — để trống = tắt",
+     "default": ""},
+    {"key": "download.proxy", "category": "download", "secret": True,
+     "label": "Proxy cho yt-dlp (http/socks5, có thể chứa user:pass)",
+     "default": ""},
 ]
 
 

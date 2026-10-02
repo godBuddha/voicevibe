@@ -43,7 +43,7 @@ celery_app.conf.update(
 #   subtitle  -> D3+ (stt + diarize -> SRT/VTT/ASS, tuỳ chọn song ngữ)  [DONE]
 PIPELINES: dict[str, str] = {
     "tts": "done", "stt": "done", "translate": "done", "dub": "done",
-    "subtitle": "done",
+    "subtitle": "done", "download": "done",
 }
 
 
@@ -288,6 +288,78 @@ def _run_dub(job_id: str, params: dict) -> dict:
                     job.status = JobStatus.cancelled
                 job.error = ("Đã hủy giữa đường — bấm Chạy lại để tiếp tục "
                              "từ công đoạn đã xong")
+                db.commit()
+        return {"ok": False, "error": "cancelled"}
+    except Exception as exc:  # noqa: BLE001
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            if job is not None:
+                _set_failed(job, exc, db)
+                db.commit()
+        return {"ok": False, "error": str(exc)[:200]}
+
+
+def _run_download(job_id: str, params: dict) -> dict:
+    """B1 — job "Tải video" riêng: URL -> file trong storage.
+
+    Kết quả `jobs/{id}/video.{ext}` dùng lại được cho job khác (media_url =
+    key này — `_resolve_media` đọc được key, `_owns_media` phủ tiền tố jobs/).
+    Marker resume nằm trong workdir bền — nút Chạy lại KHÔNG tải lại video.
+    """
+    from .db import SessionLocal
+    from .models import Job, JobStatus
+    from .pipelines.download import ensure_downloaded
+    from .pipelines.manifest import JobCancelled, work_dir
+    from .settings_service import get_setting
+    from .storage import get_storage
+
+    url = params.get("source_url") or ""
+    quality = params.get("quality") or "1080"
+    with SessionLocal() as db:
+        job = db.get(Job, job_id)
+        if job is None:
+            return {"ok": False, "error": "job not found"}
+        if _aborted(db, job_id):
+            return {"ok": False, "error": "cancelled"}
+        job.status = JobStatus.running
+        job.progress = 5
+        db.commit()
+    try:
+        storage = get_storage()
+        marker = ensure_downloaded(
+            url, work_dir(job_id), quality,
+            progress_cb=lambda pct, msg: _record_progress(job_id, pct, msg),
+            abort_check=_abort_probe(job_id),
+            cookies_file=get_setting("download.cookies_file") or None,
+            proxy=get_setting("download.proxy") or None,
+        )
+        ext = marker.get("ext") or "mp4"
+        name = "audio.mp3" if quality == "audio" else f"video.{ext}"
+        key = f"jobs/{job_id}/{name}"
+        storage.put_from_file(key, os.path.join(work_dir(job_id),
+                                                f"source.{ext}"))
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            job.status = JobStatus.done
+            job.progress = 100
+            job.result_s3_key = key
+            job.error = None
+            # metadata cho /v1/jobs + trang Jobs hiển thị title/duration
+            job.params = {**(job.params or {}),
+                          "download_title": marker.get("title") or "",
+                          "download_duration": marker.get("duration"),
+                          "download_uploader": marker.get("uploader") or ""}
+            db.commit()
+        _notify(params.get("webhook_url"),
+                {"job_id": job_id, "status": "done", "result_key": key})
+        return {"ok": True, "key": key}
+    except JobCancelled:
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            if job is not None:
+                if job.status != JobStatus.cancelled:
+                    job.status = JobStatus.cancelled
+                job.error = "Đã hủy trong lúc tải — bấm Chạy lại để tải lại"
                 db.commit()
         return {"ok": False, "error": "cancelled"}
     except Exception as exc:  # noqa: BLE001
@@ -569,6 +641,8 @@ def dispatch_inline(job_id: str, params: dict) -> dict:
         return _run_translate(job_id, params)
     if jtype == "subtitle":
         return _run_subtitle(job_id, params)
+    if jtype == "download":
+        return _run_download(job_id, params)
     return _run_stub(job_id, params)
 
 

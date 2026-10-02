@@ -42,6 +42,8 @@ from .models import (
     Voice,
 )
 from .pipelines.subtitle import FORMATS as SUBTITLE_FORMATS
+from .pipelines.download import QUALITIES as _DOWNLOAD_QUALITIES
+from .pipelines.download import validate_url as _download_validate_url
 from .prompt_library import router as prompt_library_router
 from .prompts import seed_prompts
 from .providers_api import router as ai_admin_router
@@ -62,7 +64,7 @@ from .settings_service import (
 from .storage import get_storage
 from .tasks import dispatch
 
-VALID_TYPES = {"tts", "stt", "translate", "dub", "subtitle"}
+VALID_TYPES = {"tts", "stt", "translate", "dub", "subtitle", "download"}
 
 # Docs công khai mặc định TẮT: schema API lộ toàn bộ bề mặt tấn công. Bật khi cần
 # xem Swagger trên máy cá nhân: VOICEVIBE_ENABLE_DOCS=1
@@ -164,6 +166,13 @@ class JobIn(BaseModel):
         False, description="phụ đề 2 dòng: bản gốc trên, bản dịch dưới "
                            "(cần target_lang)")
     show_speaker: bool = Field(True, description="ghi nhãn người nói vào phụ đề")
+    # --- riêng cho type=download (B1: nhập từ URL, yt-dlp) + các job media dán link
+    # KHAI TƯỜNG MINH — bài học pydantic: field không khai là bị ÂM THẦM bỏ đi
+    # (background_mode/speaker_voices từng vậy). UI gửi source_url phải tới worker.
+    source_url: str | None = Field(
+        None, description="link video/âm thanh (dán link) — tải bằng yt-dlp")
+    quality: str = Field(
+        "1080", description="download: 1080 | 720 | 480 | audio")
 
 
 class VoiceIn(BaseModel):
@@ -202,6 +211,17 @@ def create_job(
             raise HTTPException(
                 status_code=422,
                 detail="bilingual cần target_lang (bản dịch lấy gì?)")
+    if job.type == "download":
+        # Kiểm cấu hình TRƯỚC khi tạo job — job lỗi phải bị chặn lúc tạo, không
+        # phải để worker fail rồi user chờ vô ích.
+        try:
+            job.source_url = _download_validate_url(job.source_url or "")
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        if job.quality not in _DOWNLOAD_QUALITIES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"quality phải là một trong {list(_DOWNLOAD_QUALITIES)}")
 
     # Quyền sở hữu voice phải kiểm tra TRƯỚC khi tạo job. Trước đây chỉ worker
     # kiểm tra (tasks.py), tức là job đã tạo rồi mới fail trong pipeline. Giữ
@@ -545,6 +565,32 @@ def app_page(request: Request, db: Session = Depends(get_db)):
     if A.auth_optional(request, None, db) is None:
         return _redirect("/login")
     return _render(APP_HTML, request)
+
+
+class DownloadPreviewIn(BaseModel):
+    url: str
+
+
+@app.post("/v1/download/preview")
+def download_preview(body: DownloadPreviewIn, user: User = Depends(auth),
+                     db: Session = Depends(get_db)) -> dict:
+    """B1 — xem metadata link TRƯỚC khi tạo job (UI hiện title/thumbnail).
+
+    Chạy probe trong tiến trình API: socket-timeout 15s + timeout 60s cứng nên
+    không treo worker; rate limit riêng để không bị dùng làm công cụ quét link.
+    """
+    if not _check_rate(f"dlpreview:{user.id}", 20):
+        raise HTTPException(status_code=429,
+                            detail="quá nhiều lần xem trước, vui lòng đợi")
+    from .pipelines.download import probe
+    from .settings_service import get_setting
+
+    try:
+        return probe(body.url,
+                     cookies_file=get_setting("download.cookies_file") or None,
+                     proxy=get_setting("download.proxy") or None)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.post("/v1/media/upload", status_code=201)

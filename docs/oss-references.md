@@ -153,6 +153,15 @@ Chi tiết quan trọng:
   Frontend của họ (React, không phải Svelte) có cụm `settings/endpoints/*` và
   `PromptTemplate*` rất đáng **học bố cục**, nhưng không copy.
 
+### 1.7 Tải video từ link (Giai đoạn B — B1)
+
+| Thành phần | Dự án | License (verify) | Hành động |
+|---|---|---|---|
+| Engine tải video (~1800 site) | **yt-dlp** `yt-dlp/yt-dlp` | **Unlicense** (public domain) | 🟢 **ĐANG DÙNG** — `app/pipelines/download.py` gọi CLI `python -m yt_dlp` (requirements-api + requirements-worker). Nguyên tắc youwee: KHÔNG tự làm danh mục site, chỉ vá khi gặp lỗi thật |
+| Format ladder + error map | **youwee** `src-tauri/src/utils/format.rs` + `services/ytdlp.rs` | **MIT** | 🟢 **Port thuật toán** — ladder `bestvideo[height<=N][ext=mp4]+bestaudio[ext=m4a]/…`, bảng ERROR_MAP substring→message thân thiện (tiếng Việt) |
+| Cookies Netscape guard | **KrillinAI/OpenCreator** `internal/service/youtube_cookies.go` | Apache-2.0 | 🟢 Port — chỉ nhận cookie file khi dòng đầu đúng `# Netscape HTTP Cookie File` |
+| Giới hạn an toàn | (tự thiết kế) | — | youwee KHÔNG có max duration/filesize — VoiceVibe kiểm duration bằng Python SAU probe (match_filter chỉ skip + exit 0, job tưởng thành công) |
+
 ## 1c. Bối cảnh: dự án PHI THƯƠNG MẠI, 100% mã nguồn mở miễn phí (27/09/2026)
 
 Chủ dự án xác nhận: **không dự kiến thương mại hoá, phát hành miễn phí, mở 100%**.

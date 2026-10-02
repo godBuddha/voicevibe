@@ -37,3 +37,6 @@ soundfile>=0.12              # nạp audio in-memory cho pyannote (bypass torchc
 sentencepiece>=0.2           # tokenizer cho opus-mt (translation stage, Apache-2.0)
 numpy>=1.26
 cryptography>=43          # settings_service (worker đọc config từ DB)
+yt-dlp>=2025.6.9          # B1: tải video từ link (Unlicense). CLI subprocess có kiểm
+                          #   start_new_session + killpg khi hủy — yt-dlp mồ côi là
+                          #   rác .part nằm trên đĩa. Ghi nguồn docs/oss-references.md

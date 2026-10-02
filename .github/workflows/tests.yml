@@ -84,6 +84,7 @@ jobs:
             "tests/test_translate_batch.py"
             "tests/test_split_points.py"
             "tests/test_estimator.py"
+            "tests/test_download.py"
             "app.pipelines.dub --selftest"
             "app.pipelines.stt --selftest"
             "app.pipelines.translate --selftest"
@@ -94,6 +95,7 @@ jobs:
             "app.pipelines.translate_batch --selftest"
             "app.pipelines.split_points --selftest"
             "app.pipelines.estimator --selftest"
+            "app.pipelines.download --selftest"
           )
           : > /tmp/results.txt
           : > /tmp/selftest.log

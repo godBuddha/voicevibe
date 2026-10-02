@@ -43,7 +43,7 @@ celery_app.conf.update(
 #   subtitle  -> D3+ (stt + diarize -> SRT/VTT/ASS, tuỳ chọn song ngữ)  [DONE]
 PIPELINES: dict[str, str] = {
     "tts": "done", "stt": "done", "translate": "done", "dub": "done",
-    "subtitle": "done", "download": "done",
+    "subtitle": "done", "download": "done", "render": "done",
 }
 
 
@@ -436,6 +436,92 @@ def _run_download(job_id: str, params: dict) -> dict:
         return {"ok": False, "error": str(exc)[:200]}
 
 
+def _run_render(job_id: str, params: dict) -> dict:
+    """B3+B4 — job `render`: burn phụ đề song ngữ 2 style + cắt dọc 9:16 + banner.
+
+    Manifest riêng (stage prepare→subtitles→vertical→burn) — encode video dài
+    chết giữa đường thì nút Chạy lại tiếp đúng stage, không encode lại từ đầu
+    (rủi ro số 8 của kế hoạch).
+    """
+    from .db import SessionLocal
+    from .models import Job, JobStatus
+    from .pipelines.manifest import JobCancelled, work_dir
+    from .pipelines.render import load_cues_from_text, run_render
+    from .storage import get_storage
+
+    with SessionLocal() as db:
+        job = db.get(Job, job_id)
+        if job is None:
+            return {"ok": False, "error": "job not found"}
+        if _aborted(db, job_id):
+            return {"ok": False, "error": "cancelled"}
+        job.status = JobStatus.running
+        job.progress = 5
+        owner_id = job.user_id
+        db.commit()
+    try:
+        storage = get_storage()
+        src = _download_source(job_id, params, storage)
+
+        # Nguồn phụ đề: key XOR job id (đã validate ở create_job)
+        cues_text, cues_ext = None, ""
+        sub_key = params.get("subtitle_key")
+        if not sub_key and params.get("subtitle_job_id"):
+            with SessionLocal() as db:
+                sub_job = db.get(Job, params["subtitle_job_id"])
+            if sub_job is None or sub_job.user_id != owner_id:
+                raise ValueError("job phụ đề không tồn tại hoặc không thuộc về bạn")
+            if sub_job.status != JobStatus.done or not sub_job.result_s3_key:
+                raise ValueError("job phụ đề chưa hoàn thành — chưa có file để in")
+            sub_key = sub_job.result_s3_key
+        if sub_key:
+            ext = sub_key.rsplit(".", 1)[-1].lower()
+            if ext not in ("srt", "vtt", "ass"):
+                raise ValueError(
+                    f"phụ đề phải là .srt/.vtt/.ass — nhận .{ext}")
+            cues_text = storage.get_to_temp(sub_key)
+            cues_ext = ext
+
+        key = run_render(
+            src,
+            burn_subtitles=bool(params.get("burn_subtitles")),
+            vertical=bool(params.get("vertical")),
+            banner=params.get("banner") or None,
+            cues_text=cues_text, cues_ext=cues_ext,
+            workdir=work_dir(job_id), job_id=job_id,
+            key_prefix=f"jobs/{job_id}/", storage=storage,
+            abort_check=_abort_probe(job_id),
+            progress_cb=lambda pct, msg: _record_progress(job_id, pct, msg),
+        )
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            job.status = JobStatus.done
+            job.progress = 100
+            job.result_s3_key = key
+            job.error = None
+            db.commit()
+        _notify(params.get("webhook_url"),
+                {"job_id": job_id, "status": "done", "result_key": key})
+        return {"ok": True, "key": key}
+    except JobCancelled:
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            if job is not None:
+                if job.status != JobStatus.cancelled:
+                    job.status = JobStatus.cancelled
+                job.error = ("Đã hủy giữa đường — bấm Chạy lại để tiếp tục "
+                             "từ công đoạn đã xong")
+                db.commit()
+        return {"ok": False, "error": "cancelled"}
+    except Exception as exc:  # noqa: BLE001
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            if job is not None:
+                _set_failed(job, exc, db)
+                db.commit()
+        return {"ok": False, "error": str(exc)[:200]}
+
+
 def _run_stt(job_id: str, params: dict) -> dict:
     """Real D3 pipeline: media -> transcript with speakers -> SRT in storage."""
     from .db import SessionLocal
@@ -718,6 +804,8 @@ def dispatch_inline(job_id: str, params: dict) -> dict:
         return _run_subtitle(job_id, params)
     if jtype == "download":
         return _run_download(job_id, params)
+    if jtype == "render":
+        return _run_render(job_id, params)
     return _run_stub(job_id, params)
 
 

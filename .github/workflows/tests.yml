@@ -50,7 +50,7 @@ jobs:
       - name: Install API test deps
         # `pysubs2` cần cho test_subtitle — trong production nó nằm ở image worker
         # (nơi pipeline phụ đề chạy), không nằm ở image api.
-        run: pip install fastapi "uvicorn[standard]" "sqlalchemy>=2.0" httpx cryptography pydantic "celery[redis]" python-multipart pysubs2
+        run: pip install fastapi "uvicorn[standard]" "sqlalchemy>=2.0" httpx cryptography pydantic "celery[redis]" python-multipart pysubs2 pillow
       - name: Run offline selftests
         env:
           PYTHONPATH: .
@@ -87,6 +87,7 @@ jobs:
             "tests/test_download.py"
             "tests/test_url_jobs.py"
             "tests/test_tts_backends.py"
+            "tests/test_render.py"
             "app.pipelines.dub --selftest"
             "app.pipelines.stt --selftest"
             "app.pipelines.translate --selftest"
@@ -99,6 +100,7 @@ jobs:
             "app.pipelines.estimator --selftest"
             "app.pipelines.download --selftest"
             "app.pipelines.youtube_subs --selftest"
+            "app.pipelines.render --selftest"
           )
           : > /tmp/results.txt
           : > /tmp/selftest.log

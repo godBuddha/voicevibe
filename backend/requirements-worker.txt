@@ -44,3 +44,6 @@ edge-tts>=7.0             # B5: giọng đọc Microsoft miễn phí qua mạng 
                           #   dependency — tương thích AGPL-3.0; KHÔNG vendored).
                           #   ToS: dịch vụ Edge đọc văn bản miễn phí — không lạm
                           #   dụng; MẶC ĐỊNH hệ vẫn là local VieNeu.
+pillow>=10.0              # B4: vẽ banner 9:16 bằng PNG thay drawtext (HPND-MIT —
+                          #   nhẹ, thuần Python) — escape chuỗi tiếng Việt có dấu
+                          #   qua drawtext là nguồn bug kinh điển của OpenCreator

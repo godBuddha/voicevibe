@@ -64,7 +64,7 @@ from .settings_service import (
 from .storage import get_storage
 from .tasks import dispatch
 
-VALID_TYPES = {"tts", "stt", "translate", "dub", "subtitle", "download"}
+VALID_TYPES = {"tts", "stt", "translate", "dub", "subtitle", "download", "render"}
 
 # Docs công khai mặc định TẮT: schema API lộ toàn bộ bề mặt tấn công. Bật khi cần
 # xem Swagger trên máy cá nhân: VOICEVIBE_ENABLE_DOCS=1
@@ -181,6 +181,19 @@ class JobIn(BaseModel):
         "local", description="B5: engine giọng đọc — local (VieNeu, mặc định) | "
                              "edge (Microsoft miễn phí qua mạng) | cloud "
                              "(model gán trong Model Hub)")
+    # --- riêng cho type=render (B3+B4: burn phụ đề + dọc 9:16 + banner)
+    subtitle_key: str | None = Field(
+        None, description="render: storage key file phụ đề (.srt/.vtt/.ass)")
+    subtitle_job_id: str | None = Field(
+        None, description="render: job subtitle/dub đã xong — lấy file phụ đề "
+                          "từ kết quả của job đó")
+    burn_subtitles: bool = Field(
+        False, description="render: in phụ đề vào video (ASS 2 style song ngữ)")
+    vertical: bool = Field(
+        False, description="render: cắt dọc 9:16 (720×1280, Shorts/TikTok)")
+    banner: dict | None = Field(
+        None, description="render: banner tiêu đề — {'major': 'Chính', "
+                          "'minor': 'Phụ'} (dải đen 250px phía trên)")
 
 
 class VoiceIn(BaseModel):
@@ -248,6 +261,23 @@ def create_job(
             raise HTTPException(
                 status_code=422,
                 detail=f"quality phải là một trong {list(_DOWNLOAD_QUALITIES)}")
+    if job.type == "render":
+        # B3+B4: ít nhất 1 toggle; burn phụ đề cần NGUỒN (key XOR job id)
+        if not (job.burn_subtitles or job.vertical or job.banner):
+            raise HTTPException(
+                status_code=422,
+                detail="render cần ít nhất một lựa chọn: burn phụ đề / cắt dọc "
+                       "9:16 / banner tiêu đề")
+        if job.burn_subtitles and not (job.subtitle_key or job.subtitle_job_id):
+            raise HTTPException(
+                status_code=422,
+                detail="burn phụ đề cần subtitle_key (file) hoặc subtitle_job_id "
+                       "(job phụ đề đã xong)")
+        if job.subtitle_key and job.subtitle_job_id:
+            raise HTTPException(
+                status_code=422,
+                detail="chỉ chọn MỘT nguồn phụ đề: subtitle_key hoặc "
+                       "subtitle_job_id")
 
     # Quyền sở hữu voice phải kiểm tra TRƯỚC khi tạo job. Trước đây chỉ worker
     # kiểm tra (tasks.py), tức là job đã tạo rồi mới fail trong pipeline. Giữ

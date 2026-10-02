@@ -5,8 +5,11 @@
 FROM python:3.12-slim AS base
 
 # ffmpeg: dub pipeline mix/encode. ca-certificates: outbound HTTPS to providers/HF.
+# fontconfig + Noto (B4): libass burn phụ đề cần glyph tiếng Việt (Noto Sans) +
+# CJK (Noto Sans CJK) — image slim không có font nào là chữ ra ô vuông trống.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
+        fontconfig fonts-noto-core fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
 # Non-root. Both containers used to run as root, which turns any RCE in the app

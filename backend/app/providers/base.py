@@ -48,3 +48,42 @@ class ChatProvider(Protocol):
 @runtime_checkable
 class TTSProvider(Protocol):
     def synthesize(self, text: str, voice: str | None = None) -> bytes: ...
+
+
+# ---------------------------------------------------- B5 — interface 2 tầng
+# Tầng 1 (TTSProvider phía trên) là HỢP ĐỒNG TỐI THIỂU mọi engine phải có — giữ
+# nguyên từ trước đây (LocalVieneuTTSProvider / OpenAITTSProvider đã đúng shape).
+# Tầng 2 (TTSEngine) là lớp MỞ RỘNG TÙY CHỌN — port TTSProvider (tầng 2) của
+# OpenCreator internal/ttsprovider/provider.go: engine "đầy đủ" trả danh sách
+# giọng + nhận options chi tiết (tốc độ, format, hướng dẫn đọc). Engine nào
+# chưa implement tầng 2 thì pipeline chỉ dùng tầng 1 như cũ.
+
+@dataclass
+class TTSOptions:
+    text: str
+    voice: str | None = None
+    speed: float = 1.0          # 1.0 = bình thường; 1.15 = nhanh hơn 15%
+    format: str = "wav"
+    ref_audio: str | None = None    # path clip tham khảo (clone) — tầng 2 chính thức hoá
+    denoise: bool = True
+    instructions: str | None = None  # hướng dẫn đọc (một số model gpt-4o-tts hỗ trợ)
+
+
+@dataclass
+class TTSVoice:
+    """Một giọng trong catalog — port TTSVoice của OpenCreator (bỏ Scenario)."""
+    code: str                   # code engine hiểu ("Hải Đăng", "vi-VN-HoaiMyNeural", "alloy")
+    name: str                   # tên hiển thị
+    language: str               # "vi", "vi-VN", "en"...
+    gender: str                 # "male" | "female" | ""
+    provider: str               # "local" | "edge" | "cloud"
+    kind: str                   # "preset" | "clone"
+    recommended: bool = False
+
+
+@runtime_checkable
+class TTSEngine(Protocol):
+    """Tầng 2 — engine ĐẦY ĐỦ (tùy chọn implement)."""
+
+    def synthesize_ex(self, opts: TTSOptions) -> bytes: ...
+    def list_voices(self) -> list[TTSVoice]: ...

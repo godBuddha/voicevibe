@@ -162,6 +162,13 @@ Chi tiết quan trọng:
 | Cookies Netscape guard | **KrillinAI/OpenCreator** `internal/service/youtube_cookies.go` | Apache-2.0 | 🟢 Port — chỉ nhận cookie file khi dòng đầu đúng `# Netscape HTTP Cookie File` |
 | Giới hạn an toàn | (tự thiết kế) | — | youwee KHÔNG có max duration/filesize — VoiceVibe kiểm duration bằng Python SAU probe (match_filter chỉ skip + exit 0, job tưởng thành công) |
 
+### 1.8 Đa giọng đọc TTS (Giai đoạn B — B5)
+
+| Thành phần | Dự án | License (verify) | Hành động |
+|---|---|---|---|
+| Giọng đọc Microsoft miễn phí qua mạng | **edge-tts** `rany2/edge-tts` | **GPL-3.0** (pip dependency — tương thích AGPL-3.0 dự án; KHÔNG vendored source) | 🟢 **ĐANG DÙNG** — `app/providers/edge.py`. ToS: dùng dịch vụ Edge đọc văn bản, không lạm dụng; mặc định hệ vẫn là local VieNeu |
+| Interface 2 tầng (Ttser tối thiểu / TTSProvider đầy đủ) | **KrillinAI/OpenCreator** `internal/types/{interface,tts_provider}.go` | Apache-2.0 | 🟢 Port — tầng 1 `synthesize(text, voice)` giữ nguyên; tầng 2 `synthesize_ex(TTSOptions)` + `list_voices()` tùy chọn |
+
 ## 1c. Bối cảnh: dự án PHI THƯƠNG MẠI, 100% mã nguồn mở miễn phí (27/09/2026)
 
 Chủ dự án xác nhận: **không dự kiến thương mại hoá, phát hành miễn phí, mở 100%**.

@@ -47,7 +47,8 @@ def _cloud_tts() -> tuple[str, str, str] | None:
 
 
 def synthesize_with_voice(text: str, voice, storage, provider=None,
-                          out_key: str | None = None) -> str:
+                          out_key: str | None = None,
+                          backend: str | None = None) -> str:
     """Synthesize `text` using a Voice row (clone) or a preset name.
 
     voice.ref_s3_key set -> zero-shot clone from the reference clip.
@@ -59,14 +60,29 @@ def synthesize_with_voice(text: str, voice, storage, provider=None,
     - GIỌNG CLONE (ref_s3_key) → local ALWAYS: chuẩn OpenAI /audio/speech chỉ
       có preset voice, không hỗ trợ zero-shot clone (docstring
       providers/openai_compat.py).
-    - GIỌNG PRESET, stage 'tts' có model cloud → OpenAI-compatible cloud
-      provider (OpenAITTSProvider); hỏng → job failed (không fallback lặng lẽ,
-      cùng quy tắc của translate/stt).
-    - Không cloud → local VieNeu như cũ.
+    - B5 backend tường minh ("edge" | "cloud" | "local") → route đúng engine;
+      backend KHÔNG truyền → hành vi cũ (preset: cloud nếu stage 'tts' có model
+      → hỏng là failed, không fallback lặng lẽ; không cloud → local VieNeu).
     """
     if provider is None:
-        if voice is not None and getattr(voice, "ref_s3_key", None):
+        is_clone = voice is not None and getattr(voice, "ref_s3_key", None)
+        if is_clone:
             provider = LocalVieneuTTSProvider()   # clone → local ALWAYS (rule trên)
+        elif backend == "edge":
+            from ..providers.edge import EdgeTTSEngine
+
+            provider = EdgeTTSEngine()
+        elif backend == "cloud":
+            from ..providers.openai_compat import OpenAITTSProvider
+
+            cloud = _cloud_tts()
+            if cloud is None:
+                raise ValueError(
+                    "giọng đọc cloud cần gán model cho công đoạn TTS trong "
+                    "Model Hub trước (Admin → Model Hub → TTS)")
+            provider = OpenAITTSProvider(*cloud)
+        elif backend == "local":
+            provider = LocalVieneuTTSProvider()
         else:
             cloud = _cloud_tts()
             if cloud is not None:

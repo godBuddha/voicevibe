@@ -86,6 +86,7 @@ jobs:
             "tests/test_estimator.py"
             "tests/test_download.py"
             "tests/test_url_jobs.py"
+            "tests/test_tts_backends.py"
             "app.pipelines.dub --selftest"
             "app.pipelines.stt --selftest"
             "app.pipelines.translate --selftest"

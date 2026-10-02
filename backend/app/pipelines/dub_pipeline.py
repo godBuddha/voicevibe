@@ -41,7 +41,7 @@ import wave
 from typing import Callable
 
 from ..providers.base import TranscriptSegment
-from ..providers.local import LocalVieneuTTSProvider
+from ..providers.tts_catalog import build_tts, rotate_preset
 from .dub import GAP_TOLERANCE, Segment, build_mix_cmd, plan_timing
 from .estimator import StatisticalEstimator
 from .manifest import (JobCancelled, Manifest, atomic_write_json,
@@ -56,6 +56,8 @@ from .translate_batch import BatchConfig, BatchTranslator
 # chia để làm gì. Job phụ đề song song vẫn để faster-whisper tự xử cả file.
 SPLIT_SEGMENT_SECONDS = 300
 
+# B5: xoay giọng đa người nói đổi theo backend — hằng cũ giữ lại chỉ làm THAM
+# CHIẾU (catalog thật ở providers/tts_catalog.PRESET_VOICES["local"]).
 PRESET_ROTATION = ["Hải Đăng", "Mai Anh", "Quang Sơn", "Thùy Dung",
                    "Thái Sơn", "Trúc Ly", "Ngọc Huyền", "Thanh Bình"]
 
@@ -255,7 +257,8 @@ def _translator_tag(tr) -> str:
     return f"{type(tr).__name__}:{model or 'marian'}"
 
 
-def _voice_plan(attributed, speaker_voices: dict, manifest: Manifest) -> list[str]:
+def _voice_plan(attributed, speaker_voices: dict, manifest: Manifest,
+                tts_backend: str = "local") -> list[str]:
     """Gán giọng cho từng segment — GHI SỔ TRƯỚC khi đọc (A1).
 
     Tự xoay preset cho người nói lạ là hàm thuần của transcript: cùng transcript
@@ -275,7 +278,7 @@ def _voice_plan(attributed, speaker_voices: dict, manifest: Manifest) -> list[st
         voice = speaker_voices.get(spk) or speaker_voices.get("*") or ""
         if not voice:
             idx = auto_idx.setdefault(spk, len(auto_idx))
-            voice = PRESET_ROTATION[idx % len(PRESET_ROTATION)]
+            voice = rotate_preset(tts_backend, idx)
         plan.append(voice)
     manifest.outputs["voices"] = plan
     manifest.save()
@@ -304,6 +307,7 @@ def dub_audio(source_path: str, source_lang: str, target_lang: str,
               batch_size: int = 12, context_sentences: int = 2,
               source_url: str | None = None, quality: str | None = None,
               sub_source: str | None = None, captions=None,
+              tts_backend: str = "local",
               transcribe_fn=None, diarize_fn=None, merge_fn=None,
               translator_factory=None, tts_factory=None,
               ) -> tuple[str, list[Segment]]:
@@ -330,6 +334,8 @@ def dub_audio(source_path: str, source_lang: str, target_lang: str,
                        không vào vân tay là tái dùng nhầm sổ tay của video khác.
         captions       B2: phụ đề YouTube sẵn có (list[TranscriptSegment]) — có
                        mặt thì BỎ WHISPER (vẫn diarize để gán người nói).
+        tts_backend    B5: "local" (VieNeu, mặc định) | "edge" | "cloud" — đổi
+                       backend là ĐỔI CHẤT LƯỢNG GIỌNG, phải nằm trong vân tay.
         *_fn / *_factory  điểm cắm giả cho test (mặc định dùng engine thật).
     Returns (storage_key, planned_segments).
     """
@@ -359,7 +365,8 @@ def dub_audio(source_path: str, source_lang: str, target_lang: str,
          "mux_video": mux_video, "batch_size": batch_size,
          "context_sentences": context_sentences,
          "prompt_id": None, "media_url": source_path,
-         "source_url": source_url, "quality": quality, "sub_source": sub_source},
+         "source_url": source_url, "quality": quality, "sub_source": sub_source,
+         "tts_backend": tts_backend},
         _translator_tag(tr))
     manifest = Manifest.load_or_none(workdir, fp) or Manifest.create(workdir, job_id, fp)
     if manifest.stage_ok("mux"):
@@ -522,9 +529,10 @@ def dub_audio(source_path: str, source_lang: str, target_lang: str,
         atomic_write_json(translation_file, {"origins": origins, "translated": texts})
 
     # 4) ĐỌC (TTS) — từng segment; MỖI segment xong ghi tts_progress.json (A1)
-    #    nên chết giữa chừng chỉ mất đúng đoạn đang đọc.
-    tts = tts_factory() if tts_factory else LocalVieneuTTSProvider()
-    voices = _voice_plan(attributed, speaker_voices, manifest)
+    #    nên chết giữa chừng chỉ mất đúng đoạn đang đọc. B5: backend giọng đọc
+    #    đổi được (local VieNeu | edge | cloud) — factory của test thắng.
+    tts = tts_factory() if tts_factory else build_tts(tts_backend)
+    voices = _voice_plan(attributed, speaker_voices, manifest, tts_backend)
     tts_progress_file = os.path.join(workdir, "tts_progress.json")
     tts_state = (_read_json(tts_progress_file) or {}).get("segments", {})
     gen_durations: list[float] = []

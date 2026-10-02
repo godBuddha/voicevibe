@@ -329,6 +329,7 @@ def _run_dub(job_id: str, params: dict) -> dict:
             quality=params.get("quality"),
             sub_source=params.get("sub_source"),
             captions=yt_segs,
+            tts_backend=params.get("tts_backend") or "local",
         )
         with SessionLocal() as db:
             job = db.get(Job, job_id)
@@ -609,7 +610,8 @@ def _run_tts(job_id: str, params: dict) -> dict:
                 # Ownership check — a key must not synthesize with another
                 # user's cloned voice profile (IDOR).
                 raise PermissionError("voice profile does not belong to you")
-            out_key = synthesize_with_voice(params["text"], voice, get_storage())
+            out_key = synthesize_with_voice(params["text"], voice, get_storage(),
+                                            backend=params.get("tts_backend"))
             job.status = JobStatus.done
             job.progress = 100
             job.result_s3_key = out_key

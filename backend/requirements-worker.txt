@@ -40,3 +40,7 @@ cryptography>=43          # settings_service (worker đọc config từ DB)
 yt-dlp>=2025.6.9          # B1: tải video từ link (Unlicense). CLI subprocess có kiểm
                           #   start_new_session + killpg khi hủy — yt-dlp mồ côi là
                           #   rác .part nằm trên đĩa. Ghi nguồn docs/oss-references.md
+edge-tts>=7.0             # B5: giọng đọc Microsoft miễn phí qua mạng (GPL-3.0 pip
+                          #   dependency — tương thích AGPL-3.0; KHÔNG vendored).
+                          #   ToS: dịch vụ Edge đọc văn bản miễn phí — không lạm
+                          #   dụng; MẶC ĐỊNH hệ vẫn là local VieNeu.

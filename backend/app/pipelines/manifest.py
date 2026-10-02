@@ -141,6 +141,9 @@ def params_fingerprint(params: dict, backend_tag: str) -> str:
         "source_url": params.get("source_url"),
         "quality": params.get("quality"),
         "sub_source": params.get("sub_source"),
+        # B5 — backend giọng đọc (local/edge/cloud): đổi backend là đổi CHẤT
+        # LƯỢNG GIỌNG — tái dùng audio của backend khác là lẫn hai giọng.
+        "tts_backend": params.get("tts_backend"),
         "backend_tag": backend_tag,
     }
     return hashlib.sha256(_canonical(material).encode("utf-8")).hexdigest()

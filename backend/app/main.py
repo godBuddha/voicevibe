@@ -177,6 +177,10 @@ class JobIn(BaseModel):
         "auto", description="dán link YouTube — auto (mặc định): lấy phụ đề "
                             "sẵn có nếu video có, không thì tự nghe lại; "
                             "youtube: chỉ phụ đề YouTube; whisper: luôn nghe lại")
+    tts_backend: str = Field(
+        "local", description="B5: engine giọng đọc — local (VieNeu, mặc định) | "
+                             "edge (Microsoft miễn phí qua mạng) | cloud "
+                             "(model gán trong Model Hub)")
 
 
 class VoiceIn(BaseModel):
@@ -212,6 +216,10 @@ def create_job(
         raise HTTPException(
             status_code=422,
             detail="sub_source phải là auto | youtube | whisper")
+    if job.tts_backend not in ("local", "edge", "cloud"):
+        raise HTTPException(
+            status_code=422,
+            detail="tts_backend phải là local | edge | cloud")
     if job.source_url:
         # B1: dán link thì validate LUÔN ở MỌI type (download/dub/stt/subtitle)
         # — link xấu phải bị chặn lúc tạo job, không phải để worker fail.
@@ -609,6 +617,38 @@ def download_preview(body: DownloadPreviewIn, user: User = Depends(auth),
                      proxy=get_setting("download.proxy") or None)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/v1/tts/presets")
+def tts_presets(lang: str = "vi", user: User = Depends(auth)) -> dict:
+    """B5 — catalog giọng đọc theo backend (dropdown TTS/Dub).
+
+    edge: thử lấy danh sách thật từ Microsoft (cache 24h) — vắng mạng giữ
+    catalog tĩnh trong code. Filter theo prefix ngôn ngữ (mặc định vi — hệ
+    tiếng Việt; edge trả hàng trăm giọng, không lọc là dropdown vô dụng).
+    """
+    from .providers.tts_catalog import BACKENDS, PRESET_VOICES
+
+    def _voice_out(v) -> dict:
+        return {"code": v.code, "name": v.name, "language": v.language,
+                "gender": v.gender, "kind": v.kind, "recommended": v.recommended}
+
+    out: dict[str, list] = {}
+    for b in BACKENDS:
+        if b != "edge":
+            out[b] = [_voice_out(v) for v in PRESET_VOICES[b]]
+            continue
+        voices: list = []
+        try:
+            from .providers.edge import EdgeTTSEngine
+
+            for v in EdgeTTSEngine().list_voices():
+                if v.language.lower().startswith((lang or "vi").lower()):
+                    voices.append(v)
+        except Exception:  # noqa: BLE001 — thiếu package/mạng: giữ catalog tĩnh
+            voices = []
+        out[b] = [_voice_out(v) for v in voices or PRESET_VOICES[b]]
+    return {"backends": out}
 
 
 @app.post("/v1/media/upload", status_code=201)

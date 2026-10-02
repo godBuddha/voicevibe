@@ -302,6 +302,8 @@ def dub_audio(source_path: str, source_lang: str, target_lang: str,
               key_prefix: str | None = None,
               system_prompt: str | None = None,
               batch_size: int = 12, context_sentences: int = 2,
+              source_url: str | None = None, quality: str | None = None,
+              sub_source: str | None = None, captions=None,
               transcribe_fn=None, diarize_fn=None, merge_fn=None,
               translator_factory=None, tts_factory=None,
               ) -> tuple[str, list[Segment]]:
@@ -322,6 +324,12 @@ def dub_audio(source_path: str, source_lang: str, target_lang: str,
                        workdir nên xóa job dọn sạch; None = hành vi cũ.
         system_prompt  override Thư viện Prompt cho bộ dịch.
         batch_size / context_sentences  núm dịch batch (A3).
+        source_url / quality / sub_source  B1-B2: các tham số NHẬP TỪ LINK — chỉ
+                       dùng cho VÂN TAY (không tác động thuật toán ở đây): file
+                       tải về luôn có tên cố định (source.{ext}), đổi link mà
+                       không vào vân tay là tái dùng nhầm sổ tay của video khác.
+        captions       B2: phụ đề YouTube sẵn có (list[TranscriptSegment]) — có
+                       mặt thì BỎ WHISPER (vẫn diarize để gán người nói).
         *_fn / *_factory  điểm cắm giả cho test (mặc định dùng engine thật).
     Returns (storage_key, planned_segments).
     """
@@ -350,7 +358,8 @@ def dub_audio(source_path: str, source_lang: str, target_lang: str,
          "max_speed": max_speed, "retranslate_rounds": retranslate_rounds,
          "mux_video": mux_video, "batch_size": batch_size,
          "context_sentences": context_sentences,
-         "prompt_id": None, "media_url": source_path},
+         "prompt_id": None, "media_url": source_path,
+         "source_url": source_url, "quality": quality, "sub_source": sub_source},
         _translator_tag(tr))
     manifest = Manifest.load_or_none(workdir, fp) or Manifest.create(workdir, job_id, fp)
     if manifest.stage_ok("mux"):
@@ -395,6 +404,25 @@ def dub_audio(source_path: str, source_lang: str, target_lang: str,
         attributed = [TranscriptSegment(start=d["start"], end=d["end"],
                                         text=d["text"], speaker=d["speaker"])
                       for d in rows]
+    elif captions is not None:
+        # B2 — phụ đề YouTube SẴN CÓ: bỏ WHISPER (tiết kiệm GPU cả giờ cho video
+        # dài), vẫn DIARIZE để gán người nói cho từng câu.
+        _abort()
+        diarize_fn = diarize_fn or diarize
+        merge_fn = merge_fn or merge
+        _report(20, "dùng phụ đề YouTube sẵn có — bỏ qua nghe lại")
+        turns = diarize_fn(src16k)
+        attributed = merge_fn(list(captions), turns)
+        if not attributed:
+            manifest.mark("stt", error="phụ đề YouTube rỗng sau khi gán người nói")
+            raise RuntimeError("no speech detected in source (captions empty)")
+        atomic_write_json(transcript_file, {
+            "segments": [{"start": s.start, "end": s.end, "text": s.text,
+                          "speaker": s.speaker} for s in attributed]})
+        manifest.outputs["transcript"] = "transcript.json"
+        manifest.outputs["stt_source"] = "youtube-captions"
+        manifest.note("nghe bằng PHỤ ĐỀ YOUTUBE sẵn có — bỏ qua Whisper")
+        manifest.mark("stt")
     else:
         _abort()
         transcribe_fn = transcribe_fn or (lambda p, language=None, stats=None:

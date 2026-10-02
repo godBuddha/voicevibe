@@ -173,6 +173,10 @@ class JobIn(BaseModel):
         None, description="link video/âm thanh (dán link) — tải bằng yt-dlp")
     quality: str = Field(
         "1080", description="download: 1080 | 720 | 480 | audio")
+    sub_source: str = Field(
+        "auto", description="dán link YouTube — auto (mặc định): lấy phụ đề "
+                            "sẵn có nếu video có, không thì tự nghe lại; "
+                            "youtube: chỉ phụ đề YouTube; whisper: luôn nghe lại")
 
 
 class VoiceIn(BaseModel):
@@ -197,12 +201,27 @@ def create_job(
 ) -> dict:
     if job.type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"type must be one of {sorted(VALID_TYPES)}")
+    if job.type in ("dub", "stt", "subtitle"):
+        # B1: job media nhận CẢ upload (media_url) lẫn dán link (source_url)
+        if not job.media_url and not job.source_url:
+            raise HTTPException(
+                status_code=422,
+                detail=f"type {job.type} cần file upload (media_url) hoặc "
+                       "link (source_url)")
+    if job.sub_source not in ("auto", "youtube", "whisper"):
+        raise HTTPException(
+            status_code=422,
+            detail="sub_source phải là auto | youtube | whisper")
+    if job.source_url:
+        # B1: dán link thì validate LUÔN ở MỌI type (download/dub/stt/subtitle)
+        # — link xấu phải bị chặn lúc tạo job, không phải để worker fail.
+        try:
+            job.source_url = _download_validate_url(job.source_url)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
     if job.type == "subtitle":
         # Kiểm cấu hình TRƯỚC khi tạo job — cùng nguyên tắc với quyền sở hữu voice
         # bên dưới: cấu hình sai phải bị chặn lúc tạo job, không phải để worker fail.
-        if not job.media_url:
-            raise HTTPException(status_code=422,
-                                detail="subtitle cần media_url (audio hoặc video)")
         if job.format not in SUBTITLE_FORMATS:
             raise HTTPException(
                 status_code=422,
@@ -214,10 +233,9 @@ def create_job(
     if job.type == "download":
         # Kiểm cấu hình TRƯỚC khi tạo job — job lỗi phải bị chặn lúc tạo, không
         # phải để worker fail rồi user chờ vô ích.
-        try:
-            job.source_url = _download_validate_url(job.source_url or "")
-        except ValueError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        if not job.source_url:
+            raise HTTPException(status_code=422,
+                                detail="download cần source_url (link video)")
         if job.quality not in _DOWNLOAD_QUALITIES:
             raise HTTPException(
                 status_code=422,

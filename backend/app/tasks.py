@@ -103,6 +103,65 @@ def _resolve_media(media_url: str, storage) -> str:
     raise FileNotFoundError(f"media not found: {media_url}")
 
 
+def _download_source(job_id: str, params: dict, storage) -> str:
+    """B1 — job dán link: tải về thư mục làm việc bền TRƯỚC khi pipeline chạy.
+
+    Quyết định kiến trúc D1 (kế hoạch B): download KHÔNG là công đoạn của
+    manifest — job subtitle chạy inline không manifest, translate-audio tạo
+    2 job nối; nếu mỗi pipeline một cơ chế resume cho cùng việc tải file là
+    hai code path làm một việc. File tải về có TÊN CỐ ĐỊNH (source.{ext}) —
+    đổi link mà không đổi vân tay là tái dùng nhầm sổ tay của video khác,
+    vì vậy source_url/quality PHẢI nằm trong material fingerprint (dub_audio).
+    """
+    url = params.get("source_url")
+    if not url:
+        return _resolve_media(params["media_url"], storage)
+    from .pipelines.download import ensure_downloaded
+    from .pipelines.manifest import work_dir
+
+    marker = ensure_downloaded(
+        url, work_dir(job_id), params.get("quality") or "1080",
+        progress_cb=lambda pct, msg: _record_progress(job_id, pct, msg),
+        abort_check=_abort_probe(job_id),
+        cookies_file=get_setting_safe("download.cookies_file") or None,
+        proxy=get_setting_safe("download.proxy") or None,
+    )
+    return os.path.join(work_dir(job_id), f"source.{marker.get('ext') or 'mp4'}")
+
+
+def _youtube_transcript(job_id: str, params: dict):
+    """B2 — phụ đề YouTube sẵn có khi job dán link. Trả (segments|None, note).
+
+    `sub_source=auto` (mặc định): video có caption phù hợp thì lấy, không thì
+    rơi về Whisper (rất tốt hơn OpenCreator — họ fail ngay). `sub_source=
+    youtube`: người dùng CHỌN phụ đề YouTube → không có là lỗi rõ ràng, không
+    rơi Whisper (đỡ treo GPU một giờ chỉ vì hiểu nhầm). Whisper luôn chạy khi
+    `sub_source=whisper` hoặc không dán link.
+    """
+    sub_source = params.get("sub_source") or "auto"
+    url = params.get("source_url")
+    if not url or sub_source == "whisper":
+        return None, None
+    try:
+        from .pipelines.youtube_subs import fetch_captions
+
+        segs = fetch_captions(url, params.get("source_lang"))
+    except Exception as exc:  # noqa: BLE001 — mạng hỏng phải rơi về Whisper
+        if sub_source == "youtube":
+            raise RuntimeError(
+                f"lấy phụ đề YouTube thất bại: {str(exc)[:200]}") from exc
+        _record_progress(job_id, 12, "lấy phụ đề YouTube lỗi — chuyển sang nghe lại")
+        return None, None
+    if not segs:
+        if sub_source == "youtube":
+            raise ValueError(
+                "video không có phụ đề YouTube phù hợp — bỏ chọn "
+                "«Phụ đề YouTube» để hệ tự nghe lại")
+        return None, None
+    _record_progress(job_id, 12, "đã lấy phụ đề YouTube — bỏ qua nghe lại")
+    return segs, "youtube-captions"
+
+
 def _record_stt_stats(job_id: str, stats: dict) -> None:
     """Lưu số đoạn bị loại vì hallucination vào `job.params`.
 
@@ -237,7 +296,8 @@ def _run_dub(job_id: str, params: dict) -> dict:
         db.commit()
     try:
         storage = get_storage()
-        src = _resolve_media(params["media_url"], storage)
+        src = _download_source(job_id, params, storage)
+        yt_segs, _note = _youtube_transcript(job_id, params)
         # Prompt cá nhân (nếu job chọn) — thay system prompt của bộ dịch.
         override = _resolve_prompt_override(
             job_id, owner_id, params.get("prompt_id"),
@@ -265,6 +325,10 @@ def _run_dub(job_id: str, params: dict) -> dict:
             system_prompt=override,
             batch_size=bs,
             context_sentences=ctx,
+            source_url=params.get("source_url"),
+            quality=params.get("quality"),
+            sub_source=params.get("sub_source"),
+            captions=yt_segs,
         )
         with SessionLocal() as db:
             job = db.get(Job, job_id)
@@ -389,10 +453,15 @@ def _run_stt(job_id: str, params: dict) -> dict:
         db.commit()
     try:
         storage = get_storage()
-        src = _resolve_media(params["media_url"], storage)
+        src = _download_source(job_id, params, storage)
+        # B2 — phụ đề YouTube sẵn có khi dán link (auto: lấy nếu có, rơi Whisper)
+        yt_segs, _note = _youtube_transcript(job_id, params)
         stt_stats: dict = {}
-        segs, _info = transcribe(src, language=params.get("source_lang"),
-                                 stats=stt_stats)
+        if yt_segs is not None:
+            segs = yt_segs  # caption chất lượng cao nhất đã chọn ở youtube_subs
+        else:
+            segs, _info = transcribe(src, language=params.get("source_lang"),
+                                     stats=stt_stats)
         # Bỏ hallucination là quyết định ảnh hưởng nội dung -> phải nhìn thấy được.
         _record_stt_stats(job_id, stt_stats)
         turns = diarize(src)
@@ -442,13 +511,17 @@ def _run_subtitle(job_id: str, params: dict) -> dict:
         db.commit()
     try:
         storage = get_storage()
-        src = _resolve_media(params["media_url"], storage)
+        src = _download_source(job_id, params, storage)
+        yt_segs, _note = _youtube_transcript(job_id, params)
 
         stt_stats: dict = {}
         # want_words=True (A4): mốc giờ TỪNG TỪ cho tách cue phụ đề dài đúng
         # ranh giới từ — chỉ đường local Whisper có; cloud STT tự no-op (None).
-        segs, _info = transcribe(src, language=params.get("source_lang"),
-                                 stats=stt_stats, want_words=True)
+        if yt_segs is not None:
+            segs = yt_segs
+        else:
+            segs, _info = transcribe(src, language=params.get("source_lang"),
+                                     stats=stt_stats, want_words=True)
         # Bỏ hallucination là việc PHẢI NHÌN THẤY ĐƯỢC: nếu im lặng, phụ đề
         # thiếu câu mà không ai biết vì sao. Ghi vào params để /v1/jobs đọc ra.
         _record_stt_stats(job_id, stt_stats)

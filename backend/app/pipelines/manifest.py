@@ -135,6 +135,12 @@ def params_fingerprint(params: dict, backend_tag: str) -> str:
         "context_sentences": params.get("context_sentences"),
         "prompt_id": params.get("prompt_id"),
         "media_url": params.get("media_url"),
+        # B1/B2 — dán link: file tải về luôn có TÊN CỐ ĐỊNH (source.{ext}), nên
+        # media_url không phân biệt được hai lần chạy khác link. Ba key này là
+        # vân tay THẬT của nguồn đầu vào — thiếu là tái dùng nhầm sổ tay.
+        "source_url": params.get("source_url"),
+        "quality": params.get("quality"),
+        "sub_source": params.get("sub_source"),
         "backend_tag": backend_tag,
     }
     return hashlib.sha256(_canonical(material).encode("utf-8")).hexdigest()

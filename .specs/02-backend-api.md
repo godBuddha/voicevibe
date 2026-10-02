@@ -158,3 +158,63 @@ không bao giờ gãy request); bảng `audit_logs` **không FK users** (nhật 
 khi user bị xoá); CHỈ GHI hành động, GET không sinh dòng. Danh sách action:
 `app.audit.ACTIONS` (auth.*, me.*, user.*, provider.*, stage.*, model.toggle,
 setting.*, key.*, prompt.*, job.*, config.import).
+
+## Lồng tiếng tái tục + dịch batch (Giai đoạn A — port OpenCreator/KrillinAI, 02/10)
+
+### Sổ tay công đoạn (A1) — `app/pipelines/manifest.py`
+- Workdir bền: `MEDIA_ROOT/jobs/{job_id}/work/` (container read_only → chỉ volume
+  media ghi bền được; cùng tiền tố kết quả nên xóa job dọn một phát). MEDIA_ROOT
+  không ghi được → rơi tmpdir (mất resume, không chết job).
+- `manifest.json` (schema v=1): `job_id/params_fp/stages{name:{ok,error,updated_at}}/
+  outputs{...}/warnings[]`. Ghi NGUYÊN TỬ (temp→fsync→os.replace→fsync dir).
+  "Xong" = cờ ok VÀ file output tồn tại size>0 (worker bị revoke kill thì
+  `finally` không chạy — không tin cờ một mình).
+- `params_fingerprint` = sha256 các tham số ảnh hưởng kết quả (ngôn ngữ, giọng,
+  background_mode, max_speed, batch, prompt, media_url, backend_tag). Lệch →
+  đổi tên `manifest.json.stale` + chạy lại sạch (không trộn hai cấu hình).
+- Stage dub: `prepare → stt → translate → tts → fit → mix → mux`. TTS checkpoint
+  TỪNG segment (`tts_progress.json`); STT chia đoạn checkpoint TỪNG đoạn
+  (`stt_progress.json`); dịch checkpoint TỪNG batch (`translation.json`).
+- A2 `split_points.py`: audio >300s chia tại điểm YÊN TĨNH nhất ±8s quanh mốc
+  (PCM 3kHz, cửa sổ năng lượng 1.5s, tâm cửa sổ; đuôi <10s gộp; guard ≥20s).
+- `JobCancelled` (raise từ dub_audio qua `abort_check`) → `_run_dub` ép
+  status=cancelled (chống race requeue set running lại) + error lời nhắc
+  "Chạy lại". `_abort_probe(job_id)` đọc DB cache 2s — không dập DB.
+- A5 `estimator.py`: ước lượng đọc theo ngôn ngữ TRƯỚC khi TTS (profile `vi`
+  16 ký tự/s + phạt dấu câu/số/viết tắt; các ngôn ngữ khác theo bảng gốc
+  KrillinAI) → đoạn chắc chắn vượt `slot + GAP_TOLERANCE(1.5)` xin bản ngắn
+  hơn TRƯỚC; hiệu chuẩn EMA 0.7/0.3 kẹp [0.5,1.5] học từ thời lượng đo thật
+  giữa job. `plan_timing` thêm `warning` theo ngưỡng 1.15/1.30 (trần vẫn 1.35).
+
+### Dịch batch (A3) — `app/pipelines/translate_batch.py`
+- `BatchTranslator.translate_all(origins)` — 12 câu/lượt (job params
+  `batch_size` > `StageModel.params.batch_size` của công đoạn translate >
+  setting `translate.batch_size`) + ngữ cảnh ±2 câu (`context_sentences`,
+  tương tự) đánh máy "KHÔNG dịch". Trả JSON `{"translations":[{index,text}]}` —
+  xác thực nghiêm (đủ số/index 1..n không trùng/không rỗng).
+- Fail → bisect chia đôi đệ quy; đáy 1 câu → `tr.translate` (chain đầy đủ);
+  hỏng nốt → giữ nguyên văn + warning vào manifest. Checkpoint sau mỗi batch
+  (chỉ dịch phần còn `null` khi resume; fingerprint origins — lệch văn bản →
+  dịch lại từ đầu).
+- `_extract_json_object`: trích JSON khỏi fence markdown/prose/phẩy thừa
+  (quét ngoặc tôn trọng chuỗi). KHÔNG dùng `json_mode` provider (endpoint lạ
+  trả 400 cho response_format).
+- Prompt mới `translate_batch` trong `DEFAULT_PROMPTS` (system message); override
+  Thư viện Prompt = system, danh sách câu + JSON contract = user message.
+- `batch_capable(tr)`: CloudChat → `_chat`; ChainTranslator → completer entry
+  đầu; Marian local → None (dịch từng câu như cũ).
+
+### Endpoint mới
+- `POST /v1/jobs/{id}/retry` — chủ job hoặc admin; chỉ failed/cancelled
+  (queued/running/done → 409). Reset queued/progress 0/error None, GIỮ params +
+  result_key (kết quả cũ tải được tới khi lần mới xong), dispatch lại + lưu
+  task_id. Audit `job.retry`.
+- `DELETE /v1/jobs/{id}` nay dọn `delete_prefix("jobs/{id}/")` (kết quả +
+  workdir); key legacy `jobs/dub/<hash>` (dub cũ) dọn riêng CHỈ khi type=dub —
+  file TTS dùng chung `jobs/tts/…` không bao giờ đụng.
+- `Storage.delete_prefix(prefix)`: Local = rmtree (qua guard traversal); S3 =
+  list + remove_objects batch 1000 (generator LỜI — phải duyệt hết kết quả lỗi,
+  không duyệt là KHÔNG xoá gì).
+- `JobIn`: `prompt_id` chấp nhận cho type `translate` **và `dub`** (422 còn lại).
+- GET jobs vẫn cùng shape; thêm `params.stage` (msg công đoạn, 80 ký tự) +
+  `params.stt_dropped*` như cũ. adaptJob SPA pass-through — không phá.

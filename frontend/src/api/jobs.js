@@ -44,6 +44,14 @@ export async function cancelJob(jobId) {
   return api.post(`/v1/jobs/${jobId}/cancel`);
 }
 
+// Chạy lại job hỏng/đã hủy — TIẾP TỤC từ công đoạn đã xong (A1 sổ tay công
+// đoạn): STT đã nghe xong không nghe lại, bản dịch đã dịch không dịch lại.
+// Server từ chối job còn hoạt động (409) và job đã xong (409).
+export async function retryJob(jobId) {
+  const res = await api.post(`/v1/jobs/${jobId}/retry`);
+  return { ...res, jobId: res.job_id };
+}
+
 // Xóa job khỏi lịch sử (chỉ job đã kết thúc — server từ chối job còn hoạt động).
 export async function deleteJob(jobId) {
   return api.del(`/v1/jobs/${jobId}`);

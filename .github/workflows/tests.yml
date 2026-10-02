@@ -80,12 +80,20 @@ jobs:
             "tests/test_hallucination.py"
             "tests/test_retranslate.py"
             "tests/test_background.py"
+            "tests/test_dub_resume.py"
+            "tests/test_translate_batch.py"
+            "tests/test_split_points.py"
+            "tests/test_estimator.py"
             "app.pipelines.dub --selftest"
             "app.pipelines.stt --selftest"
             "app.pipelines.translate --selftest"
             "app.pipelines.tts --selftest"
             "app.pipelines.subtitle --selftest"
             "app.pipelines.dub_pipeline --selftest"
+            "app.pipelines.manifest --selftest"
+            "app.pipelines.translate_batch --selftest"
+            "app.pipelines.split_points --selftest"
+            "app.pipelines.estimator --selftest"
           )
           : > /tmp/results.txt
           : > /tmp/selftest.log

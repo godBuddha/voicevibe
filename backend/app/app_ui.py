@@ -536,10 +536,39 @@ function jobHtml(j) {
     else media = `<a href="${esc(u)}" download>⬇️ Tải kết quả (${esc(j.result_key.split(".").pop())})</a>`;
   }
   const err = j.error ? `<div class="err" style="margin-top:6px">${esc(j.error)}</div>` : "";
+  // Tiến độ theo CÔNG ĐOẠN (backend ghi params.stage mỗi khâu) — thấy "nghe
+  // đoạn 2/5" thay vì chỉ số % trơn.
+  const stg = (j.params && j.params.stage && (j.status === "running" || j.status === "queued"))
+    ? `<span class="mut" style="margin-left:6px">— ${esc(j.params.stage)}</span>` : "";
+  // Hành động: Hủy (còn hoạt động) / Chạy lại (hỏng hoặc đã hủy — tiếp tục từ
+  // công đoạn đã xong nhờ sổ tay công đoạn, không nấu lại từ đầu).
+  const act = (j.status === "queued" || j.status === "running")
+    ? `<button class="ghost" onclick="cancelJob('${j.job_id}')">✕ Hủy</button>`
+    : ((j.status === "failed" || j.status === "cancelled")
+       ? `<button class="ghost" onclick="retryJob('${j.job_id}')" title="Tiếp tục từ công đoạn đã xong">↻ Chạy lại</button>` : "");
   return `<div class="job"><div class="h">
     <b>${esc(j.type.toUpperCase())}</b><span class="mut">${esc(j.job_id)}</span>
-    <span class="pill ${esc(j.status)}">${esc(j.status)}${j.status==="running" ? " "+j.progress+"%" : ""}</span></div>
+    <span class="pill ${esc(j.status)}">${esc(j.status)}${j.status==="running" ? " "+j.progress+"%" : ""}</span>
+    ${stg}${act ? `<span style="margin-left:auto">${act}</span>` : ""}</div>
     ${err}${media}</div>`;
+}
+
+async function cancelJob(id) {
+  if (!confirm("Hủy job này? Job đang chờ/xử lý sẽ bị dừng.")) return;
+  const r = await fetch("/v1/jobs/" + id + "/cancel", { method: "POST", headers: H(), credentials: "same-origin" });
+  const d = await r.json();
+  if (!r.ok) { flash("✗ " + (d.detail || r.status), "err"); return; }
+  flash("✔ Đã hủy job " + id);
+  loadJobs();
+}
+
+async function retryJob(id) {
+  // Chạy lại = xếp hàng lại; khâu nào đã xong (sổ tay công đoạn) sẽ bị BỎ QUA.
+  const r = await fetch("/v1/jobs/" + id + "/retry", { method: "POST", headers: H(), credentials: "same-origin" });
+  const d = await r.json();
+  if (!r.ok) { flash("✗ " + (d.detail || r.status), "err"); return; }
+  flash("✔ Đã xếp hàng lại job " + id + " — tiếp tục từ công đoạn đã xong");
+  loadJobs();
 }
 
 async function uploadTo(url, inputId, extra) {
@@ -576,7 +605,7 @@ async function submitTTS() {
     const r = await fetch("/v1/jobs", { method:"POST", headers:H(), credentials:"same-origin", body: JSON.stringify(body) });
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || r.status);
-    flash("✔ Job " + d.job_id + " đã tạo (−" + d.credits_charged + " credits).");
+    flash("✔ Job " + d.job_id + " đã tạo.");
     go("jobs");
   } catch (e) { flash("✗ " + e.message, "err"); }
 }
@@ -589,7 +618,7 @@ async function submitSTT() {
       type:"stt", media_url: up.media_key, source_lang: $("sttlang").value }) });
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || r.status);
-    flash("✔ Job " + d.job_id + " đã tạo (−" + d.credits_charged + " credits). SRT sẽ hiện ở tab Jobs.");
+    flash("✔ Job " + d.job_id + " đã tạo. SRT sẽ hiện ở tab Jobs.");
     go("jobs");
   } catch (e) { flash("✗ " + e.message, "err"); }
 }
@@ -609,7 +638,7 @@ async function submitSubtitle() {
     const r = await fetch("/v1/jobs", { method:"POST", headers:H(), credentials:"same-origin", body: JSON.stringify(body) });
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || r.status);
-    flash("✔ Job " + d.job_id + " đã tạo (−" + d.credits_charged + " credits). Phụ đề sẽ hiện ở tab Jobs.");
+    flash("✔ Job " + d.job_id + " đã tạo. Phụ đề sẽ hiện ở tab Jobs.");
     go("jobs");
   } catch (e) { flash("✗ " + e.message, "err"); }
 }

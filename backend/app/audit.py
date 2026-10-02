@@ -45,6 +45,7 @@ ACTIONS: tuple[str, ...] = (
     "prompt.update",
     "prompt.reset",
     "job.cancel",
+    "job.retry",
     "job.delete",
     "config.import",
 )

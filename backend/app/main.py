@@ -212,12 +212,13 @@ def create_job(
             raise HTTPException(status_code=404, detail="voice not found")
 
     # Quyền sở hữu prompt cá nhân — cùng nguyên tắc voice: chặn TRƯỚC khi tạo
-    # job thay vì để worker fail. Chỉ type translate dùng được (prompt cá nhân
-    # thay system prompt của bộ dịch chat); type khác + prompt_id → 422.
+    # job thay vì để worker fail. Dùng cho translate (từng câu) và dub (A3, thay
+    # system prompt của bộ dịch batch); type khác + prompt_id → 422.
     if job.prompt_id:
-        if job.type != "translate":
+        if job.type not in ("translate", "dub"):
             raise HTTPException(
-                status_code=422, detail="prompt_id hiện chỉ dùng cho job translate")
+                status_code=422,
+                detail="prompt_id chỉ dùng cho job translate hoặc dub")
         prompt = db.get(PromptLibrary, job.prompt_id)
         if prompt is None or prompt.user_id != user.id:
             raise HTTPException(status_code=404, detail="prompt not found")
@@ -672,24 +673,64 @@ def cancel_job(job_id: str, user: User = Depends(auth),
     return {"job_id": job.id, "status": "cancelled"}
 
 
+@app.post("/v1/jobs/{job_id}/retry")
+def retry_job(job_id: str, user: User = Depends(auth),
+              db: Session = Depends(get_db)) -> dict:
+    """Chạy lại job đã hỏng/đã hủy — TIẾP TỤC từ công đoạn đã xong (A1).
+
+    Chỉ job failed/cancelled mới được chạy lại (queued/running → 409 — đang
+    chạy; done → 409 — muốn làm lại thì tạo job mới). Giữ nguyên `params` +
+    `result_s3_key`: kết quả cũ vẫn tải được tới khi lần chạy mới hoàn thành
+    (endpoint /result chỉ trả khi done — không có cửa sổ bất nhất). Sổ tay
+    công đoạn trong `media/jobs/{id}/work/` là thứ quyết định chạy lại từ đâu —
+    endpoint này chỉ xếp hàng lại.
+    """
+    job = _own_job(job_id, user, db)
+    if job.status == JobStatus.done:
+        raise HTTPException(status_code=409,
+                            detail="job đã xong — muốn làm lại hãy tạo job mới")
+    if job.status in (JobStatus.queued, JobStatus.running):
+        raise HTTPException(status_code=409,
+                            detail="job đang chờ/chạy — hủy trước nếu muốn làm lại")
+    job.status = JobStatus.queued
+    job.progress = 0
+    job.error = None
+    db.commit()
+    mode, task_id = dispatch(job.id, job.params)
+    job.task_id = task_id
+    db.commit()
+    _audit("job.retry", user_id=user.id, target=job.id)
+    return {"job_id": job.id, "status": "queued", "dispatch": mode}
+
+
 @app.delete("/v1/jobs/{job_id}")
 def delete_job(job_id: str, user: User = Depends(auth),
                db: Session = Depends(get_db)) -> dict:
     """Xóa job khỏi lịch sử (chỉ job đã kết thúc — đang chờ/chạy phải HỦY trước).
 
-    Dọn file kết quả RIÊNG của job (nằm trong thư mục `jobs/<id>/`). File TTS
-    dùng chung (`jobs/tts/<hash>.wav`) KHÔNG đụng — có thể đang được job khác
-    tham chiếu, xóa là gãy kết quả của người khác.
+    Dọn SẠCH mọi file dưới tiền tố `jobs/<id>/` — kết quả + thư mục làm việc
+    (sổ tay công đoạn, checkpoint). File TTS dùng chung (`jobs/tts/<hash>.wav`)
+    KHÔNG đụng — có thể đang được job khác tham chiếu. Kết quả cũ của job dub
+    legacy (`jobs/dub/<hash>…`, tạo trước khi có key_prefix) cũng được dọn
+    best-effort — trước đây chúng để lại rác vĩnh viễn trên đĩa (bug thật).
     """
     job = _own_job(job_id, user, db)
     if job.status in (JobStatus.queued, JobStatus.running):
         raise HTTPException(status_code=409,
                             detail="job đang chờ/chạy — hãy HỦY trước khi xóa")
     key = job.result_s3_key
-    if key and key.startswith(f"jobs/{job_id}/"):
+    storage = get_storage()
+    try:
+        storage.delete_prefix(f"jobs/{job_id}/")
+    except Exception:  # noqa: BLE001 — lỗi dọn không chặn việc xóa row
+        pass
+    if key and not key.startswith(f"jobs/{job_id}/") and job.type == "dub":
+        # Key dub legacy ngoài tiền tố (`jobs/dub/<hash>…` — tạo trước khi có
+        # key_prefix): dọn riêng. CHỈ dub — file TTS dùng chung (`jobs/tts/…`)
+        # có thể đang được job khác tham chiếu, xóa là gãy kết quả người khác.
         try:
-            get_storage().delete(key)
-        except Exception:  # noqa: BLE001 — thiếu file không chặn việc xóa row
+            storage.delete(key)
+        except Exception:  # noqa: BLE001
             pass
     db.delete(job)
     db.commit()

@@ -294,4 +294,15 @@ assert ra.status_code == 200
 assert B.get("/v1/admin/prompt-library").status_code == 403
 print("12. admin read-only + filter user .................. OK")
 
+# --------------------------------------------------- 13. seed không vượt cột
+# Bẫy thật: mô tả prompt mới dài 284 ký tự > String(255) → seed_prompts chết
+# lúc BOOT (API crash-loop cả hệ thống). Guard: mọi prompt mặc định phải vừa cột.
+from app.prompts import DEFAULT_PROMPTS  # noqa: E402
+
+for key, d in DEFAULT_PROMPTS.items():
+    assert len(d["description"]) <= 255, \
+        f"{key}: description {len(d['description'])} > 255 — seed sẽ chết lúc boot"
+    assert len(d["content"]) <= 4096, f"{key}: content quá dài"
+print("13. seed DEFAULT_PROMPTS vừa cột (≤255) ............ OK")
+
 print("PROMPT LIBRARY GUARD PASSED")

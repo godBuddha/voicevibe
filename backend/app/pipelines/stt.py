@@ -139,10 +139,16 @@ def _cloud_stt() -> tuple[str, str, str] | None:
 def transcribe(audio_path: str, model_size: str = "large-v3",
                compute_type: str = "int8", language: str | None = None,
                device: str = "auto", filter_hallucinations: bool = True,
-               stats: dict | None = None):
+               stats: dict | None = None, want_words: bool = False):
     """STT: stage 'stt' có model cloud → OpenAI-compatible /audio/transcriptions;
     không có → faster-whisper local. Trả (segments, info) — cloud không trả info
     whisper nên info=None.
+
+    `want_words=True` (A4): local Whisper chạy thêm `word_timestamps=True` và
+    gắn mốc giờ TỪNG TỪ vào từng segment (seg.words) — nguyên liệu để tách cue
+    phụ đề dài đúng ranh giới từ. Tốn thêm chút giải mã, nên chỉ bật cho job
+    phụ đề; job lồng tiếng (dub) dùng mốc câu là đủ. Cloud STT không trả word
+    → seg.words=None, gọi với want_words không lỗi chỉ là không có.
 
     Quy tắc lỗi: cloud ĐÃ cấu hình mà gọi hỏng → raise (job failed) — KHÔNG
     lặng lẽ rơi về local: admin cấu hình cloud là ý định rõ ràng, tự chuyển
@@ -171,19 +177,51 @@ def transcribe(audio_path: str, model_size: str = "large-v3",
     from faster_whisper import WhisperModel
 
     model = WhisperModel(model_size, device=device, compute_type=compute_type)
-    segments, info = model.transcribe(audio_path, language=language, vad_filter=True)
+    segments, info = model.transcribe(audio_path, language=language, vad_filter=True,
+                                      word_timestamps=want_words)
     raw = list(segments)
 
     dropped: list[tuple[str, str]] = []
     if filter_hallucinations:
         raw, dropped = drop_hallucinations(raw)
 
-    out = [TranscriptSegment(start=s.start, end=s.end, text=s.text.strip())
+    out = [TranscriptSegment(start=s.start, end=s.end, text=s.text.strip(),
+                             words=_segment_words(s))
            for s in raw]
     if stats is not None:
         stats["kept"] = len(out)
         stats["dropped"] = [{"text": t[:120], "reason": r} for t, r in dropped]
     return out, info
+
+
+def _segment_words(seg) -> list | None:
+    """Trích word-level từ segment faster-whisper, kèm mẹo cắt `—` (port từ
+    pkg/fasterwhisper/transcription.go:66-98).
+
+    Model thỉnh thoảng dính hai từ vào một token bằng dấu gạch ngang dài `—`
+    (ví dụ "Xin chào—các bạn"). Cắt ĐỐI XỨNG thời lượng: token chia đôi tại
+    điểm giữa — không hoàn hảo, nhưng sai nửa token còn hơn gộp hai từ thành
+    một (align ranh giới từ sẽ trượt cả câu).
+    """
+    raw_words = getattr(seg, "words", None)
+    if not raw_words:
+        return None
+    from ..providers.base import Word
+
+    out: list[Word] = []
+    for w in raw_words:
+        text = (getattr(w, "word", "") or "").strip()
+        start = float(w.start)
+        end = float(w.end)
+        if "—" in text:
+            parts = text.split("—")
+            mid = (start + end) / 2
+            out.append(Word(start=start, end=mid, text=parts[0].strip()))
+            if len(parts) > 1 and parts[1].strip():
+                out.append(Word(start=mid, end=end, text=parts[1].strip()))
+        elif text:
+            out.append(Word(start=start, end=end, text=text))
+    return out or None
 
 
 def _audio_dict(audio_path: str) -> dict:
@@ -311,8 +349,26 @@ def _selftest() -> None:
     assert srt.splitlines()[1] == "00:00:00,000 --> 00:00:04,200", srt
     assert "[SPEAKER_00]" in srt and "[SPEAKER_01]" in srt
 
+    # --- A4: mẹo cắt `—` (token dính hai từ) + merge giữ nguyên words
+    from ..providers.base import Word
+
+    class FakeSeg:
+        words = [type("W", (), {"word": "Xin chào—các bạn", "start": 0.0, "end": 2.0})(),
+                 type("W", (), {"word": " nhé", "start": 2.0, "end": 2.5})()]
+
+    ws = _segment_words(FakeSeg())
+    assert len(ws) == 3, [w.text for w in ws]
+    assert ws[0].text == "Xin chào" and ws[1].text == "các bạn" and ws[2].text == "nhé"
+    assert abs(ws[0].end - 1.0) < 1e-9 and abs(ws[1].start - 1.0) < 1e-9
+    assert abs(ws[2].start - 2.0) < 1e-9 and abs(ws[2].end - 2.5) < 1e-9
+
+    seg_words = [Word(0.0, 4.2, "Xin"), Word(4.2, 4.5, "chào")]
+    kept = merge([TranscriptSegment(0.0, 4.2, "Xin chào", None, seg_words)], dia)
+    assert kept[0].words == seg_words, "dataclasses.replace phải giữ words"
+
     print("merge overlap assignment .. OK")
     print("SRT format ................ OK")
+    print("word '—' split + giữ words . OK")
     print("D3 LOGIC SELFTEST PASSED")
 
 

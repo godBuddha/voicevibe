@@ -46,6 +46,21 @@ DEFAULT_PROMPTS: dict[str, dict] = {
             "Reply with the translation only.\n\n{text}"
         ),
     },
+    "translate_batch": {
+        "description": (
+            "Dịch LOẠT nhiều câu trong MỘT lượt gọi LLM (Lồng tiếng, Phụ đề "
+            "song ngữ) — đây là message HỆ THỐNG; danh sách câu + yêu cầu JSON "
+            "do hệ thống dựng ở message người dùng, không đưa vào đây."
+        ),
+        "variables": ["source", "target", "batch_size", "context_count"],
+        "content": (
+            "Bạn là một biên dịch viên phụ đề chuyên nghiệp. Dịch {batch_size} câu "
+            "từ {source} sang {target} để LỒNG TIẾNG — bản dịch sẽ được đọc to, nên "
+            "phải NGẮN GỌN, tự nhiên, đúng nhịp nói. Giữ đúng tên riêng, số và thuật "
+            "ngữ. KHÔNG dịch phần ngữ cảnh, KHÔNG thêm lời giải thích, KHÔNG đổi số "
+            "lượng câu. Chỉ trả về JSON đúng cấu trúc được yêu cầu."
+        ),
+    },
 }
 
 

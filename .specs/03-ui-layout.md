@@ -66,3 +66,15 @@ import-export, backup docs, danger). Item "Sắp có" = disabled, không điều
 Inline UI: `app_ui.py` trang settings (PAGES + section — test_ui_js bắt bijection,
 raw fetch + H()); `admin_ui.py` tab "Nhật ký kiểm toán" + card Tình trạng hệ thống
 trong tab Cấu hình + cột Người dùng hiển thị tên.
+
+## Lồng tiếng tái tục (Giai đoạn A — 02/10)
+
+- **Trang Jobs (SPA + UI inline)**: hàng job hỏng/đã hủy có nút **"Chạy lại"**
+  (màu primary, title "Tiếp tục từ công đoạn đã xong") cạnh nút Xóa. `doRetry`
+  → POST /v1/jobs/{id}/retry → fetchJobs; 409 từ server hiện ở actionError.
+- **Tiến độ theo công đoạn**: dòng % kèm `progress.message || params.stage`
+  (vd "45% — nghe đoạn 2/5") — backend ghi `params.stage` mỗi khâu.
+- UI inline `jobHtml`: nút ✕ Hủy (queued/running) + ↻ Chạy lại
+  (failed/cancelled) trong hàng đầu card; stage hiện cạnh pill trạng thái.
+- Sửa tiện: 3 chuỗi flash UI inline còn ghi "−{credits_charged} credits" (trường
+  đã gỡ từ 3577ef1) → chỉ flash "Job đã tạo".

@@ -57,6 +57,18 @@ class LocalStorage:
         p.unlink()
         return True
 
+    def delete_prefix(self, prefix: str) -> int:
+        """Xoá CẢ THƯ MỤC một tiền tố (`jobs/{id}/`) — dọn dẹp khi xóa job.
+
+        Đi qua `_path` để được guard chống path traversal như mọi key khác.
+        Trả về 1 nếu có xoá (không đếm từng file — caller chỉ cần biết "đã dọn").
+        """
+        p = self._path(prefix)
+        if not p.exists():
+            return 0
+        shutil.rmtree(p, ignore_errors=True)
+        return 1
+
 
 class S3Storage:
     """MinIO / S3 — same key contract as LocalStorage, via the minio SDK."""
@@ -118,6 +130,30 @@ class S3Storage:
             return True
         except S3Error:
             return False
+
+    def delete_prefix(self, prefix: str) -> int:
+        """Xoá mọi object dưới một tiền tố (`jobs/{id}/`) — batch 1000/lượt như
+        best practice của MinIO (remove_objects). Trả về số object đã gửi lệnh xoá.
+
+        LƯU Ý: `remove_objects` trả generator LƯỜI — lệnh xoá chỉ chạy thật khi
+        duyệt hết kết quả lỗi (không duyệt = KHÔNG xoá gì, đã kiểm tài liệu).
+        """
+        from minio.deleteobjects import DeleteObject
+
+        count = 0
+        batch: list[DeleteObject] = []
+        for obj in self._client.list_objects(self.bucket, prefix=prefix, recursive=True):
+            batch.append(DeleteObject(obj.object_name))
+            if len(batch) >= 1000:
+                for _err in self._client.remove_objects(self.bucket, batch):
+                    pass  # lỗi từng object: best-effort, không giết việc dọn
+                count += len(batch)
+                batch = []
+        if batch:
+            for _err in self._client.remove_objects(self.bucket, batch):
+                pass
+            count += len(batch)
+        return count
 
     def presigned_url(self, key: str, expires_hours: float = 1.0) -> str:
         import datetime

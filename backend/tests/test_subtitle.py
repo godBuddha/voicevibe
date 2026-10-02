@@ -106,11 +106,12 @@ print("bản dịch rỗng -> giữ dòng gốc ....... OK")
 
 # ------------------------------------------- 7. segment end == start
 # Whisper thỉnh thoảng trả segment dài 0 giây. Phải xuất được file hợp lệ, không
-# làm lệch mốc của các cue sau.
+# làm lệch mốc của các cue sau. A6: cue dưới 300ms được KÉO DÀI đủ 300ms (người
+# xem kịp đọc) — trước đây chỉ nâng 1ms (vẫn "vô hình" khi phát).
 zero = render([TranscriptSegment(1.0, 1.0, "chớp"), SEGS[1]], "srt")
-assert "00:00:01,000 --> 00:00:01,001" in zero, zero
+assert "00:00:01,000 --> 00:00:01,300" in zero, zero
 assert "00:00:02,500 --> 00:00:05,000" in zero, zero
-print("segment 0 giây không làm hỏng file ... OK")
+print("segment 0 giây -> kéo dài đủ 300ms ... OK")
 
 # --------------------------------------------------- 8. đầu vào sai
 for bad in ("ass2", "txt", "SRT", ""):

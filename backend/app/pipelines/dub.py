@@ -24,6 +24,17 @@ MIN_ATEMPO = 0.5   # per-instance range of ffmpeg `atempo`
 MAX_ATEMPO = 2.0
 MAX_SPEED = 1.35   # beyond this, dubbed speech sounds rushed
 MAX_OVERRUN = 0.40  # seconds a segment may bleed past its slot into silence
+# (KrillinAI GapTolerance): giọng được phép tràn vào quãng lặng trước câu kế
+# tối đa 1.5s — cả plan_timing (bleed) lẫn ước lượng pre-TTS dùng chung ngân
+# sách này để hai phép tính nhất quán.
+GAP_TOLERANCE = 1.5
+
+# Ngưỡng CẢNH BÁO tốc độ (port từ KrillinAI fit.go SpeedAccept/SpeedMax): vượt
+# 1.15 giọng bắt đầu gấp; vượt 1.30 rõ ràng gắt. KHÔNG phải trần cứng — trần vẫn
+# là MAX_SPEED (hành vi cũ giữ nguyên), cảnh báo chỉ để kế hoạch phơi ra cho
+# người dùng thấy chỗ nào nghe sẽ gấp và nên sửa bản dịch.
+SPEED_ACCEPT = 1.15
+SPEED_WARN_MAX = 1.30
 
 
 @dataclass
@@ -38,6 +49,10 @@ class Segment:
     delay_ms: int = 0
     placed: float = 0.0         # actual occupied duration after tempo change
     needs_shorter_text: bool = False
+    # A5: ước lượng thời lượng đọc TRƯỚC khi gọi TTS (giây) + cảnh báo tốc độ
+    # (nếu có). `estimate` = 0 nghĩa là chưa ước lượng (job cũ / không dùng).
+    estimated: float = 0.0
+    warning: str | None = None
     # bed thực tế đã dùng: "htdemucs" (tách nhạc không lời), "fallback" (nguồn
     # giảm âm lượng — giọng gốc vẫn còn 12%), hoặc None (im lặng). Ghi vào kế
     # hoạch để người dùng thấy chất lượng bed, không phải phán đoán ngầm.
@@ -60,6 +75,7 @@ def plan_timing(segments: list[Segment], max_speed: float = MAX_SPEED,
         if s.gen_duration <= slot:
             s.speed, s.delay_ms, s.placed = 1.0, round(s.start * 1000), s.gen_duration
             s.needs_shorter_text = False
+            s.warning = None
         else:
             speed_needed = s.gen_duration / budget
             if speed_needed <= max_speed:
@@ -72,6 +88,15 @@ def plan_timing(segments: list[Segment], max_speed: float = MAX_SPEED,
                 s.needs_shorter_text = True
             s.delay_ms = round(s.start * 1000)
             s.placed = s.gen_duration / s.speed
+            # Cảnh báo theo hai ngưỡng (KrillinAI SpeedAccept/SpeedMax): >1.15
+            # là "nên xin bản ngắn hơn", >1.30 là "gắt rõ — gần chạm trần 1.35".
+            if s.speed > SPEED_WARN_MAX:
+                s.warning = f"tốc độ {s.speed:.2f} vượt {SPEED_WARN_MAX} — giọng gắt rõ"
+            elif s.speed > SPEED_ACCEPT:
+                s.warning = (f"tốc độ {s.speed:.2f} vượt mức dễ chịu "
+                             f"{SPEED_ACCEPT} — nên xin bản dịch ngắn hơn")
+            else:
+                s.warning = None
     return segments
 
 
@@ -130,8 +155,13 @@ def _selftest() -> None:
     print("== TIMING PLAN ==")
     for s in segs:
         flag = "  <-- RE-TRANSLATE (shorter)" if s.needs_shorter_text else ""
+        warn = f"  [!] {s.warning}" if s.warning else ""
         print(f"#{s.idx} {s.speaker} slot={s.end - s.start:5.2f}s gen={s.gen_duration:5.2f}s "
-              f"speed={s.speed:4.2f} delay={s.delay_ms:6d}ms placed={s.placed:5.2f}s{flag}")
+              f"speed={s.speed:4.2f} delay={s.delay_ms:6d}ms placed={s.placed:5.2f}s{flag}{warn}")
+
+    # cảnh báo tốc độ theo ngưỡng
+    assert segs[2].warning is not None, "speed 1.4? phải có cảnh báo"
+    assert segs[1].warning is not None or segs[1].speed <= SPEED_ACCEPT
 
     wavs = [f"seg{s.idx}.wav" for s in segs]
     print("\n== FFMPEG MIX ==")

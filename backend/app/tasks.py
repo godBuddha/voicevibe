@@ -128,11 +128,100 @@ def _record_stt_stats(job_id: str, stats: dict) -> None:
         pass
 
 
+def _abort_probe(job_id: str, ttl: float = 2.0):
+    """Probe trả True khi job ĐÃ bị hủy — đọc DB có cache `ttl` giây.
+
+    Cắm vào `dub_audio(abort_check=...)` để hủy cắm được GIỮA ĐƯỜNG (giữa các
+    khâu / giữa các câu đọc), không phải chờ khâu xong. Cache 2s: probe được
+    gọi mỗi câu dịch/đọc — không cache là vài chục query/giây trên SQLite vô ích.
+    """
+    import time as _time
+
+    cache = {"t": 0.0, "aborted": False}
+
+    def probe() -> bool:
+        now = _time.monotonic()
+        if now - cache["t"] >= ttl:
+            cache["t"] = now
+            try:
+                from .db import SessionLocal
+                from .models import Job, JobStatus
+
+                with SessionLocal() as db:
+                    job = db.get(Job, job_id)
+                    cache["aborted"] = bool(job is not None
+                                            and job.status == JobStatus.cancelled)
+            except Exception:  # noqa: BLE001 — DB hụt một nhịp không đáng chết job
+                pass
+        return cache["aborted"]
+
+    return probe
+
+
+def _record_progress(job_id: str, pct: int, msg: str) -> None:
+    """Phơi tiến độ pipeline vào job (progress + params.stage) — pattern
+    `_record_stt_stats`: thông tin phụ, lỗi không được giết job."""
+    try:
+        from .db import SessionLocal
+        from .models import Job
+
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            if job is not None:
+                job.progress = max(int(job.progress or 0), int(pct))
+                job.params = {**(job.params or {}), "stage": str(msg)[:80]}
+                db.commit()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _resolve_prompt_override(job_id: str, owner_id: str, prompt_id: str | None,
+                             source: str, target: str):
+    """Prompt cá nhân (Thư viện Prompt) của CHỦ job → chuỗi override (đã điền
+    biến {source}/{target}); None nếu không chọn / prompt đã xoá. Đường dùng
+    chung cho `_run_translate` và dub.
+
+    Prompt bị xoá/đổi chủ giữa lúc tạo job và lúc chạy → ghi chú fallback vào
+    DB (pattern `_record_stt_stats`) — không im lặng."""
+    if not prompt_id:
+        return None
+    from .prompt_library import resolve_prompt_override
+
+    override = resolve_prompt_override(prompt_id, owner_id)
+    if override is None:
+        try:
+            from .db import SessionLocal
+            from .models import Job
+
+            with SessionLocal() as db:
+                job = db.get(Job, job_id)
+                if job is not None:
+                    job.params = {**(job.params or {}), "prompt_fallback": "not found"}
+                    db.commit()
+        except Exception:  # noqa: BLE001 — thông tin phụ
+            pass
+        return None
+    from .prompts import render_template
+
+    # Biến {source}/{target} phải điền TẠI ĐÂY (đúng như đường cũ của
+    # _run_translate) — trả template trần là prompt user gửi model nguyên chữ
+    # "{source}" (test_prompt_library bắt đúng ca này).
+    return render_template(override, source=source, target=target)
+
+
 def _run_dub(job_id: str, params: dict) -> dict:
-    """Real D5/D7 pipeline: media -> STT -> translate -> TTS -> mix -> storage."""
+    """Real D5/D7 pipeline: media -> STT -> translate -> TTS -> mix -> storage.
+
+    A1: chạy trong thư mục làm việc bền `media/jobs/{job_id}/work/` + sổ tay
+    công đoạn — job hỏng/hủy thì "Chạy lại" tiếp tục từ khâu đã xong (xem
+    pipelines/manifest.py). Kết quả cũng nằm dưới `jobs/{job_id}/` (key_prefix)
+    để xóa job dọn sạch một phát.
+    """
     from .db import SessionLocal
     from .models import Job, JobStatus
     from .pipelines.dub_pipeline import dub_audio
+    from .pipelines.manifest import JobCancelled, work_dir
+    from .pipelines.translate import stage_translate_params
     from .settings_service import get_setting
     from .storage import get_storage
 
@@ -144,10 +233,22 @@ def _run_dub(job_id: str, params: dict) -> dict:
             return {"ok": False, "error": "cancelled"}
         job.status = JobStatus.running
         job.progress = 10
+        owner_id = job.user_id
         db.commit()
     try:
         storage = get_storage()
         src = _resolve_media(params["media_url"], storage)
+        # Prompt cá nhân (nếu job chọn) — thay system prompt của bộ dịch.
+        override = _resolve_prompt_override(
+            job_id, owner_id, params.get("prompt_id"),
+            params.get("source_lang") or "vi", params.get("target_lang") or "en")
+        # Núm dịch batch: job params > công đoạn translate (Model Hub, params
+        # JSON của StageModel — cổng có sẵn trước đây không ai đọc) > setting.
+        sp = stage_translate_params()
+        bs = int(params.get("batch_size") or sp.get("batch_size")
+                 or get_setting("translate.batch_size", 12) or 12)
+        ctx = int(params.get("context_sentences") or sp.get("context_sentences")
+                  or get_setting("translate.context_sentences", 2) or 2)
         key, _plan = dub_audio(
             src,
             params.get("source_lang") or "vi",
@@ -156,6 +257,14 @@ def _run_dub(job_id: str, params: dict) -> dict:
             storage,
             max_speed=float(get_setting("max_speed", 1.35)),
             background_mode=params.get("background_mode") or "silence",
+            workdir=work_dir(job_id),
+            job_id=job_id,
+            abort_check=_abort_probe(job_id),
+            progress_cb=lambda pct, msg: _record_progress(job_id, pct, msg),
+            key_prefix=f"jobs/{job_id}/",
+            system_prompt=override,
+            batch_size=bs,
+            context_sentences=ctx,
         )
         with SessionLocal() as db:
             job = db.get(Job, job_id)
@@ -167,6 +276,20 @@ def _run_dub(job_id: str, params: dict) -> dict:
         _notify(params.get("webhook_url"),
                 {"job_id": job_id, "status": "done", "result_key": key})
         return {"ok": True, "key": key}
+    except JobCancelled:
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            if job is not None:
+                # Ép cancelled: hủy đã đặt cờ trên DB TRƯỚC rồi worker mới thấy,
+                # nhưng task requeue/race có thể vừa set running lại — guard này
+                # không cho trạng thái sống sót. Kèm lời nhắc để nút Chạy lại có
+                # ngữ nghĩa "tiếp tục từ công đoạn đã xong".
+                if job.status != JobStatus.cancelled:
+                    job.status = JobStatus.cancelled
+                job.error = ("Đã hủy giữa đường — bấm Chạy lại để tiếp tục "
+                             "từ công đoạn đã xong")
+                db.commit()
+        return {"ok": False, "error": "cancelled"}
     except Exception as exc:  # noqa: BLE001
         with SessionLocal() as db:
             job = db.get(Job, job_id)
@@ -250,8 +373,10 @@ def _run_subtitle(job_id: str, params: dict) -> dict:
         src = _resolve_media(params["media_url"], storage)
 
         stt_stats: dict = {}
+        # want_words=True (A4): mốc giờ TỪNG TỪ cho tách cue phụ đề dài đúng
+        # ranh giới từ — chỉ đường local Whisper có; cloud STT tự no-op (None).
         segs, _info = transcribe(src, language=params.get("source_lang"),
-                                 stats=stt_stats)
+                                 stats=stt_stats, want_words=True)
         # Bỏ hallucination là việc PHẢI NHÌN THẤY ĐƯỢC: nếu im lặng, phụ đề
         # thiếu câu mà không ai biết vì sao. Ghi vào params để /v1/jobs đọc ra.
         _record_stt_stats(job_id, stt_stats)
@@ -269,17 +394,29 @@ def _run_subtitle(job_id: str, params: dict) -> dict:
 
         translations = None
         if bilingual or params.get("target_lang"):
-            from .pipelines.translate import build_translator
+            from .pipelines.translate import batch_capable, build_translator
+            from .pipelines.translate_batch import BatchConfig, BatchTranslator
 
             source = params.get("source_lang") or "auto"
             target = params.get("target_lang")
             if not target:
                 raise ValueError("target_lang là bắt buộc khi cần dịch phụ đề")
             tr = build_translator(source, target)
-            # Dịch từng cue MỘT, giữ nguyên số lượng và thứ tự — ghép lại theo
-            # chỉ số. Dịch gộp cả khối rồi tách lại sẽ lệch số dòng không báo lỗi.
-            translations = [tr.translate(s.text) if s.text.strip() else ""
-                            for s in attributed]
+            # A3 — dịch LOẠT (LLM) thay vì từng cue: giữ nguyên số lượng + thứ
+            # tự, có ngữ cảnh ±2 câu nên bản dịch mạch lạc hơn hẳn; LLM hỏng
+            # một lô thì bisect chia nhỏ, cùng đáy là dịch từng cue như cũ.
+            # Marian local không batch được → giữ đường từng cue.
+            chat = batch_capable(tr)
+            if chat is not None:
+                bt = BatchTranslator(chat, source, target, fallback=tr,
+                                     config=BatchConfig())
+                translations = bt.translate_all([s.text for s in attributed])
+            else:
+                # Dịch từng cue MỘT, giữ nguyên số lượng và thứ tự — ghép lại
+                # theo chỉ số. Dịch gộp cả khối rồi tách lại sẽ lệch số dòng
+                # không báo lỗi.
+                translations = [tr.translate(s.text) if s.text.strip() else ""
+                                for s in attributed]
 
         out = render(attributed, fmt, translations=translations,
                      bilingual=bilingual, show_speaker=show_speaker)
@@ -365,31 +502,10 @@ def _run_translate(job_id: str, params: dict) -> dict:
         text = params.get("text") or ""
         if not text.strip():
             raise ValueError("text is required for translate jobs")
-        # Thư viện prompt: params.prompt_id = prompt cá nhân của CHỦ job, thay
-        # system prompt của bộ dịch chat. Prompt bị xoá/đổi chủ giữa lúc tạo job
-        # và lúc chạy → resolve None → fallback prompt hệ thống (ghi chú vào
-        # params để UI/audit thấy được — không im lặng).
-        override = None
-        prompt_id = params.get("prompt_id")
-        if prompt_id:
-            from .prompt_library import resolve_prompt_override
-            from .prompts import render_template
-            override = resolve_prompt_override(prompt_id, owner_id)
-            if override is None:
-                # `params` ở đây là dict in-memory — ghi chú fallback phải lưu DB
-                # (pattern _record_stt_stats) nếu không GET /jobs sẽ không thấy.
-                try:
-                    from .db import SessionLocal as _SL
-                    from .models import Job as _Job
-                    with _SL() as _db:
-                        _job = _db.get(_Job, job_id)
-                        if _job is not None:
-                            _job.params = {**(_job.params or {}), "prompt_fallback": "not found"}
-                            _db.commit()
-                except Exception:  # noqa: BLE001 — thông tin phụ, không chết job
-                    pass
-            else:
-                override = render_template(override, source=source, target=target)
+        # Thư viện prompt: params.prompt_id = prompt cá nhân của CHỦ job (đường
+        # dùng chung `_resolve_prompt_override` — cả dub dùng).
+        override = _resolve_prompt_override(job_id, owner_id, params.get("prompt_id"),
+                                           source, target)
         tr = build_translator(source, target, system_prompt=override)
         out = tr.translate(text)
         key = f"jobs/{job_id}/translated.txt"

@@ -127,6 +127,44 @@ def stage_translator(source: str, target: str, system_prompt: str | None = None)
     return ChainTranslator(ProviderChain([_make(e) for e in chain]))
 
 
+def batch_capable(tr):
+    """Bộ complete chat phía sau translator — để dịch LOẠT (translate_batch).
+
+    Trả về None nếu translator không phải LLM chat (LocalMarianTranslator): khi
+    đó chỉ có thể dịch từng câu, không batch được. Chuỗi fallback
+    (ChainTranslator) trả completer của ENTRY ĐẦU — các lượt batch chỉ đi entry
+    0; nếu entry 0 hỏng, bisect sẽ chia nhỏ rồi chạm đáy bằng `tr.translate`
+    (đầy đủ chain) — job vẫn xong, chỉ là mất lợi ích batch khi entry 0 chết.
+    """
+    if isinstance(tr, CloudChatTranslator):
+        return tr._chat
+    chain = getattr(tr, "_chain", None)
+    for p in getattr(chain, "providers", []) or []:
+        if isinstance(p, CloudChatTranslator):
+            return p._chat
+    return None
+
+
+def stage_translate_params() -> dict:
+    """params JSON của entry đầu công đoạn 'translate' — {} nếu không có/lỗi.
+
+    Đây là cổng cấu hình đã có sẵn trong Model Hub (`StageModel.params` — set
+    được trong /admin → Công đoạn) nhưng trước đây KHÔNG AI ĐỌC. Dùng cho các
+    núm dịch batch (batch_size / context) mà không cần schema mới.
+    """
+    try:
+        from ..db import SessionLocal
+        from ..providers_api import stage_chain
+
+        with SessionLocal() as db:
+            chain = stage_chain("translate", db)
+        if chain and chain[0].get("params"):
+            return dict(chain[0]["params"])
+    except Exception:  # noqa: BLE001 — worker không được chết vì DB chưa migrate
+        pass
+    return {}
+
+
 class ChainTranslator:
     """Bọc ProviderChain theo interface của mọi translator (translate /
     retranslate_shorter) — dùng được ở mọi nơi build_translator trả về."""

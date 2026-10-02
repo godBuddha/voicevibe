@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useApi } from '../hooks/useApi.jsx';
-import { cancelJob, deleteJob, getResult } from '../api/jobs.js';
+import { cancelJob, deleteJob, getResult, retryJob } from '../api/jobs.js';
 import { BASE } from '../api/client.js';
 
 export default function Jobs() {
@@ -140,6 +140,22 @@ export default function Jobs() {
     setActionError(null);
     try {
       await cancelJob(job.id);
+      await fetchJobs();
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const doRetry = async (job, e) => {
+    e.stopPropagation();
+    // A1 — Chạy lại TIẾP TỤC từ công đoạn đã xong (sổ tay trong workdir):
+    // STT đã nghe xong không nghe lại, bản dịch đã dịch không dịch lại.
+    setBusyId(job.id);
+    setActionError(null);
+    try {
+      await retryJob(job.id);
       await fetchJobs();
     } catch (err) {
       setActionError(err.message);
@@ -310,8 +326,13 @@ export default function Jobs() {
                                 }}
                               />
                             </div>
-                            <div style={{ marginTop: '4px', fontSize: 'var(--text-xs)', color: 'var(--text-dim)' }}>
+                            <div style={{ marginTop: '4px', fontSize: 'var(--text-xs)', color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {fmtPercent(job.progress.percent)}%
+                              {(job.progress.message || job.params?.stage) && (
+                                <span style={{ marginLeft: '6px', opacity: 0.8 }}>
+                                  — {job.progress.message || job.params.stage}
+                                </span>
+                              )}
                             </div>
                           </div>
                         )}
@@ -335,6 +356,22 @@ export default function Jobs() {
                               }}
                             >
                               {isBusy ? 'Đang hủy...' : 'Hủy job'}
+                            </button>
+                          )}
+                          {!isActive && (job.status === 'failed' || job.status === 'cancelled') && (
+                            <button
+                              disabled={isBusy}
+                              onClick={(e) => doRetry(job, e)}
+                              title="Tiếp tục từ công đoạn đã xong — không chạy lại từ đầu"
+                              style={{
+                                background: 'var(--primary-light)', color: 'var(--primary)',
+                                border: 'none', padding: '6px 12px',
+                                borderRadius: 'var(--radius)', fontSize: 'var(--text-xs)',
+                                fontWeight: 600, cursor: isBusy ? 'wait' : 'pointer',
+                                opacity: isBusy ? 0.6 : 1,
+                              }}
+                            >
+                              {isBusy ? 'Đang xếp hàng...' : 'Chạy lại'}
                             </button>
                           )}
                           {!isActive && (

@@ -307,7 +307,7 @@ def dub_audio(source_path: str, source_lang: str, target_lang: str,
               batch_size: int = 12, context_sentences: int = 2,
               source_url: str | None = None, quality: str | None = None,
               sub_source: str | None = None, captions=None,
-              tts_backend: str = "local",
+              tts_backend: str = "local", with_subs: bool = False,
               transcribe_fn=None, diarize_fn=None, merge_fn=None,
               translator_factory=None, tts_factory=None,
               ) -> tuple[str, list[Segment]]:
@@ -336,6 +336,9 @@ def dub_audio(source_path: str, source_lang: str, target_lang: str,
                        mặt thì BỎ WHISPER (vẫn diarize để gán người nói).
         tts_backend    B5: "local" (VieNeu, mặc định) | "edge" | "cloud" — đổi
                        backend là ĐỔI CHẤT LƯỢNG GIỌNG, phải nằm trong vân tay.
+        with_subs      B4b: xuất thêm `bilingual.srt` (2 dòng song ngữ) sau mux.
+                       KHÔNG nằm trong vân tay — hàm thuần của translations:
+                       bật/tắt giữa chừng tái dùng sổ tay, chỉ chạy thêm khâu.
         *_fn / *_factory  điểm cắm giả cho test (mặc định dùng engine thật).
     Returns (storage_key, planned_segments).
     """
@@ -623,6 +626,26 @@ def dub_audio(source_path: str, source_lang: str, target_lang: str,
         manifest.mark("mux")
     else:
         key = manifest.outputs["result_key"]
+
+    # 7b) PHỤ ĐỀ SONG NGỮ (B4b) — xuất từ bản dịch ĐÃ CÓ, chạy sau mux cả trên
+    #     đường resume. with_subs CỐ Ý KHÔNG nằm trong vân tay: subs là hàm
+    #     thuần của translations (đã trong vân tay qua backend_tag/params) —
+    #     bật/tắt giữa chừng tái dùng nguyên sổ tay (mux đã xong) và chỉ chạy
+    #     thêm khâu subs — đúng ý "thêm phụ đề vào dub đã có, không làm lại".
+    if with_subs and not manifest.stage_ok("subs"):
+        _abort()
+        _report(97, "xuất phụ đề song ngữ")
+        from .subtitle import render as render_subs
+
+        segs_srt = render_subs(
+            attributed, "srt",
+            translations=list(texts), bilingual=True, show_speaker=False)
+        subs_key = f"{key_prefix}bilingual.srt" if key_prefix \
+            else f"jobs/dub/{os.urandom(6).hex()}/bilingual.srt"
+        storage.put(subs_key, segs_srt.encode("utf-8"))
+        manifest.outputs["subs_key"] = subs_key
+        manifest.mark("subs")
+    subs_key = manifest.outputs.get("subs_key")
     _report(100, "xong")
     return key, plan_segs
 

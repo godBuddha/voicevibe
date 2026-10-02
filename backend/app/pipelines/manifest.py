@@ -45,6 +45,23 @@ STAGES = ("prepare", "stt", "translate", "tts", "fit", "mix", "mux")
 SCHEMA_VERSION = 1
 
 
+def read_outputs(workdir: str) -> dict:
+    """Đọc `outputs` từ sổ tay của workdir — accessor nhẹ cho caller.
+
+    B4b: tasks._run_dub cần biết key phụ đề song ngữ (`subs_key`) sau khi
+    dub_audio trả về — đọc file sổ tay trực tiếp thay vì bắt dub_audio trả
+    thêm giá trị (signature của nó là contract của smoke scripts).
+    Sổ không đọc được / không có → {} (thông tin phụ không được giết job).
+    """
+    path = os.path.join(workdir, MANIFEST_NAME)
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("outputs") or {}
+    except (OSError, ValueError):
+        return {}
+
+
 class JobCancelled(Exception):
     """Job bị hủy giữa đường.
 

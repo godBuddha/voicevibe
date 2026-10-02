@@ -330,13 +330,29 @@ def _run_dub(job_id: str, params: dict) -> dict:
             sub_source=params.get("sub_source"),
             captions=yt_segs,
             tts_backend=params.get("tts_backend") or "local",
+            with_subs=bool(params.get("with_subs")),
         )
+        # B4b — phụ đề song ngữ là OUTPUT PHỤ: đọc từ sổ tay (accessor nhẹ),
+        # ghi vào params để /v1/jobs + render job tái dùng được.
+        try:
+            from .pipelines.manifest import read_outputs
+
+            subs_key = read_outputs(work_dir(job_id)).get("subs_key")
+        except Exception:  # noqa: BLE001 — thông tin phụ, không giết job
+            subs_key = None
+        if subs_key:
+            _record_progress(job_id, 100, "phụ đề song ngữ: " + subs_key)
         with SessionLocal() as db:
             job = db.get(Job, job_id)
             job.status = JobStatus.done
             job.progress = 100
             job.result_s3_key = key
             job.error = None
+            if subs_key:
+                job.params = {**(job.params or {}),
+                              "extra_outputs": [{"kind": "subtitle",
+                                                 "key": subs_key,
+                                                 "filename": "bilingual.srt"}]}
             db.commit()
         _notify(params.get("webhook_url"),
                 {"job_id": job_id, "status": "done", "result_key": key})

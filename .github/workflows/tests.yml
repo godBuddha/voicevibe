@@ -88,6 +88,7 @@ jobs:
             "tests/test_url_jobs.py"
             "tests/test_tts_backends.py"
             "tests/test_render.py"
+            "tests/test_media_ownership.py"
             "app.pipelines.dub --selftest"
             "app.pipelines.stt --selftest"
             "app.pipelines.translate --selftest"

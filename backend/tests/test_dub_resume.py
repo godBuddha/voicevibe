@@ -89,6 +89,10 @@ class FakeStorage:
     def __init__(self):
         self.puts: dict[str, str] = {}
 
+    def put(self, key, data):
+        self.puts[key] = data
+        return key
+
     def put_from_file(self, key, path):
         self.puts[key] = path
         return key
@@ -338,5 +342,41 @@ class MarianLike:
 
 assert dub_pipeline.batch_capable(MarianLike()) is None
 print("7. batch_capable (cloud/chain/marian) ....... OK")
+
+# --- 8. with_subs (B4b): bilingual.srt sau mux; KHÔNG nằm vân tay — bật/tắt
+#      giữa chừng tái dùng sổ tay (mux đã xong), không chạy lại engine
+if SRC:
+    wd3 = os.path.join(TMP, "work3")
+    os.makedirs(wd3, exist_ok=True)
+    st8 = FakeStorage()
+    kw8 = dict(storage=st8, mux_video=False, background_mode="silence",
+               transcribe_fn=fake_transcribe, diarize_fn=fake_diarize,
+               merge_fn=fake_merge, translator_factory=FakeTranslator,
+               tts_factory=FakeTTS, job_id="jr1", key_prefix="jobs/jr1/")
+    key, _plan = dub_pipeline.dub_audio(SRC, "vi", "en", {}, with_subs=True,
+                                        workdir=wd3, **kw8)
+    assert "jobs/jr1/bilingual.srt" in st8.puts, st8.puts
+    from app.pipelines.manifest import read_outputs as _read_outputs
+    outs = _read_outputs(wd3)
+    assert outs.get("subs_key") == "jobs/jr1/bilingual.srt", outs
+    calls_after = (CALLS["transcribe"], CALLS["diarize"])
+    # lần 2: with_subs vẫn bật → resume, không đụng engine
+    dub_pipeline.dub_audio(SRC, "vi", "en", {}, with_subs=True,
+                           workdir=wd3, **kw8)
+    assert (CALLS["transcribe"], CALLS["diarize"]) == calls_after
+    # lần 3: TẮT with_subs → vân tay KHÔNG đổi (subs hàm thuần của bản dịch)
+    # → mux tái dùng, subs stage đã ok, KHÔNG xoá file phụ đề
+    dub_pipeline.dub_audio(SRC, "vi", "en", {}, with_subs=False,
+                           workdir=wd3, **kw8)
+    assert (CALLS["transcribe"], CALLS["diarize"]) == calls_after
+    assert "jobs/jr1/bilingual.srt" in st8.puts, "tắt with_subs phải GIỮ file cũ"
+    # vân tay có CỐ Ý không gồm with_subs (tài liệu hoá quyết định)
+    from app.pipelines.manifest import params_fingerprint
+    fpA = params_fingerprint({"source_lang": "vi", "target_lang": "en",
+                              "media_url": "x"}, "tag")
+    fpB = params_fingerprint({"source_lang": "vi", "target_lang": "en",
+                              "media_url": "x", "with_subs": True}, "tag")
+    assert fpA == fpB, "with_subs không được vào vân tay (bật/tắt tái dùng sổ)"
+    print("8. with_subs: bilingual.srt + resume + KHÔNG vân tay OK")
 
 print("DUB RESUME GUARDS PASSED")

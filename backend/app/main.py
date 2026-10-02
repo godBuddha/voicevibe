@@ -194,6 +194,9 @@ class JobIn(BaseModel):
     banner: dict | None = Field(
         None, description="render: banner tiêu đề — {'major': 'Chính', "
                           "'minor': 'Phụ'} (dải đen 250px phía trên)")
+    with_subs: bool = Field(
+        False, description="dub (B4b): xuất thêm phụ đề song ngữ bilingual.srt "
+                           "kèm video — tái dùng được cho job render")
 
 
 class VoiceIn(BaseModel):
@@ -719,8 +722,19 @@ def _owns_media(db: Session, user: User, key: str) -> bool:
     if db.scalar(select(Job).where(Job.result_s3_key == key,
                                    Job.user_id == user.id)):
         return True
-    return db.scalar(select(Voice).where(Voice.ref_s3_key == key,
-                                        Voice.user_id == user.id)) is not None
+    if db.scalar(select(Voice).where(Voice.ref_s3_key == key,
+                                    Voice.user_id == user.id)) is not None:
+        return True
+    # B4b — HỌ KHOÁ `jobs/{job_id}/…`: output PHỤ (bilingual.srt, workdir) không
+    # là result_s3_key của job nào → trước đây 404 ngay khi chủ job tự tải.
+    # Đối chiếu CHỦ JOB của đoạn thứ hai — không phải chỉ cần tiền tố đúng là
+    # đọc được (khác user cùng tiền tố phải 404). Khoá "jobs/" không có id thì
+    # không thuộc họ này (bỏ qua, rơi về các khớp chính xác phía trên).
+    if len(parts) >= 2 and parts[0] == "jobs" and parts[1]:
+        job = db.get(Job, parts[1])
+        if job is not None and job.user_id == user.id:
+            return True
+    return False
 
 
 @app.get("/media/{key:path}")

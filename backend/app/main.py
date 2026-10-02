@@ -64,7 +64,8 @@ from .settings_service import (
 from .storage import get_storage
 from .tasks import dispatch
 
-VALID_TYPES = {"tts", "stt", "translate", "dub", "subtitle", "download", "render"}
+VALID_TYPES = {"tts", "stt", "translate", "dub", "subtitle", "download",
+               "render", "summary"}
 
 # Docs công khai mặc định TẮT: schema API lộ toàn bộ bề mặt tấn công. Bật khi cần
 # xem Swagger trên máy cá nhân: VOICEVIBE_ENABLE_DOCS=1
@@ -264,6 +265,13 @@ def create_job(
             raise HTTPException(
                 status_code=422,
                 detail=f"quality phải là một trong {list(_DOWNLOAD_QUALITIES)}")
+    if job.type == "summary":
+        # B6: cần NỘI DUNG — text dán sẵn HOẶC file/link để tự nghe
+        if not (job.text or job.media_url or job.source_url):
+            raise HTTPException(
+                status_code=422,
+                detail="summary cần text (dán văn bản) hoặc media_url/source_url "
+                       "(video/âm thanh để hệ tự nghe)")
     if job.type == "render":
         # B3+B4: ít nhất 1 toggle; burn phụ đề cần NGUỒN (key XOR job id)
         if not (job.burn_subtitles or job.vertical or job.banner):
@@ -291,10 +299,11 @@ def create_job(
             raise HTTPException(status_code=404, detail="voice not found")
 
     # Quyền sở hữu prompt cá nhân — cùng nguyên tắc voice: chặn TRƯỚC khi tạo
-    # job thay vì để worker fail. Dùng cho translate (từng câu) và dub (A3, thay
-    # system prompt của bộ dịch batch); type khác + prompt_id → 422.
+    # job thay vì để worker fail. Dùng cho translate (từng câu), dub (A3, thay
+    # system prompt của bộ dịch batch) và summary (B6, thay prompt tóm tắt);
+    # type khác + prompt_id → 422.
     if job.prompt_id:
-        if job.type not in ("translate", "dub"):
+        if job.type not in ("translate", "dub", "summary"):
             raise HTTPException(
                 status_code=422,
                 detail="prompt_id chỉ dùng cho job translate hoặc dub")
@@ -345,7 +354,7 @@ def get_result(
     # mọi key thành công khai trong thời gian URL còn hiệu lực.
     key = j.result_s3_key
     ext = key.rsplit(".", 1)[-1].lower() if "." in key else ""
-    kind = ("text" if ext in {"srt", "vtt", "ass", "txt"}
+    kind = ("text" if ext in {"srt", "vtt", "ass", "txt", "md"}
             else "video" if ext in {"mp4", "mkv", "webm", "mov"} else "audio")
     out = {"job_id": j.id, "download_url": f"/media/{key}",
            "filename": os.path.basename(key), "kind": kind}

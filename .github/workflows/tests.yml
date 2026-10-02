@@ -89,6 +89,7 @@ jobs:
             "tests/test_tts_backends.py"
             "tests/test_render.py"
             "tests/test_media_ownership.py"
+            "tests/test_summary.py"
             "app.pipelines.dub --selftest"
             "app.pipelines.stt --selftest"
             "app.pipelines.translate --selftest"
@@ -102,6 +103,7 @@ jobs:
             "app.pipelines.download --selftest"
             "app.pipelines.youtube_subs --selftest"
             "app.pipelines.render --selftest"
+            "app.pipelines.summary --selftest"
           )
           : > /tmp/results.txt
           : > /tmp/selftest.log

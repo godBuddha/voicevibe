@@ -62,7 +62,7 @@ class OpenAIChatProvider(OpenAIBase):
     """POST /v1/chat/completions — translation & any LLM step."""
 
     def complete(self, system: str, user: str, *, json_mode: bool = False,
-                 max_tokens: int = 2048) -> str:
+                 max_tokens: int = 2048, temperature: float = 0.2) -> str:
         body: dict = {
             "model": self.model,
             "messages": [
@@ -70,7 +70,10 @@ class OpenAIChatProvider(OpenAIBase):
                 {"role": "user", "content": user},
             ],
             "max_tokens": max_tokens,
-            "temperature": 0.2,
+            # temperature là kwarg MỚI (B6): tóm tắt map-reduce cần temp thấp
+            # (0.3 — nhất quán, đỡ sa hoại) trong khi single-shot 0.7 cho văn
+            # phong tự nhiên. Default giữ 0.2 — caller cũ không đổi hành vi.
+            "temperature": temperature,
         }
         if json_mode:
             body["response_format"] = {"type": "json_object"}

@@ -153,6 +153,7 @@ STAGE_FEATURES: dict[str, str] = {
     "tts": "text_to_speech",
     "dub": "video_translation",
     "subtitle": "subtitle_translation",
+    "summarize": "text_generation",  # B6 — gán model riêng cho tóm tắt
 }
 
 

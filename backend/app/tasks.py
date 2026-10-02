@@ -44,6 +44,7 @@ celery_app.conf.update(
 PIPELINES: dict[str, str] = {
     "tts": "done", "stt": "done", "translate": "done", "dub": "done",
     "subtitle": "done", "download": "done", "render": "done",
+    "summary": "done",
 }
 
 
@@ -538,6 +539,108 @@ def _run_render(job_id: str, params: dict) -> dict:
         return {"ok": False, "error": str(exc)[:200]}
 
 
+def _run_summary(job_id: str, params: dict) -> dict:
+    """B6 — job `summary`: text dán sẵn HOẶC media/link (tự nghe trước).
+
+    Stage "summarize" vào manifest: nghe lại cả giờ chỉ vì chết lúc tóm tắt
+    là lãng phí GPU lớn nhất của job này — checkpoint transcript.json (A1).
+    Model: stage 'summarize' (Model Hub) → settings translate.* → không có
+    model chat thì FAIL RÕ ở lúc tạo thông điệp (không đoán).
+    """
+    from .db import SessionLocal
+    from .models import Job, JobStatus
+    from .pipelines.manifest import (JobCancelled, Manifest, atomic_write_json,
+                                     params_fingerprint, work_dir)
+    from .pipelines.summary import build_chat, map_reduce, transcript_with_timestamps
+    from .storage import get_storage
+
+    with SessionLocal() as db:
+        job = db.get(Job, job_id)
+        if job is None:
+            return {"ok": False, "error": "job not found"}
+        if _aborted(db, job_id):
+            return {"ok": False, "error": "cancelled"}
+        job.status = JobStatus.running
+        job.progress = 5
+        owner_id = job.user_id
+        db.commit()
+    try:
+        storage = get_storage()
+        target = params.get("target_lang") or "vi"
+        override = _resolve_prompt_override(job_id, owner_id,
+                                            params.get("prompt_id"),
+                                            "auto", target)
+        chat = build_chat()
+        if chat is None:
+            raise ValueError(
+                "chưa cấu hình model chat — gán trong Admin → Model Hub "
+                "(công đoạn Tóm tắt) hoặc Settings → Dịch thuật (base_url, "
+                "api_key, model)")
+
+        wd = work_dir(job_id)
+        if params.get("text"):
+            transcript = params["text"]
+        else:
+            src = _download_source(job_id, params, storage)
+            # checkpoint transcript.json — nghe một lần là đủ cho mọi lần retry
+            tfile = os.path.join(wd, "transcript.json")
+            fp = params_fingerprint({"media_url": src, "type": "summary",
+                                     "source_lang": params.get("source_lang")},
+                                    "whisper")
+            manifest = (Manifest.load_or_none(wd, fp)
+                        or Manifest.create(wd, job_id, fp, job_type="summary"))
+            if not manifest.stage_ok("stt"):
+                _record_progress(job_id, 10, "nghe lại nội dung (Whisper)")
+                transcript = transcript_with_timestamps(
+                    src, language=params.get("source_lang"))
+                atomic_write_json(tfile, {"transcript": transcript})
+                manifest.outputs["transcript"] = "transcript.json"
+                manifest.mark("stt")
+            else:
+                with open(tfile, encoding="utf-8") as f:
+                    import json as _json
+
+                    transcript = (_json.load(f) or {}).get("transcript") or ""
+                _record_progress(job_id, 20, "dùng transcript đã nghe (resume)")
+            if not transcript.strip():
+                raise ValueError(
+                    "không nghe được nội dung nào — file trống hoặc toàn nhạc")
+        _record_progress(job_id, 25, "chuẩn bị tóm tắt")
+        out = map_reduce(chat, transcript, target=target,
+                         system_prompt=override,
+                         progress_cb=lambda pct, msg: _record_progress(job_id, pct, msg),
+                         abort_check=_abort_probe(job_id))
+        key = f"jobs/{job_id}/summary.md"
+        storage.put(key, out.encode("utf-8"))
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            job.status = JobStatus.done
+            job.progress = 100
+            job.result_s3_key = key
+            job.error = None
+            db.commit()
+        _notify(params.get("webhook_url"),
+                {"job_id": job_id, "status": "done", "result_key": key})
+        return {"ok": True, "key": key}
+    except JobCancelled:
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            if job is not None:
+                if job.status != JobStatus.cancelled:
+                    job.status = JobStatus.cancelled
+                job.error = ("Đã hủy giữa đường — bấm Chạy lại để tiếp tục "
+                             "từ công đoạn đã xong")
+                db.commit()
+        return {"ok": False, "error": "cancelled"}
+    except Exception as exc:  # noqa: BLE001
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            if job is not None:
+                _set_failed(job, exc, db)
+                db.commit()
+        return {"ok": False, "error": str(exc)[:200]}
+
+
 def _run_stt(job_id: str, params: dict) -> dict:
     """Real D3 pipeline: media -> transcript with speakers -> SRT in storage."""
     from .db import SessionLocal
@@ -822,6 +925,8 @@ def dispatch_inline(job_id: str, params: dict) -> dict:
         return _run_download(job_id, params)
     if jtype == "render":
         return _run_render(job_id, params)
+    if jtype == "summary":
+        return _run_summary(job_id, params)
     return _run_stub(job_id, params)
 
 

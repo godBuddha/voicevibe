@@ -146,7 +146,7 @@ PROVIDER_OPENAI = "openai"   # bất kỳ endpoint chuẩn OpenAI (OpenAI, DeepS
 PROVIDER_OLLAMA = "ollama"   # Ollama native API (/api/tags, /api/pull, …)
 PROVIDER_KINDS = (PROVIDER_OPENAI, PROVIDER_OLLAMA)
 
-STAGES = ("stt", "translate", "retranslate", "tts", "dub")
+STAGES = ("stt", "translate", "retranslate", "tts", "dub", "summarize")
 
 
 class AiProvider(Base):

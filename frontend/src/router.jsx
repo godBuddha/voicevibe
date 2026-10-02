@@ -11,6 +11,9 @@ import STT from './pages/STT.jsx';
 import Subtitle from './pages/Subtitle.jsx';
 import TranslateText from './pages/TranslateText.jsx';
 import TranslateAudio from './pages/TranslateAudio.jsx';
+import Download from './pages/Download.jsx';
+import Render from './pages/Render.jsx';
+import Summary from './pages/Summary.jsx';
 import Jobs from './pages/Jobs.jsx';
 import ApiKeys from './pages/ApiKeys.jsx';
 import Prompts from './pages/Prompts.jsx';
@@ -70,6 +73,9 @@ export default createBrowserRouter([
       { path: 'subtitle', element: <Subtitle /> },
       { path: 'translate-text', element: <TranslateText /> },
       { path: 'translate-audio', element: <TranslateAudio /> },
+      { path: 'download', element: <Download /> },
+      { path: 'render', element: <Render /> },
+      { path: 'summary', element: <Summary /> },
       { path: 'jobs', element: <Jobs /> },
       { path: 'prompts', element: <Prompts /> },
       // SETTINGS HUB — Control Center cho cả user thường lẫn admin. Sidebar

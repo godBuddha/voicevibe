@@ -45,6 +45,9 @@ PANELS = [  # (screenshot name, app router target, element that must be visible)
     ("06-api-keys", "api", "#keylist"),
     ("12-subtitle", "subtitle", "#subfile"),
     ("13-settings", "settings", "#sesslist"),
+    ("14-download", "download", "#dlurl"),
+    ("15-render", "render", "#rfile"),
+    ("16-summary", "summary", "#sumtext"),
 ]
 
 

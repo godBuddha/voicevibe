@@ -32,8 +32,11 @@ export function adaptJob(j) {
   const p = j.params || {};
   // Nhãn hiển thị: tên file (media_url) → đầu đoạn text → fallback theo loại.
   const mediaName = p.media_url ? decodeURIComponent(p.media_url.split('/').pop()) : '';
+  // B1/B6: job dán link (download tóm tắt) nhãn là tiêu đề tải được hoặc link
+  const srcName = p.download_title
+    || (p.source_url ? decodeURIComponent(p.source_url.split('/').pop()) || p.source_url : '');
   const typeLabel = TYPE_LABELS[j.type] || j.type;
-  const label = mediaName || (p.text ? p.text.slice(0, 60) : typeLabel);
+  const label = mediaName || srcName || (p.text ? p.text.slice(0, 60) : typeLabel);
   return {
     id: j.job_id,
     type: j.type,
@@ -50,7 +53,7 @@ export function adaptJob(j) {
   };
 }
 
-const TYPE_LABELS = { dub: 'Lồng tiếng', tts: 'Văn bản → giọng nói', stt: 'Giọng nói → văn bản', translate: 'Dịch văn bản', subtitle: 'Tạo phụ đề' };
+const TYPE_LABELS = { dub: 'Lồng tiếng', tts: 'Văn bản → giọng nói', stt: 'Giọng nói → văn bản', translate: 'Dịch văn bản', subtitle: 'Tạo phụ đề', download: 'Tải video từ link', render: 'Xử lý video', summary: 'Tóm tắt nội dung' };
 
 // GET /v1/voices: {voices: [{id, name, lang, engine, created_at}]}
 //   → {id, name, lang, engine, isClone} (engine vieneu = giọng clone/từ mẫu)

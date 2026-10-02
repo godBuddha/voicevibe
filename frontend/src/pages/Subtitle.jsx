@@ -24,6 +24,8 @@ export default function Subtitle() {
   const [editText, setEditText] = useState('');
   const [timeRange, setTimeRange] = useState({ start: '', end: '' });
   const [resultKey, setResultKey] = useState(null);
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [subSource, setSubSource] = useState('auto');
 
   const handleFile = (f) => {
     if (f && (f.type.startsWith('video/') || f.type.startsWith('audio/'))) {
@@ -37,17 +39,18 @@ export default function Subtitle() {
   };
 
   const startSubtitle = async () => {
-    if (!file) return;
+    if (!file && !sourceUrl.trim()) return;
     setIsProcessing(true);
     setError(null);
     try {
-      // Chuẩn thật: file → media_url, job JSON có `type` + format + song ngữ.
-      // Song ngữ BẮT BUỘC có target_lang (backend 422 khi thiếu — đã gặp thật).
-      const media_url = await uploadMedia(file);
+      // B1: dán link (yt-dlp tự tải) hoặc file upload; B2 phụ đề YouTube sẵn có.
       const payload = {
-        type: 'subtitle', media_url, format: exportFormat,
+        type: 'subtitle', format: exportFormat,
         bilingual: isBilingual, show_speaker: true,
+        sub_source: sourceUrl.trim() ? subSource : 'whisper',
       };
+      if (sourceUrl.trim()) payload.source_url = sourceUrl.trim();
+      else payload.media_url = await uploadMedia(file);
       if (isBilingual) payload.target_lang = targetLang;
       const created = await createJob(payload);
       const done = await pollJob(created.jobId, {
@@ -139,8 +142,39 @@ export default function Subtitle() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '20px' }}>
         {/* Left */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          {/* Upload */}
+          {/* B1/B2 — dán link thay file (yt-dlp tự tải, phụ đề YouTube sẵn có) */}
           {!cues.length && !job && (
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+              <input
+                value={sourceUrl}
+                onChange={(e) => setSourceUrl(e.target.value)}
+                placeholder="Tùy chọn: dán link video (YouTube…) thay vì chọn file"
+                style={{
+                  flex: 1, padding: '8px 10px', borderRadius: 'var(--radius)',
+                  border: '1px solid var(--border)', background: 'var(--bg)',
+                  color: 'var(--text)', fontSize: 'var(--text-sm)',
+                }}
+              />
+              <select
+                value={subSource}
+                onChange={(e) => setSubSource(e.target.value)}
+                disabled={!sourceUrl.trim()}
+                style={{
+                  padding: '8px 10px', borderRadius: 'var(--radius)',
+                  border: '1px solid var(--border)', background: 'var(--bg)',
+                  color: 'var(--text)', fontSize: 'var(--text-sm)',
+                  opacity: sourceUrl.trim() ? 1 : 0.5,
+                }}
+              >
+                <option value="auto">Phụ đề YouTube nếu có</option>
+                <option value="youtube">Chỉ phụ đề YouTube</option>
+                <option value="whisper">Luôn tự nghe lại</option>
+              </select>
+            </div>
+          )}
+
+          {/* Upload */}
+          {!cues.length && !job && !sourceUrl.trim() && (
             <div
               onDragOver={(e) => e.preventDefault()}
               onDragEnter={(e) => e.preventDefault()}

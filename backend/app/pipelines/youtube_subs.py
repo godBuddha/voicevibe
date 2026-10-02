@@ -117,6 +117,11 @@ def fetch_captions(url: str, lang: str | None = None, *,
             return None
 
         def info_fn(u: str, opts: dict):
+            # B1 (03/10): YouTube chặn client web mặc định từ IP datacenter
+            # ("Sign in to confirm you're not a bot") — client `android` vẫn
+            # đọc được metadata ẩn danh (khớp trick CLI `_yt_extractor_args`
+            # của download.py).
+            opts.setdefault("extractor_args", {"youtube": {"player_client": ["android"]}})
             with yt_dlp.YoutubeDL(opts) as ydl:
                 return ydl.extract_info(u, download=False)
 

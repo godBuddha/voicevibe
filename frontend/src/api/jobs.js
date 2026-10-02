@@ -39,6 +39,17 @@ export async function pollJob(jobId, { onUpdate, timeoutMs = 600000, intervalMs 
   }
 }
 
+// B1 — xem metadata link TRƯỚC khi tạo job (title/thumbnail/duration).
+// Lỗi → ném lỗi có message thân thiện từ ERROR_MAP (UI hiển thị nguyên văn).
+export async function downloadPreview(url) {
+  return api.post('/v1/download/preview', { body: { url } });
+}
+
+// B5 — catalog giọng đọc theo backend (local VieNeu / edge / cloud).
+export async function ttsPresets(lang = 'vi') {
+  return api.get(`/v1/tts/presets?lang=${encodeURIComponent(lang)}`);
+}
+
 // Hủy job đang chờ/đang chạy — job miễn phí (self-host), không trừ, không hoàn gì.
 export async function cancelJob(jobId) {
   return api.post(`/v1/jobs/${jobId}/cancel`);

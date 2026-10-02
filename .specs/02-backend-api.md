@@ -218,3 +218,86 @@ setting.*, key.*, prompt.*, job.*, config.import).
 - `JobIn`: `prompt_id` chấp nhận cho type `translate` **và `dub`** (422 còn lại).
 - GET jobs vẫn cùng shape; thêm `params.stage` (msg công đoạn, 80 ký tự) +
   `params.stt_dropped*` như cũ. adaptJob SPA pass-through — không phá.
+
+## Giai đoạn B — tính năng mới (port OpenCreator/youwee, 03/10)
+
+### B1 — nhập từ URL (yt-dlp)
+- `pipelines/download.py`: CLI subprocess `python -m yt_dlp` với
+  `start_new_session=True` + `os.killpg` khi hủy (yt-dlp mồ côi = rác .part).
+  FORMAT_LADDER (port youwee format.rs): 1080/720/480 mp4-m4a, audio mp3.
+  ERROR_MAP ~20 substring → message tiếng Việt có gợi ý. `ensure_downloaded`
+  ghi marker `download.json` (url+quality+file size>0) trong workdir bền —
+  retry KHÔNG tải lại. Gate duration ≤ 7200s kiểm bằng Python SAU probe
+  (match_filter chỉ "skip" + exit 0 — job tưởng thành công). URL validate
+  http(s), từ chối `-`. Cookie chỉ nhận khi dòng đầu đúng `# Netscape HTTP
+  Cookie File` (port youtube_cookies.go).
+- Endpoint: `POST /v1/download/preview` (auth, rate 20/phút, timeout 60s) —
+  `{url}` → `{title, duration, thumbnail, uploader, webpage_url, ext}`.
+- Settings: `download.cookies_file` (path Netscape, không secret),
+  `download.proxy` (secret).
+- JobIn mới (khai tường minh — bài học pydantic nuốt âm thầm): `source_url`,
+  `quality`, `sub_source` (auto|youtube|whisper), `tts_backend`
+  (local|edge|cloud), `subtitle_key`, `subtitle_job_id`, `burn_subtitles`,
+  `vertical`, `banner{major,minor}`, `with_subs`.
+- `_download_source(job_id, params, storage)` — chung cho
+  dub/stt/subtitle/render/summary khi dán link; file tải về tên cố định
+  `work/source.{ext}` → source_url/quality PHẢI trong vân tay
+  (`params_fingerprint` += source_url/quality/sub_source/tts_backend).
+
+### B2 — phụ đề YouTube sẵn có
+- `pipelines/youtube_subs.py` (port youtube_subtitle.go): chọn track
+  auto`-orig` → manual → auto; LOẠI track đã bị dịch (`tlang=` trong URL
+  caption); canonical lang iw→he, zh-hans→zh. Parser VTT tự viết (pysubs2 rối
+  với word-timestamp inline — cue đầu dòng `<ts>` bị missed-start); word-level
+  ghép câu + khử từ lặp cue rolling. `_youtube_transcript`: auto = lấy nếu có
+  không thì rơi Whisper; youtube = fail rõ; whisper = luôn nghe lại.
+  Captions vào dub → BỎ WHISPER, vẫn diarize.
+
+### B3+B4 — job `render`
+- `pipelines/render.py`: stage `prepare→subtitles→vertical→burn` (manifest
+  job_type="render", stage tắt KHÔNG mark). ASS 2 style 1 Dialogue
+  (`{\rMajor}…\N{\rMinor}`, port srt_embed.go:767-778), không ghi PlayResX/Y
+  (384×288 mặc định); wrap theo rune-width (port bảng hệ số) + MỞ RỘNG wrap
+  latin THEO TỪ. Vertical trước burn (phụ đề đo bề rộng theo frame dọc
+  720×1280). Banner Pillow→PNG→`overlay` qua `-filter_complex` (overlay là
+  filter 2 input — không nhét `-vf` được, gặp thật). crf 20 thay bitrate.
+  `render_fingerprint` SOI TOÀN BỘ material (params_fingerprint của dub bỏ
+  qua key lạ — bẫy thật).
+- Nguồn phụ đề: `subtitle_key` XOR `subtitle_job_id` (422 khi cả hai; job
+  phải done + cùng chủ + ext srt/vtt/ass).
+
+### B4b — dub with_subs + quyền đọc output phụ
+- dub kwarg `with_subs` → `bilingual.srt` sau mux (stage "subs"); KHÔNG nằm
+  trong vân tay (hàm thuần của translations — bật/tắt chỉ chạy thêm khâu).
+  `manifest.read_outputs(workdir)` accessor.
+- `_owns_media` THÊM HỌ KHOÁ `jobs/{job_id}/…` đối chiếu CHỦ JOB (output phụ
+  không là result_key của job nào — 404 trước đây với chính chủ). Test 2 chiều.
+
+### B5 — đa TTS provider 2 tầng
+- `providers/base.py`: `TTSOptions`/`TTSVoice`/`TTSEngine` (tầng 2 tùy chọn);
+  tầng 1 `TTSProvider.synthesize(text, voice)` giữ nguyên.
+- `providers/edge.py`: EdgeTTSEngine (asyncio.run bọc; mp3 24k → ffmpeg
+  48kHz mono wav; retry 3× backoff; list_voices cache 24h, vắng mạng KHÔNG
+  raise). `providers/tts_catalog.py`: PRESET_VOICES 3 backend + build_tts +
+  parse_voice_ref (LEGACY không dấu `:` = local — job cũ/giọng clone không vỡ)
+  + rotate_preset. Dub `tts_backend` + vân tay; `synthesize_with_voice(backend)`;
+  endpoint `GET /v1/tts/presets?lang=vi`.
+
+### B6 — job `summary`
+- `pipelines/summary.py` (port youwee ai.rs): ≤32k single-shot temp 0.7
+  truncate 8000; >32k chunk `\n\n`→câu→hard-cut → map tuần tự kèm
+  `<previous_part_summary>` temp 0.3 → reduce batch 8000 → compose. Chống
+  injection 3 lớp (Security rule ghim ĐẦU system prompt ở CODE; tag untrusted;
+  title tách riêng). `models.STAGES += "summarize"` +
+  `STAGE_FEATURES["summarize"]="text_generation"`. Prompt 3 key
+  summarize/summarize_map/summarize_compose. Checkpoint transcript.json —
+  retry không nghe lại. `get_result` ext "md" → kind text. prompt_id cho
+  summary (override single-shot; map/reduce giữ vai trò riêng).
+- `OpenAIChatProvider.complete(..., temperature=0.2)` kwarg mới — default
+  không đổi.
+
+### Endpoint + settings tổng hợp Giai đoạn B
+| Method | Path | Mô tả |
+|---|---|---|
+| POST | /v1/download/preview | Metadata link trước khi tải (title/duration/thumbnail) |
+| GET | /v1/tts/presets | Catalog giọng theo backend local/edge/cloud |

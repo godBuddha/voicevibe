@@ -170,6 +170,10 @@ __THEME_CSS__
       <a data-page="dub" onclick="go('dub')">🎬 Dịch video</a>
       <div class="group">AI Giọng nói &amp; Video</div>
       <a data-page="stt" onclick="go('stt')">📝 Chuyển giọng nói thành văn bản</a>
+      <a data-page="download" onclick="go('download')">⬇️ Tải video từ link</a>
+      <a data-page="render" onclick="go('render')">✂️ Xử lý video (phụ đề + 9:16)</a>
+      <div class="group">Tóm tắt</div>
+      <a data-page="summary" onclick="go('summary')">🗒️ Tóm tắt nội dung</a>
       <a class="soon" onclick="soon('Tạo video bằng AI')">🎥 Tạo video bằng AI</a>
       <a class="soon" onclick="soon('Thay đổi giọng nói')">🎚️ Thay đổi giọng nói</a>
       <div class="group">Khác</div>
@@ -328,6 +332,62 @@ __THEME_CSS__
       </div>
     </section>
 
+    <!-- DOWNLOAD (B1) -->
+    <section id="page-download" class="page">
+      <div class="card">
+        <h2>⬇️ Tải video từ link</h2>
+        <p class="mut">Dán link video (YouTube, TikTok…) — hệ tải về kho để dùng lại cho Lồng tiếng / Phụ đề / Tóm tắt. Giới hạn 2 giờ.</p>
+        <label>Link video</label>
+        <input id="dlurl" placeholder="https://…">
+        <div class="row"><div><label>Chất lượng</label>
+          <select id="dlq"><option value="1080">1080p</option><option value="720">720p</option><option value="480">480p</option><option value="audio">Chỉ âm thanh (MP3)</option></select></div></div>
+        <button class="go" onclick="submitDownload()">⬇️ Bắt đầu tải</button>
+        <div id="dlmsg" class="status"></div>
+      </div>
+    </section>
+
+    <!-- RENDER (B3+B4) -->
+    <section id="page-render" class="page">
+      <div class="card">
+        <h2>✂️ Xử lý video</h2>
+        <p class="mut">In phụ đề song ngữ 2 dòng + cắt dọc 9:16 + banner tiêu đề — gộp một job.</p>
+        <label>Video gốc</label>
+        <input type="file" id="rfile" accept="video/*">
+        <div class="row">
+          <div><label>In phụ đề</label><select id="rburn"><option value="0">Không</option><option value="1">Có — 2 dòng song ngữ</option></select></div>
+          <div><label>Cắt dọc 9:16</label><select id="rvert"><option value="1">Có (TikTok/Shorts)</option><option value="0">Không</option></select></div>
+        </div>
+        <div class="row">
+          <div><label>File phụ đề (khi bật In phụ đề)</label><input type="file" id="rsub" accept=".srt,.vtt,.ass"></div>
+          <div><label>Job phụ đề đã xong (thay file)</label><input id="rjob" placeholder="ID job phụ đề / lồng tiếng"></div>
+        </div>
+        <div class="row">
+          <div><label>Banner dòng chính (vàng lớn)</label><input id="rmajor" placeholder="Tiêu đề chính"></div>
+          <div><label>Banner dòng phụ (vàng nhỏ)</label><input id="rminor" placeholder="Tiêu đề phụ"></div>
+        </div>
+        <button class="go" onclick="submitRender()">✂️ Bắt đầu xử lý</button>
+        <div id="rmsg" class="status"></div>
+      </div>
+    </section>
+
+    <!-- SUMMARY (B6) -->
+    <section id="page-summary" class="page">
+      <div class="card">
+        <h2>🗒️ Tóm tắt nội dung</h2>
+        <p class="mut">Dán văn bản HOẶC chọn video/âm thanh (hoặc dán link ở ô dưới) — hệ tự nghe rồi tóm tắt, kèm mốc [giờ:phút:giây].</p>
+        <label>Văn bản cần tóm tắt (bỏ trống nếu dùng file/link)</label>
+        <textarea id="sumtext" rows="5" placeholder="Dán nội dung…"></textarea>
+        <label>Hoặc file video/âm thanh</label>
+        <input type="file" id="sumfile" accept="audio/*,video/*">
+        <label>Hoặc link video</label>
+        <input id="sumurl" placeholder="https://… (tùy chọn)">
+        <div class="row"><div><label>Tóm tắt bằng</label>
+          <select id="sumlang"><option value="vi">Tiếng Việt</option><option value="en">English</option></select></div></div>
+        <button class="go" onclick="submitSummary()">🗒️ Tóm tắt ngay</button>
+        <div id="summsg" class="status"></div>
+      </div>
+    </section>
+
     <!-- JOBS -->
     <section id="page-jobs" class="page">
       <div class="card">
@@ -398,7 +458,7 @@ const $ = (id) => document.getElementById(id);
 // Xác thực qua COOKIE PHIÊN do server đặt (HttpOnly) — JS không đọc/không lưu token.
 // `credentials:"same-origin"` để fetch gửi kèm cookie.
 const H = () => ({ "Content-Type": "application/json" });
-const PAGES = ["dashboard","dub","tts","voices","stt","subtitle","jobs","api","settings"];
+const PAGES = ["dashboard","dub","tts","voices","stt","subtitle","jobs","api","settings","download","render","summary"];
 let POLL = null, ME = {};
 
 function esc(s){ const d=document.createElement("div"); d.textContent=s==null?"":String(s); return d.innerHTML; }
@@ -486,7 +546,7 @@ async function loadUsage() {
   $("st-jobs").textContent = fmt(total);
   // Màu đọc từ CSS var -> tự đổi theo theme (không hardcode hex ở đây).
   const colors = chartColors();
-  const names = { tts:"TTS", stt:"STT", translate:"Dịch thuật", dub:"Dub video", subtitle:"Phụ đề", other:"Khác" };
+  const names = { tts:"TTS", stt:"STT", translate:"Dịch thuật", dub:"Dub video", subtitle:"Phụ đề", download:"Tải video", render:"Xử lý video", summary:"Tóm tắt", other:"Khác" };
   let html = "";
   for (const [t, n] of Object.entries(d.by_type)) {
     const c = colors[t.split("_")[0]] || vvCssVar("--chart-other");
@@ -619,6 +679,60 @@ async function submitSTT() {
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || r.status);
     flash("✔ Job " + d.job_id + " đã tạo. SRT sẽ hiện ở tab Jobs.");
+    go("jobs");
+  } catch (e) { flash("✗ " + e.message, "err"); }
+}
+
+async function submitDownload() {
+  flash("⏳ tạo job tải video…");
+  try {
+    const r = await fetch("/v1/jobs", { method:"POST", headers:H(), credentials:"same-origin", body: JSON.stringify({
+      type:"download", source_url: $("dlurl").value.trim(), quality: $("dlq").value }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || r.status);
+    flash("✔ Job " + d.job_id + " đã tạo — theo dõi ở tab Jobs.");
+    go("jobs");
+  } catch (e) { flash("✗ " + e.message, "err"); }
+}
+
+async function submitRender() {
+  flash("⏳ tạo job xử lý video…");
+  try {
+    const up = $("rfile").files[0] ? await uploadTo("/v1/media/upload", "rfile") : null;
+    const body = { type:"render",
+      burn_subtitles: $("rburn").value === "1",
+      vertical: $("rvert").value === "1" };
+    if (up) body.media_url = up.media_key;
+    if ($("rburn").value === "1") {
+      const sub = $("rsub").files[0] ? await uploadTo("/v1/media/upload", "rsub") : null;
+      if (sub) body.subtitle_key = sub.media_key;
+      else if ($("rjob").value.trim()) body.subtitle_job_id = $("rjob").value.trim();
+      else throw new Error("In phụ đề cần file phụ đề hoặc ID job phụ đề đã xong");
+    }
+    const major = $("rmajor").value.trim(), minor = $("rminor").value.trim();
+    if (major || minor) body.banner = { major: major, minor: minor };
+    const r = await fetch("/v1/jobs", { method:"POST", headers:H(), credentials:"same-origin", body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || r.status);
+    flash("✔ Job " + d.job_id + " đã tạo — theo dõi ở tab Jobs.");
+    go("jobs");
+  } catch (e) { flash("✗ " + e.message, "err"); }
+}
+
+async function submitSummary() {
+  flash("⏳ tạo job tóm tắt…");
+  try {
+    const body = { type:"summary", target_lang: $("sumlang").value };
+    if ($("sumtext").value.trim()) body.text = $("sumtext").value;
+    else if ($("sumurl").value.trim()) body.source_url = $("sumurl").value.trim();
+    else if ($("sumfile").files[0]) {
+      const up = await uploadTo("/v1/media/upload", "sumfile");
+      body.media_url = up.media_key;
+    } else throw new Error("Nhập văn bản, chọn file hoặc dán link");
+    const r = await fetch("/v1/jobs", { method:"POST", headers:H(), credentials:"same-origin", body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || r.status);
+    flash("✔ Job " + d.job_id + " đã tạo — kết quả ở tab Jobs.");
     go("jobs");
   } catch (e) { flash("✗ " + e.message, "err"); }
 }

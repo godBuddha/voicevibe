@@ -25,6 +25,10 @@ export default function Dub() {
   const { api } = useApi();
   const fileInputRef = useRef(null);
   const [file, setFile] = useState(null);
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [useYouTube, setUseYouTube] = useState(false);
+  const [withSubs, setWithSubs] = useState(false);
+  const [subSource, setSubSource] = useState('auto');
   const [fromLang, setFromLang] = useState('en');
   const [toLang, setToLang] = useState('vi');
   const [voiceOption, setVoiceOption] = useState('original');
@@ -97,25 +101,32 @@ export default function Dub() {
   };
 
   const startDub = async () => {
-    if (!file) return;
+    if (!file && !sourceUrl.trim()) return;
     setIsProcessing(true);
     setError(null);
     setJob(null);
     setResult(null);
     try {
-      // Chuẩn thật của backend: nộp file vào /v1/media/upload → nhận media_key,
-      // rồi tạo job JSON có `type`. (Trước đây nộp thẳng multipart không `type`
-      // → 422, nút bấm thành cờ mờ.)
-      const media_url = await uploadMedia(file);
+      // B1: dán link (yt-dlp tự tải) THAY cho upload file — file tải về có
+      // tên cố định work/source.{ext}, backend đọc qua source_url.
       const payload = {
         type: 'dub',
-        media_url,
         source_lang: fromLang,
         target_lang: toLang,
         // "Tách nhạc nền" = giữ âm thanh gốc nhỏ → source_low (Demucs); ngược
         // lại là im lặng tuyệt đối.
         background_mode: demucsEnabled ? 'source_low' : 'silence',
+        // B4b: xuất thêm phụ đề song ngữ kèm video (Render dùng lại được)
+        with_subs: withSubs,
+        // B2: phụ đề YouTube sẵn có khi dán link — auto: lấy nếu có
+        sub_source: sourceUrl.trim() ? subSource : 'whisper',
       };
+      if (sourceUrl.trim()) {
+        payload.source_url = sourceUrl.trim();
+      } else {
+        // Chuẩn thật của backend: nộp file vào /v1/media/upload → media_key
+        payload.media_url = await uploadMedia(file);
+      }
       // Chọn giọng riêng → map MỌI người nói về một giọng ("*" = áp cho tất cả;
       // UI không biết trước id speaker vì diarization chạy sau khi job bắt đầu).
       if (voiceOption === 'clone' && cloneVoice) {
@@ -313,6 +324,60 @@ export default function Dub() {
             </div>
           </div>
 
+          {/* B1 — dán link thay file upload (yt-dlp tự tải) */}
+          <div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', marginBottom: '8px' }}>
+              <input
+                type="checkbox"
+                checked={sourceUrl.trim() !== '' || useYouTube}
+                onChange={(e) => {
+                  setUseYouTube(e.target.checked);
+                  if (e.target.checked) setFile(null);
+                }}
+                style={{ margin: 0 }}
+              />
+              <span style={{ fontSize: 'var(--text-base)', fontWeight: 600 }}>
+                Dùng video từ link (YouTube…)
+              </span>
+            </label>
+            {(sourceUrl.trim() !== '' || useYouTube) && (
+              <>
+                <input
+                  value={sourceUrl}
+                  onChange={(e) => setSourceUrl(e.target.value)}
+                  placeholder="https://www.youtube.com/watch?v=…"
+                  style={{
+                    width: '100%', padding: '8px 10px', borderRadius: 'var(--radius)',
+                    border: '1px solid var(--border)', background: 'var(--bg)',
+                    color: 'var(--text)', fontSize: 'var(--text-sm)',
+                  }}
+                />
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginTop: '8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={withSubs}
+                    onChange={(e) => setWithSubs(e.target.checked)}
+                    style={{ margin: 0 }}
+                  />
+                  <span style={{ fontSize: 'var(--text-sm)' }}>
+                    Xuất thêm phụ đề song ngữ kèm video (dùng cho Xử lý video)
+                  </span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginTop: '6px' }}>
+                  <input
+                    type="checkbox"
+                    checked={subSource !== 'whisper'}
+                    onChange={(e) => setSubSource(e.target.checked ? 'auto' : 'whisper')}
+                    style={{ margin: 0 }}
+                  />
+                  <span style={{ fontSize: 'var(--text-sm)' }}>
+                    Dùng phụ đề YouTube sẵn có nếu video có (bỏ qua nghe lại — nhanh hơn nhiều)
+                  </span>
+                </label>
+              </>
+            )}
+          </div>
+
           {/* Demucs toggle */}
           <div>
             <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
@@ -331,7 +396,7 @@ export default function Dub() {
           {/* Start button */}
           <div>
             <button
-              disabled={!file || isProcessing || (voiceOption === 'clone' && !cloneVoice)}
+              disabled={(!file && !sourceUrl.trim()) || isProcessing || (voiceOption === 'clone' && !cloneVoice)}
               onClick={startDub}
               style={{
                 background: 'var(--gradient)',

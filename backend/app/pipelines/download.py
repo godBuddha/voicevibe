@@ -73,6 +73,9 @@ ERROR_MAP: list[tuple[str, str]] = [
      "yt-dlp đã quá cũ. Cập nhật trong container: pip install -U yt-dlp"),
     ("sign in to confirm your age",
      "Video giới hạn độ tuổi — cần cookies đăng nhập (Cài đặt → Tải video từ link)."),
+    ("sign in to confirm",
+     "YouTube yêu cầu xác thực (chống bot) — cần cookies đăng nhập "
+     "(Cài đặt → Tải video từ link)."),
     ("private video",
      "Video riêng tư — cần cookies đăng nhập (Cài đặt → Tải video từ link)."),
     ("members-only", "Video chỉ dành cho thành viên trả phí của kênh."),
@@ -133,6 +136,20 @@ def cookies_ok(path: str | None) -> bool:
         return False
 
 
+def _yt_extractor_args(url: str) -> list[str]:
+    """Trick youwee (extractor-args) — YouTube chặn IP datacenter không cookie
+    với client web mặc định ("Sign in to confirm you're not a bot"). Client
+    `android` vẫn tải được ẩn danh (đã kiểm thật 03/10 với "Me at the zoo" —
+    tv/ios/web_embedded đều chết). Chỉ áp cho youtube/youtu.be; site khác
+    không đụng (nguyên tắc: yt-dlp quyết định)."""
+    from urllib.parse import urlparse
+
+    host = (urlparse(url).hostname or "").lower()
+    if host in ("youtube.com", "www.youtube.com", "youtu.be", "m.youtube.com"):
+        return ["--extractor-args", "youtube:player_client=android"]
+    return []
+
+
 def build_argv(url: str, dest_dir: str, quality: str, *,
                cookies_file: str | None = None, proxy: str | None = None) -> list[str]:
     """Lệnh yt-dlp đầy đủ. `--newline` để mỗi progress là MỘT dòng (parse %)."""
@@ -154,6 +171,7 @@ def build_argv(url: str, dest_dir: str, quality: str, *,
         argv += ["--cookies", cookies_file]
     if proxy:
         argv += ["--proxy", proxy]
+    argv += _yt_extractor_args(url)
     argv.append(url)
     return argv
 
@@ -167,6 +185,7 @@ def probe_argv(url: str, *, cookies_file: str | None = None,
         argv += ["--cookies", cookies_file]
     if proxy:
         argv += ["--proxy", proxy]
+    argv += _yt_extractor_args(url)
     argv.append(url)
     return argv
 
@@ -465,7 +484,8 @@ def selftest() -> None:
     print("DOWNLOAD SELFTEST PASSED")
 
 
-def raise_cancel():
+def raise_cancel(argv=None):
+    """Runner giả ném hủy ngay khi được gọi — khớp contract runner(argv)."""
     raise JobCancelled("hủy trong lúc tải")
 
 

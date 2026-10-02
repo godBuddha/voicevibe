@@ -762,6 +762,26 @@ const FLOWS = [
     rec.steps.push({ action: 'xem nhật ký kiểm toán', detail: `có dòng: ${hasRows}, không lộ secret: ${noAdminLeak}`, ok: rec.ok });
   }),
 
+  flow('f-gb-nav', { expect: true }, async (page, rec) => {
+    // Giai đoạn B: 3 trang mới render + form đúng cấu trúc (không bấm submit —
+    // tạo job thật với link giả sẽ fail, chỉ kiểm giao diện + chuyển trang).
+    let okAll = true; const seen = [];
+    for (const [route, mustHave] of [
+      ['/download', ['Tải video từ link', 'Chất lượng']],
+      ['/render', ['Xử lý video', 'Cắt dọc 9:16']],
+      ['/summary', ['Tóm tắt nội dung', 'Tóm tắt ngay']],
+    ]) {
+      await page.goto(`${BASE}${route}`, { waitUntil: 'networkidle2', timeout: 30000 });
+      await sleep(500);
+      const body = await page.evaluate(() => document.body.innerText);
+      const ok = mustHave.every((t) => body.includes(t));
+      seen.push(`${route}:${ok ? 'ok' : 'thiếu ' + mustHave.join(',')}`);
+      okAll = okAll && ok;
+    }
+    rec.ok = okAll;
+    rec.steps.push({ action: 'dò 3 trang mới', detail: seen.join(' | '), ok: rec.ok });
+  }),
+
   flow('f-logout', { expect: true }, async (page, rec) => {
     await page.goto(`${BASE}/`, { waitUntil: 'networkidle2', timeout: 30000 });
     await sleep(500);
@@ -793,6 +813,9 @@ const NAV_ROUTES = [
   ['04-voices', '/voices', true, null],
   ['05-stt', '/stt', true, null],
   ['06-subtitle', '/subtitle', true, null],
+  ['06b-download', '/download', true, null],
+  ['06c-render', '/render', true, null],
+  ['06d-summary', '/summary', true, null],
   ['07-jobs', '/jobs', true, null],
   ['08-api-keys', '/api-keys', true, null],
   ['10-admin-users', '/settings/members', true, null],

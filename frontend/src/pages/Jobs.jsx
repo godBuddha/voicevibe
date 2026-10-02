@@ -122,6 +122,9 @@ export default function Jobs() {
     stt: { label: 'STT', icon: '🎙️' },
     subtitle: { label: 'Phụ đề', icon: '🎞️' },
     translate: { label: 'Dịch', icon: '🌐' },
+    download: { label: 'Tải video', icon: '⬇️' },
+    render: { label: 'Xử lý video', icon: '🎞️' },
+    summary: { label: 'Tóm tắt', icon: '📝' },
   };
 
   // % hiển thị an toàn (trước đây toFixed trên giá trị lạ → NaN% trên UI).

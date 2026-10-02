@@ -12,6 +12,9 @@ import {
   KeyRound,
   Settings,
   AudioWaveform,
+  Download,
+  Scissors,
+  NotebookText,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth.jsx';
 
@@ -45,9 +48,16 @@ const navigation = [
     heading: 'AI GIỌI NÓI & VIDEO',
     items: [
       { label: 'Chuyển giọng nói thành văn bản', to: '/stt', Icon: FileText },
-      // Hai mục mock "Tạo video bằng AI" và "Thay đổi giọng nói" đã bỏ —
-      // backend không có pipeline nào cho chúng, giữ lại chỉ tạo link chết
-      // (đã gặp thật với "Chuyển phụ đề thành giọng nói").
+      // Giai đoạn B — tính năng mới có pipeline thật (download/render/summary
+      // jobs); các mục mock cũ không pipeline đã bỏ và giữ nguyên lý do.
+      { label: 'Tải video từ link', to: '/download', Icon: Download },
+      { label: 'Xử lý video (phụ đề + 9:16)', to: '/render', Icon: Scissors },
+    ],
+  },
+  {
+    heading: 'TÓM TẮT',
+    items: [
+      { label: 'Tóm tắt nội dung', to: '/summary', Icon: NotebookText },
     ],
   },
 ];

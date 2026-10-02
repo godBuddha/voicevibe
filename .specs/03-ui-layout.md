@@ -78,3 +78,26 @@ trong tab Cấu hình + cột Người dùng hiển thị tên.
   (failed/cancelled) trong hàng đầu card; stage hiện cạnh pill trạng thái.
 - Sửa tiện: 3 chuỗi flash UI inline còn ghi "−{credits_charged} credits" (trường
   đã gỡ từ 3577ef1) → chỉ flash "Job đã tạo".
+
+## Giai đoạn B — 3 trang mới + ô link (03/10)
+
+- **Tải video từ link (/download)**: ô URL + nút Xem trước (metadata
+  title/thumbnail/duration từ /v1/download/preview) + dropdown chất lượng
+  (1080/720/480/audio) + nút tải; job chạy → theo dõi ở trang Jobs. Lỗi yt-dlp
+  hiển thị nguyên văn (đã dịch tiếng Việt ở ERROR_MAP).
+- **Xử lý video (/render)**: 3 bật/tắt gộp một job — In phụ đề song ngữ 2 dòng
+  (nguồn: file .srt/.vtt/.ass HOẶC ID job phụ đề/lồng tiếng đã xong), cắt dọc
+  9:16, banner 2 dòng (major/minor). Video upload; kết quả phát video + nút tải.
+- **Tóm tắt nội dung (/summary)**: 3 tab nguồn (Văn bản / File video-âm thanh /
+  Từ link) + chọn ngôn ngữ tóm tắt; kết quả Markdown render đậm/đề mục/bullet +
+  nút tải .md; mốc [hh:mm:ss] giữ nguyên để nhảy tới video.
+- **Ô link trong trang Lồng tiếng + Dịch phụ đề**: checkbox "Dùng video từ link"
+  → ô URL thay upload; Dub thêm bật/tắt "Xuất thêm phụ đề song ngữ kèm video"
+  (with_subs) + "Dùng phụ đề YouTube sẵn có nếu có" (sub_source auto/whisper);
+  Subtitle thêm dropdown phụ đề YouTube (auto/youtube/whisper) khi dán link.
+- adapt.js TYPE_LABELS += download/render/summary; nhãn job = download_title
+  (tiêu đề tải được) → source_url basename → text → typeLabel. Jobs.jsx mapType
+  += 3 loại (⬇️/🎞️/📝). Sidebar: nhóm "AI GIỌI NÓI & VIDEO" thêm Tải video +
+  Xử lý video; nhóm mới "TÓM TẮT" (lucide Download/Scissors/NotebookText).
+- UI inline: PAGES 9→12 trang (guard test_ui_js bijection) + nav 3 mục + 3
+  section form tối giản (submit → flash job_id → nhảy tab Jobs) + chart names.

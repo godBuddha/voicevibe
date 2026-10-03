@@ -233,4 +233,60 @@ finally:
     YT.fetch_captions = real_fetch
 print("7. youtube-only không caption → failed rõ ràng .... OK")
 
+# ------- 8. GB8 — công tắc use_cookies: 2 lựa chọn ngay trong giao diện
+from app.settings_service import delete_setting, set_setting  # noqa: E402
+
+# 8a. bật cookies mà admin chưa cấu hình → 422 LÚC TẠO JOB (không để job
+# chạy nửa chừng mới chết) + preview cũng 422 cùng thông điệp.
+delete_setting("download.cookies_file")
+r = c.post("/v1/jobs", json={"type": "download",
+                             "source_url": "https://x.test/v",
+                             "quality": "720", "use_cookies": True})
+assert r.status_code == 422, r.text
+assert "cookies" in r.json()["detail"].lower(), r.text
+r = c.post("/v1/download/preview",
+           json={"url": "https://x.test/v", "use_cookies": True})
+assert r.status_code == 422, r.text
+
+# 8b. cookies đã cấu hình: use_cookies=True → ensure_downloaded NHẬN file;
+#     mặc định (tắt) → cookies_file=None DÙ cookies đã cấu hình (ẩn danh là
+#     an toàn hơn cho tài khoản Google — không dùng cookies vô tình).
+ck_path = os.path.join(str(WORK), "ck.txt")
+with open(ck_path, "w") as f:
+    f.write("# Netscape HTTP Cookie File\n.x.test\tTRUE\t/\tFALSE\t0\tSID\tx\n")
+set_setting("download.cookies_file", ck_path)
+_ck_seen: list = []
+
+
+def ensure_cookies_capture(url, workdir, quality="1080", *, progress_cb=None,
+                           cookies_file=None, **_kw):
+    _ck_seen.append(cookies_file)
+    return fake_ensure(url, workdir, quality, progress_cb=progress_cb)
+
+
+real_ensure = DLM.ensure_downloaded
+DLM.ensure_downloaded = ensure_cookies_capture
+try:
+    r = c.post("/v1/jobs", json={"type": "download",
+                                 "source_url": "https://x.test/v",
+                                 "quality": "720", "use_cookies": True})
+    assert r.status_code in (200, 202), r.text
+    JC = r.json()["job_id"]
+    d = c.get(f"/v1/jobs/{JC}").json()
+    assert d["status"] == "done", d
+    assert _ck_seen[-1] == ck_path, _ck_seen
+
+    r = c.post("/v1/jobs", json={"type": "download",
+                                 "source_url": "https://x.test/v",
+                                 "quality": "480"})  # mặc định KHÔNG cookies
+    assert r.status_code in (200, 202), r.text
+    JA = r.json()["job_id"]
+    d = c.get(f"/v1/jobs/{JA}").json()
+    assert d["status"] == "done", d
+    assert _ck_seen[-1] is None, "tắt công tắc phải tải ẩn danh"
+finally:
+    DLM.ensure_downloaded = real_ensure
+    delete_setting("download.cookies_file")
+print("8. công tắc cookies: 422 thiếu cấu hình + ẩn danh mặc định OK")
+
 print("URL JOBS SUITE PASSED")

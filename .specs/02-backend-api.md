@@ -226,23 +226,32 @@ setting.*, key.*, prompt.*, job.*, config.import).
   `start_new_session=True` + `os.killpg` khi hủy (yt-dlp mồ côi = rác .part).
   FORMAT_LADDER (port youwee format.rs): 1080/720/480 mp4-m4a, audio mp3.
   ERROR_MAP ~20 substring → message tiếng Việt có gợi ý. `ensure_downloaded`
-  ghi marker `download.json` (url+quality+file size>0) trong workdir bền —
-  retry KHÔNG tải lại. Gate duration ≤ 7200s kiểm bằng Python SAU probe
+  ghi marker `download.json` (url+quality+cookies+file size>0) trong workdir
+  bền — retry KHÔNG tải lại; **đổi chế độ cookies giữa chừng → tải lại**
+  (marker ẩn danh không được reuse thành "đã có bản cookies"; marker cũ
+  trước GB8 không có khoá `cookies` — coi như ẩn danh, nâng cấp không phá
+  resume). Gate duration ≤ 7200s kiểm bằng Python SAU probe
   (match_filter chỉ "skip" + exit 0 — job tưởng thành công). URL validate
   http(s), từ chối `-`. Cookie chỉ nhận khi dòng đầu đúng `# Netscape HTTP
   Cookie File` (port youtube_cookies.go).
 - Endpoint: `POST /v1/download/preview` (auth, rate 20/phút, timeout 60s) —
-  `{url}` → `{title, duration, thumbnail, uploader, webpage_url, ext}`.
+  `{url, use_cookies}` → `{title, duration, thumbnail, uploader, webpage_url,
+  ext}`; `use_cookies=true` mà chưa cấu hình cookies → 422.
 - Settings: `download.cookies_file` (path Netscape, không secret),
   `download.proxy` (secret).
 - JobIn mới (khai tường minh — bài học pydantic nuốt âm thầm): `source_url`,
-  `quality`, `sub_source` (auto|youtube|whisper), `tts_backend`
+  `quality`, **`use_cookies` (GB8: mặc định FALSE — tải ẨN DANH; TRUE thì
+  dùng cookies file đã cấu hình, chưa cấu hình → 422 lúc tạo job)**,
+  `sub_source` (auto|youtube|whisper), `tts_backend`
   (local|edge|cloud), `subtitle_key`, `subtitle_job_id`, `burn_subtitles`,
   `vertical`, `banner{major,minor}`, `with_subs`.
 - `_download_source(job_id, params, storage)` — chung cho
-  dub/stt/subtitle/render/summary khi dán link; file tải về tên cố định
+  dub/stt/subtitle/render/summary khi dán link; cookies CHỈ truyền khi
+  `params.use_cookies` (mặc định ẩn danh — an toàn tài khoản Google, khó
+  bị YouTube flag IP); file tải về tên cố định
   `work/source.{ext}` → source_url/quality PHẢI trong vân tay
-  (`params_fingerprint` += source_url/quality/sub_source/tts_backend).
+  (`params_fingerprint` += source_url/quality/sub_source/tts_backend;
+  `use_cookies` CỐ Ý KHÔNG nằm trong vân tay — retry reuse file đã tải).
 
 ### B2 — phụ đề YouTube sẵn có
 - `pipelines/youtube_subs.py` (port youtube_subtitle.go): chọn track

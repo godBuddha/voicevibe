@@ -174,6 +174,12 @@ class JobIn(BaseModel):
         None, description="link video/âm thanh (dán link) — tải bằng yt-dlp")
     quality: str = Field(
         "1080", description="download: 1080 | 720 | 480 | audio")
+    use_cookies: bool = Field(
+        False, description="B1/GB8: công tắc cookies — TẮT (mặc định): tải "
+                           "ẨN DANH (an toàn cho tài khoản Google; public "
+                           "video tải được); BẬT: tải bằng file cookies "
+                           "admin đặt ở Cài đặt → tải video (video riêng "
+                           "tư / giới hạn tuổi / HD ổn định)")
     sub_source: str = Field(
         "auto", description="dán link YouTube — auto (mặc định): lấy phụ đề "
                             "sẵn có nếu video có, không thì tự nghe lại; "
@@ -244,6 +250,15 @@ def create_job(
             job.source_url = _download_validate_url(job.source_url)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if job.use_cookies and job.source_url:
+        # GB8 — công tắc cookies: bật mà admin chưa cấu hình file cookies thì
+        # chặn LÚC TẠO JOB (user không phải chờ job chạy nửa chừng mới chết).
+        if not get_setting("download.cookies_file"):
+            raise HTTPException(
+                status_code=422,
+                detail="Đã bật 'Dùng cookies đăng nhập' nhưng quản trị viên "
+                       "chưa đặt file cookies — vào Cài đặt → Tải video từ "
+                       "link (định dạng Netscape)")
     if job.type == "subtitle":
         # Kiểm cấu hình TRƯỚC khi tạo job — cùng nguyên tắc với quyền sở hữu voice
         # bên dưới: cấu hình sai phải bị chặn lúc tạo job, không phải để worker fail.
@@ -637,6 +652,9 @@ def app_page(request: Request, db: Session = Depends(get_db)):
 
 class DownloadPreviewIn(BaseModel):
     url: str
+    use_cookies: bool = Field(
+        False, description="GB8: xem metadata bằng cookies (video riêng tư / "
+                           "giới hạn tuổi không xem trước được ẩn danh)")
 
 
 @app.post("/v1/download/preview")
@@ -653,9 +671,18 @@ def download_preview(body: DownloadPreviewIn, user: User = Depends(auth),
     from .pipelines.download import probe
     from .settings_service import get_setting
 
+    cookies_file = (get_setting("download.cookies_file") or None)
+    if body.use_cookies and not cookies_file:
+        # GB8 — cùng thông điệp với create_job: chặn trước, không probe phí.
+        raise HTTPException(
+            status_code=422,
+            detail="Đã bật 'Dùng cookies đăng nhập' nhưng quản trị viên chưa "
+                   "đặt file cookies — vào Cài đặt → Tải video từ link "
+                   "(định dạng Netscape)")
+
     try:
         return probe(body.url,
-                     cookies_file=get_setting("download.cookies_file") or None,
+                     cookies_file=cookies_file if body.use_cookies else None,
                      proxy=get_setting("download.proxy") or None)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

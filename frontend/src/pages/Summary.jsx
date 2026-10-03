@@ -29,6 +29,7 @@ export default function Summary() {
   const [file, setFile] = useState(null);
   const [url, setUrl] = useState('');
   const [target, setTarget] = useState('vi');
+  const [useCookies, setUseCookies] = useState(false); // GB8 — tải bằng cookies
   const [job, setJob] = useState(null);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
@@ -39,7 +40,8 @@ export default function Summary() {
     setResult(null);
     setBusy(true);
     try {
-      const payload = { type: 'summary', target_lang: target };
+      const payload = { type: 'summary', target_lang: target,
+                        use_cookies: useCookies };
       if (mode === 'text' && text.trim()) {
         payload.text = text;
       } else if (url.trim()) {
@@ -137,8 +139,25 @@ export default function Summary() {
         </div>
       )}
       {mode === 'url' && (
-        <input value={url} onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://… (link video)" style={{ ...inputStyle, width: '100%', marginBottom: '14px' }} />
+        <>
+          <input value={url} onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://… (link video)" style={{ ...inputStyle, width: '100%', marginBottom: '8px' }} />
+          {/* GB8 — công tắc cookies cho link dán */}
+          <label
+            title="Tắt: tải ẩn danh (public video tải được, an toàn hơn). Bật: dùng cookies admin đặt ở Cài đặt — bắt buộc với video riêng tư / giới hạn tuổi."
+            style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '14px' }}
+          >
+            <input
+              type="checkbox"
+              checked={useCookies}
+              onChange={(e) => setUseCookies(e.target.checked)}
+              style={{ margin: 0 }}
+            />
+            <span style={{ fontSize: 'var(--text-sm)' }}>
+              Tải bằng cookies đăng nhập (video riêng tư / giới hạn tuổi)
+            </span>
+          </label>
+        </>
       )}
 
       <button

@@ -26,6 +26,7 @@ export default function Subtitle() {
   const [resultKey, setResultKey] = useState(null);
   const [sourceUrl, setSourceUrl] = useState('');
   const [subSource, setSubSource] = useState('auto');
+  const [useCookies, setUseCookies] = useState(false); // GB8 — tải bằng cookies
 
   const handleFile = (f) => {
     if (f && (f.type.startsWith('video/') || f.type.startsWith('audio/'))) {
@@ -48,6 +49,7 @@ export default function Subtitle() {
         type: 'subtitle', format: exportFormat,
         bilingual: isBilingual, show_speaker: true,
         sub_source: sourceUrl.trim() ? subSource : 'whisper',
+        use_cookies: useCookies, // GB8 — mặc định ẩn danh, bật thì dùng cookies
       };
       if (sourceUrl.trim()) payload.source_url = sourceUrl.trim();
       else payload.media_url = await uploadMedia(file);
@@ -171,6 +173,24 @@ export default function Subtitle() {
                 <option value="whisper">Luôn tự nghe lại</option>
               </select>
             </div>
+          )}
+
+          {/* GB8 — công tắc cookies cho link dán (chỉ hiện khi có link) */}
+          {!!sourceUrl.trim() && (
+            <label
+              title="Tắt: tải ẩn danh (public video tải được, an toàn hơn). Bật: dùng cookies admin đặt ở Cài đặt — bắt buộc với video riêng tư / giới hạn tuổi."
+              style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: '10px' }}
+            >
+              <input
+                type="checkbox"
+                checked={useCookies}
+                onChange={(e) => setUseCookies(e.target.checked)}
+                style={{ margin: 0 }}
+              />
+              <span style={{ fontSize: 'var(--text-sm)' }}>
+                Tải bằng cookies đăng nhập (video riêng tư / giới hạn tuổi)
+              </span>
+            </label>
           )}
 
           {/* Upload */}

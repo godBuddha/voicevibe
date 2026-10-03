@@ -27,6 +27,7 @@ export default function Dub() {
   const [file, setFile] = useState(null);
   const [sourceUrl, setSourceUrl] = useState('');
   const [useYouTube, setUseYouTube] = useState(false);
+  const [useCookies, setUseCookies] = useState(false); // GB8 — tải bằng cookies
   const [withSubs, setWithSubs] = useState(false);
   const [subSource, setSubSource] = useState('auto');
   const [fromLang, setFromLang] = useState('en');
@@ -120,6 +121,8 @@ export default function Dub() {
         with_subs: withSubs,
         // B2: phụ đề YouTube sẵn có khi dán link — auto: lấy nếu có
         sub_source: sourceUrl.trim() ? subSource : 'whisper',
+        // GB8: cookies chỉ khi job yêu cầu — mặc định tải ẩn danh
+        use_cookies: useCookies,
       };
       if (sourceUrl.trim()) {
         payload.source_url = sourceUrl.trim();
@@ -372,6 +375,21 @@ export default function Dub() {
                   />
                   <span style={{ fontSize: 'var(--text-sm)' }}>
                     Dùng phụ đề YouTube sẵn có nếu video có (bỏ qua nghe lại — nhanh hơn nhiều)
+                  </span>
+                </label>
+                {/* GB8 — công tắc cookies cạnh ô link */}
+                <label
+                  title="Tắt: tải ẩn danh (public video tải được, an toàn hơn). Bật: dùng cookies admin đặt ở Cài đặt — bắt buộc với video riêng tư / giới hạn tuổi."
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginTop: '6px' }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={useCookies}
+                    onChange={(e) => setUseCookies(e.target.checked)}
+                    style={{ margin: 0 }}
+                  />
+                  <span style={{ fontSize: 'var(--text-sm)' }}>
+                    Tải bằng cookies đăng nhập (video riêng tư / giới hạn tuổi)
                   </span>
                 </label>
               </>

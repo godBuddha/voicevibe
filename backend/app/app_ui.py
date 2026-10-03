@@ -341,6 +341,9 @@ __THEME_CSS__
         <input id="dlurl" placeholder="https://…">
         <div class="row"><div><label>Chất lượng</label>
           <select id="dlq"><option value="1080">1080p</option><option value="720">720p</option><option value="480">480p</option><option value="audio">Chỉ âm thanh (MP3)</option></select></div></div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer" title="Tắt: tải ẩn danh (public video tải được, an toàn hơn). Bật: dùng cookies admin đặt ở Cài đặt — bắt buộc với video riêng tư / giới hạn tuổi.">
+          <input type="checkbox" id="dlcookies" style="margin:0">
+          <span>Dùng cookies đăng nhập (video riêng tư / giới hạn tuổi — mặc định tải ẩn danh)</span></label>
         <button class="go" onclick="submitDownload()">⬇️ Bắt đầu tải</button>
         <div id="dlmsg" class="status"></div>
       </div>
@@ -381,6 +384,9 @@ __THEME_CSS__
         <input type="file" id="sumfile" accept="audio/*,video/*">
         <label>Hoặc link video</label>
         <input id="sumurl" placeholder="https://… (tùy chọn)">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer" title="Tắt: tải ẩn danh (public video tải được, an toàn hơn). Bật: dùng cookies admin đặt ở Cài đặt — bắt buộc với video riêng tư / giới hạn tuổi.">
+          <input type="checkbox" id="sumcookies" style="margin:0">
+          <span>Dùng cookies đăng nhập cho link (video riêng tư / giới hạn tuổi)</span></label>
         <div class="row"><div><label>Tóm tắt bằng</label>
           <select id="sumlang"><option value="vi">Tiếng Việt</option><option value="en">English</option></select></div></div>
         <button class="go" onclick="submitSummary()">🗒️ Tóm tắt ngay</button>
@@ -687,7 +693,8 @@ async function submitDownload() {
   flash("⏳ tạo job tải video…");
   try {
     const r = await fetch("/v1/jobs", { method:"POST", headers:H(), credentials:"same-origin", body: JSON.stringify({
-      type:"download", source_url: $("dlurl").value.trim(), quality: $("dlq").value }) });
+      type:"download", source_url: $("dlurl").value.trim(), quality: $("dlq").value,
+      use_cookies: $("dlcookies").checked }) });
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || r.status);
     flash("✔ Job " + d.job_id + " đã tạo — theo dõi ở tab Jobs.");
@@ -722,7 +729,8 @@ async function submitRender() {
 async function submitSummary() {
   flash("⏳ tạo job tóm tắt…");
   try {
-    const body = { type:"summary", target_lang: $("sumlang").value };
+    const body = { type:"summary", target_lang: $("sumlang").value,
+                   use_cookies: $("sumcookies").checked };
     if ($("sumtext").value.trim()) body.text = $("sumtext").value;
     else if ($("sumurl").value.trim()) body.source_url = $("sumurl").value.trim();
     else if ($("sumfile").files[0]) {

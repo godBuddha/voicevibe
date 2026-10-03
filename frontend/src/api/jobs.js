@@ -41,8 +41,10 @@ export async function pollJob(jobId, { onUpdate, timeoutMs = 600000, intervalMs 
 
 // B1 — xem metadata link TRƯỚC khi tạo job (title/thumbnail/duration).
 // Lỗi → ném lỗi có message thân thiện từ ERROR_MAP (UI hiển thị nguyên văn).
-export async function downloadPreview(url) {
-  return api.post('/v1/download/preview', { body: { url } });
+export async function downloadPreview(url, useCookies = false) {
+  // GB8: use_cookies — xem metadata bằng cookies (video riêng tư / giới hạn
+  // tuổi không xem trước được ẩn danh).
+  return api.post('/v1/download/preview', { body: { url, use_cookies: useCookies } });
 }
 
 // B5 — catalog giọng đọc theo backend (local VieNeu / edge / cloud).

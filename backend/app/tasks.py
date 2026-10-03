@@ -124,7 +124,11 @@ def _download_source(job_id: str, params: dict, storage) -> str:
         url, work_dir(job_id), params.get("quality") or "1080",
         progress_cb=lambda pct, msg: _record_progress(job_id, pct, msg),
         abort_check=_abort_probe(job_id),
-        cookies_file=get_setting_safe("download.cookies_file") or None,
+        # GB8: cookies CHỈ dùng khi job yêu cầu (use_cookies=True) — mặc định
+        # tải ẩn danh (an toàn hơn cho tài khoản Google của admin; YouTube
+        # cũng khó flag IP hơn). File cookies nằm ở Cài đặt → tải video.
+        cookies_file=(get_setting_safe("download.cookies_file") or None)
+        if params.get("use_cookies") else None,
         proxy=get_setting_safe("download.proxy") or None,
     )
     return os.path.join(work_dir(job_id), f"source.{marker.get('ext') or 'mp4'}")
@@ -412,7 +416,8 @@ def _run_download(job_id: str, params: dict) -> dict:
             url, work_dir(job_id), quality,
             progress_cb=lambda pct, msg: _record_progress(job_id, pct, msg),
             abort_check=_abort_probe(job_id),
-            cookies_file=get_setting("download.cookies_file") or None,
+            cookies_file=(get_setting("download.cookies_file") or None)
+            if params.get("use_cookies") else None,
             proxy=get_setting("download.proxy") or None,
         )
         ext = marker.get("ext") or "mp4"

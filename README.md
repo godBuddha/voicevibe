@@ -98,11 +98,13 @@ Kiểm chứng trên GPU thật: `docs/verification/subtitle.{srt,vtt,ass}` và
 | B6 | **AI tóm tắt** video/âm thanh/văn bản | `/summary` — map-reduce xử lý được transcript dài cả giờ; kết quả Markdown kèm mốc [hh:mm:ss]; chống prompt injection 3 lớp |
 
 Ghi chú vận hành: tải video YouTube **không cần đăng nhập** — hệ tự dùng
-client `android` của yt-dlp (đã kiểm chứng thật trên IP nhà dân). YouTube
-thi thoảng "flag" máy chủ nếu gọi dồn dập → lỗi bot-check là TẠM THỜI, đợi
-vài phút rồi Chạy lại là được; cookies chỉ bắt buộc với video riêng tư /
-giới hạn độ tuổi / muốn chất lượng cao ổn định — quản trị viên đặt file
-`cookies.txt` (định dạng Netscape) và proxy ở **Cài đặt → tải video**.
+client `android` của yt-dlp (đã kiểm chứng thật trên IP nhà dân) và **mặc định
+tải ẨN DANH** (an toàn cho tài khoản Google). Mỗi nơi dán link đều có công
+tắc **"Dùng cookies đăng nhập"** để chọn chế độ 2 chiều: bật lên cho video
+riêng tư / giới hạn độ tuổi (bật mà admin chưa cấu hình thì hệ chặn ngay khi
+tạo job). YouTube thi thoảng "flag" máy chủ nếu gọi dồn dập → lỗi bot-check
+là TẠM THỜI, đợi vài phút rồi Chạy lại là được; file `cookies.txt` (Netscape)
+và proxy đặt ở **Cài đặt → tải video**.
 Model cho Tóm tắt gán ở **Model Hub → công đoạn "summarize"** (mặc định dùng
 bộ model Dịch thuật). Đa giọng đọc edge có ToS Microsoft — mặc định hệ
 vẫn là local VieNeu.

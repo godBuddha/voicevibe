@@ -20,6 +20,7 @@ const fmtDur = (s) => {
 export default function Download() {
   const [url, setUrl] = useState('');
   const [quality, setQuality] = useState('1080');
+  const [useCookies, setUseCookies] = useState(false);
   const [preview, setPreview] = useState(null);
   const [probing, setProbing] = useState(false);
   const [job, setJob] = useState(null);
@@ -31,7 +32,7 @@ export default function Download() {
     setPreview(null);
     setError(null);
     try {
-      setPreview(await downloadPreview(url.trim()));
+      setPreview(await downloadPreview(url.trim(), useCookies));
     } catch (e) {
       setError(e.message);
     } finally {
@@ -45,6 +46,7 @@ export default function Download() {
     try {
       const created = await createJob({
         type: 'download', source_url: url.trim(), quality,
+        use_cookies: useCookies,
       });
       const done = await pollJob(created.jobId, {
         onUpdate: setJob, timeoutMs: 45 * 60 * 1000,
@@ -129,6 +131,23 @@ export default function Download() {
             <option key={q.v} value={q.v}>{q.label}</option>
           ))}
         </select>
+        {/* GB8 — hai lựa chọn ngay trong giao diện: ẩn danh (mặc định, an toàn)
+            hoặc cookies đăng nhập (video riêng tư / giới hạn tuổi). Bật mà admin
+            chưa cấu hình → backend chặn ngay khi bấm tải. */}
+        <label
+          title="Tắt: tải ẩn danh (không đụng tài khoản Google — public video tải được). Bật: dùng cookies admin đặt ở Cài đặt → Tải video từ link (video riêng tư / giới hạn tuổi)."
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}
+        >
+          <input
+            type="checkbox"
+            checked={useCookies}
+            onChange={(e) => setUseCookies(e.target.checked)}
+            style={{ margin: 0 }}
+          />
+          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text)' }}>
+            Dùng cookies đăng nhập
+          </span>
+        </label>
         <button
           disabled={!url.trim()}
           onClick={doDownload}
@@ -186,7 +205,8 @@ export default function Download() {
           💡 Mẹo
         </h4>
         <ul style={{ fontSize: 'var(--text-sm)', listStyle: 'none', padding: 0, margin: 0 }}>
-          <li style={{ marginBottom: '6px' }}>• Video riêng tư / giới hạn độ tuổi cần cookies: quản trị viên cấu hình ở Cài đặt → Tải video từ link</li>
+          <li style={{ marginBottom: '6px' }}>• Mặc định tải <b>ẩn danh</b> — public video tải được, không đụng tài khoản Google nào</li>
+          <li style={{ marginBottom: '6px' }}>• Video riêng tư / giới hạn độ tuổi: bật "Dùng cookies đăng nhập" (quản trị viên đặt file cookies ở Cài đặt → Tải video từ link)</li>
           <li>• Bị chặn khu vực? Cấu hình proxy cùng chỗ đó</li>
         </ul>
       </div>

@@ -293,7 +293,11 @@ def ensure_downloaded(url: str, workdir: str, quality: str = "1080", *,
             marker = json.load(f)
     except Exception:  # noqa: BLE001 — thiếu/corrupt = chưa có
         marker = None
-    if marker and marker.get("url") == url and marker.get("quality") == quality:
+    if (marker and marker.get("url") == url and marker.get("quality") == quality
+            and marker.get("cookies", False) == bool(cookies_file)):
+        # ".get('cookies', False)": marker cũ (trước GB8) không có khoá này —
+        # coi như ẩn danh, khớp khi lần này cũng ẩn danh (nâng cấp không
+        # phá resume của job cũ).
         out = os.path.join(workdir, f"source.{marker.get('ext', 'mp4')}")
         if os.path.exists(out) and os.path.getsize(out) > 0:
             return marker  # đã tải rồi — SKIP
@@ -323,6 +327,10 @@ def ensure_downloaded(url: str, workdir: str, quality: str = "1080", *,
         raise ValueError("yt-dlp báo xong nhưng không tìm thấy file — thử lại")
     marker = {
         "url": url, "quality": quality,
+        # GB8: chế độ cookies nằm trong marker — bật/tắt cookies giữa chừng
+        # là tải lại (marker ẩn danh 360p không được reuse thành "đã có 1080p
+        # cookies"); marker cũ không có khoá này coi như ẩn danh.
+        "cookies": bool(cookies_file),
         "ext": os.path.splitext(out)[1].lstrip("."),
         "size": os.path.getsize(out),
         "title": info.get("title") or "",
@@ -459,11 +467,26 @@ def selftest() -> None:
     # 5. tải + marker + SKIP lần 2
     marker = ensure_downloaded("https://x.test/v", tmp, "1080", runner=fake_runner)
     assert marker["ext"] == "mp4" and marker["size"] == 100, marker
+    assert marker["cookies"] is False, marker
     dl_calls = len([a for a in calls if "--dump-single-json" not in a])
     marker2 = ensure_downloaded("https://x.test/v", tmp, "1080", runner=fake_runner)
     assert marker2["url"] == marker["url"]
     dl_calls2 = len([a for a in calls if "--dump-single-json" not in a])
     assert dl_calls2 == dl_calls, "lần 2 phải SKIP không tải lại"
+
+    # 5b. GB8 — bật cookies giữa chừng: marker ẩn danh KHÔNG được reuse,
+    # phải tải lại (cookie có thể lấy được format cao hơn / video riêng tư).
+    ck = os.path.join(tmp, "ck.txt")
+    with open(ck, "w") as f:
+        f.write("# Netscape HTTP Cookie File\n.x.test\tTRUE\t/\tFALSE\t0\tSID\tx\n")
+    marker3 = ensure_downloaded("https://x.test/v", tmp, "1080",
+                                cookies_file=ck, runner=fake_runner)
+    assert marker3["cookies"] is True, marker3
+    dl_calls3 = len([a for a in calls if "--dump-single-json" not in a])
+    assert dl_calls3 > dl_calls, "đổi chế độ cookies phải tải lại"
+    # ẩn danh lại sau đó → lại tải lại (hai chiều, không chỉ chiều bật)
+    marker4 = ensure_downloaded("https://x.test/v", tmp, "1080", runner=fake_runner)
+    assert marker4["cookies"] is False, marker4
     print("5. marker download.json + resume skip ............. OK")
 
     # 6. abort → JobCancelled (runner ném JobCancelled ngay khi được gọi)

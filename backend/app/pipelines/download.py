@@ -74,7 +74,8 @@ ERROR_MAP: list[tuple[str, str]] = [
     ("sign in to confirm your age",
      "Video giới hạn độ tuổi — cần cookies đăng nhập (Cài đặt → Tải video từ link)."),
     ("sign in to confirm",
-     "YouTube yêu cầu xác thực (chống bot) — cần cookies đăng nhập "
+     "YouTube tạm nghi ngờ máy chủ (thường tự hết sau ít phút — thử lại "
+     "sau, đừng gọi dồn dập). Cần chắc chắn/1080p thì đặt cookies đăng nhập "
      "(Cài đặt → Tải video từ link)."),
     ("private video",
      "Video riêng tư — cần cookies đăng nhập (Cài đặt → Tải video từ link)."),
@@ -137,11 +138,14 @@ def cookies_ok(path: str | None) -> bool:
 
 
 def _yt_extractor_args(url: str) -> list[str]:
-    """Trick youwee (extractor-args) — YouTube chặn IP datacenter không cookie
-    với client web mặc định ("Sign in to confirm you're not a bot"). Client
-    `android` vẫn tải được ẩn danh (đã kiểm thật 03/10 với "Me at the zoo" —
-    tv/ios/web_embedded đều chết). Chỉ áp cho youtube/youtu.be; site khác
-    không đụng (nguyên tắc: yt-dlp quyết định)."""
+    """Trick youwee (extractor-args) — client `android` tải được ẩn danh (đã
+    kiểm thật 03/10 với "Me at the zoo" từ IP nhà dân, KHÔNG cookie: tải xong
+    file mp4 360p). Client web mặc định thì YouTube chặn bot-check kể cả IP
+    nhà dân (yt-dlp 2026 gọi player API web là dính "Sign in to confirm");
+    tv/ios/web_embedded đều chết. Lưu ý: gọi dồn dập (test liên tục) khiến
+    YouTube flag IP tạm thời — khi đó android cũng dính bot-check, đợi vài
+    phút tự hết. Chỉ áp cho youtube/youtu.be; site khác không đụng (nguyên
+    tắc: yt-dlp quyết định)."""
     from urllib.parse import urlparse
 
     host = (urlparse(url).hostname or "").lower()

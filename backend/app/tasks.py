@@ -76,6 +76,21 @@ def _set_failed(job, exc: Exception, db) -> None:
     transition(db, job, JobStatus.failed, error=str(exc)[:500], progress=100)
 
 
+def _publish_outputs(db, job, result_key: str, subs_key: str | None = None) -> None:
+    """GC3 — publish phiên bản kết quả (append-only) + đổi con trỏ hiện hành.
+
+    Publish là NÂNG CẤP: helper tự nuốt lỗi (publish_result/publish_subs giữ
+    key tên-cứng khi lỗi) — job vẫn done, KHÔNG giết kết quả đã có.
+    Job TTS KHÔNG đi qua đây — file `jobs/tts/{hash}.wav` là cache dùng chung
+    (nhiều job trỏ cùng file), versioning nó là nhân bản storage vô ích.
+    """
+    from .artifacts import publish_result, publish_subs
+
+    publish_result(db, job, result_key)
+    if subs_key:
+        publish_subs(db, job, subs_key)
+
+
 def _notify(url: str | None, payload: dict) -> None:
     """Fire-and-forget webhook — failures must never fail the job.
 
@@ -375,6 +390,7 @@ def _run_dub(job_id: str, params: dict) -> dict:
                                                          "key": subs_key,
                                                          "filename": "bilingual.srt"}]}
                                      if subs_key else None))
+            _publish_outputs(db, job, key, subs_key)
             db.commit()
         _notify(params.get("webhook_url"),
                 {"job_id": job_id, "status": "done", "result_key": key})
@@ -448,6 +464,7 @@ def _run_download(job_id: str, params: dict) -> dict:
                        extra_params={"download_title": marker.get("title") or "",
                                      "download_duration": marker.get("duration"),
                                      "download_uploader": marker.get("uploader") or ""})
+            _publish_outputs(db, job, key)
             db.commit()
         _notify(params.get("webhook_url"),
                 {"job_id": job_id, "status": "done", "result_key": key})
@@ -529,6 +546,7 @@ def _run_render(job_id: str, params: dict) -> dict:
         with SessionLocal() as db:
             job = db.get(Job, job_id)
             transition(db, job, JobStatus.done, progress=100, result_key=key)
+            _publish_outputs(db, job, key)
             db.commit()
         _notify(params.get("webhook_url"),
                 {"job_id": job_id, "status": "done", "result_key": key})
@@ -627,6 +645,7 @@ def _run_summary(job_id: str, params: dict) -> dict:
         with SessionLocal() as db:
             job = db.get(Job, job_id)
             transition(db, job, JobStatus.done, progress=100, result_key=key)
+            _publish_outputs(db, job, key)
             db.commit()
         _notify(params.get("webhook_url"),
                 {"job_id": job_id, "status": "done", "result_key": key})
@@ -686,6 +705,7 @@ def _run_stt(job_id: str, params: dict) -> dict:
         with SessionLocal() as db:
             job = db.get(Job, job_id)
             transition(db, job, JobStatus.done, progress=100, result_key=key)
+            _publish_outputs(db, job, key)
             db.commit()
         _notify(params.get("webhook_url"),
                 {"job_id": job_id, "status": "done", "result_key": key})
@@ -782,6 +802,7 @@ def _run_subtitle(job_id: str, params: dict) -> dict:
         with SessionLocal() as db:
             job = db.get(Job, job_id)
             transition(db, job, JobStatus.done, progress=100, result_key=key)
+            _publish_outputs(db, job, key)
             db.commit()
         _notify(params.get("webhook_url"),
                 {"job_id": job_id, "status": "done", "result_key": key})
@@ -864,6 +885,7 @@ def _run_translate(job_id: str, params: dict) -> dict:
         with SessionLocal() as db:
             job = db.get(Job, job_id)
             transition(db, job, JobStatus.done, progress=100, result_key=key)
+            _publish_outputs(db, job, key)
             db.commit()
         _notify(params.get("webhook_url"),
                 {"job_id": job_id, "status": "done", "result_key": key})

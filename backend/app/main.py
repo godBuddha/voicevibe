@@ -34,6 +34,7 @@ from .migrations import ensure_schema
 from .models import (
     ApiKey,
     Job,
+    JobArtifact,
     JobEvent,
     JobStatus,
     MediaObject,
@@ -256,10 +257,15 @@ def healthz() -> dict:
             "ratelimit": rate_limit_backend()}
 
 
-@app.post("/v1/jobs", status_code=202)
-def create_job(
-    job: JobIn, user: User = Depends(auth), db: Session = Depends(get_db)
-) -> dict:
+def _validate_job_in(job: JobIn, user: User, db: Session) -> None:
+    """Validate cấu hình job — DUY NHẤT MỘT ĐƯỜNG, dùng chung cho tạo job và
+    "Nhân bản" (GC3). Hai đường validate riêng biệt là nguồn bug kinh điển:
+    sửa một đường quên đường kia (bài học JobIn nuốt field âm thầm). Nó cũng
+    CHUẨN HOÁ `job.source_url` (validate_url) — caller dùng job sau khi gọi.
+
+    Quyền sở hữu voice/prompt phải kiểm TRƯỚC khi tạo job (trước đây chỉ worker
+    kiểm → job đã tạo rồi mới fail). Giữ kiểm ở worker làm lớp hai.
+    """
     if job.type not in VALID_TYPES:
         raise HTTPException(status_code=422, detail=f"type must be one of {sorted(VALID_TYPES)}")
     if job.type in ("dub", "stt", "subtitle"):
@@ -339,9 +345,6 @@ def create_job(
                 detail="chỉ chọn MỘT nguồn phụ đề: subtitle_key hoặc "
                        "subtitle_job_id")
 
-    # Quyền sở hữu voice phải kiểm tra TRƯỚC khi tạo job. Trước đây chỉ worker
-    # kiểm tra (tasks.py), tức là job đã tạo rồi mới fail trong pipeline. Giữ
-    # kiểm tra ở worker làm lớp hai.
     if job.voice_id:
         voice = db.get(Voice, job.voice_id)
         if voice is None or voice.user_id != user.id:
@@ -359,6 +362,13 @@ def create_job(
         prompt = db.get(PromptLibrary, job.prompt_id)
         if prompt is None or prompt.user_id != user.id:
             raise HTTPException(status_code=404, detail="prompt not found")
+
+
+@app.post("/v1/jobs", status_code=202)
+def create_job(
+    job: JobIn, user: User = Depends(auth), db: Session = Depends(get_db)
+) -> dict:
+    _validate_job_in(job, user, db)
 
     j = Job(user_id=user.id, type=job.type, params=job.model_dump(exclude_none=True))
     db.add(j)
@@ -472,6 +482,17 @@ def get_result(
             else "video" if ext in {"mp4", "mkv", "webm", "mov"} else "audio")
     out = {"job_id": j.id, "download_url": f"/media/{key}",
            "filename": os.path.basename(key), "kind": kind}
+    # GC3 — phiên bản hiện hành (nếu có): UI hiện "Phiên bản N". Best-effort —
+    # job tạo trước GC3 không có row artifact thì không có field này.
+    try:
+        from .models import JobArtifact
+        art = db.scalars(
+            select(JobArtifact).where(JobArtifact.job_id == j.id,
+                                      JobArtifact.key == key)).first()
+        if art is not None:
+            out["version"] = art.version
+    except Exception:  # noqa: BLE001 — thông tin phụ
+        pass
     # Kết quả dạng chữ (SRT/TXT) gửi kèm nội dung để UI không phải tải lần 2 —
     # chặn 64KB để endpoint không trở thành bơm-ram-vô-tận với kết quả khổng lồ.
     if kind == "text":
@@ -990,6 +1011,90 @@ def retry_job(job_id: str, user: User = Depends(auth),
     return {"job_id": job.id, "status": "queued", "dispatch": mode}
 
 
+@app.get("/v1/jobs/{job_id}/artifacts")
+def list_artifacts(job_id: str, user: User = Depends(auth),
+                   db: Session = Depends(get_db)) -> dict:
+    """Danh sách phiên bản kết quả (GC3) — append-only, cờ `current` tô đậm
+    phiên bản đang là kết quả hiện hành."""
+    job = _own_job(job_id, user, db)
+    from .artifacts import current_flags
+    return {"job_id": job.id, "artifacts": current_flags(db, job)}
+
+
+@app.post("/v1/jobs/{job_id}/artifacts/{version}/restore")
+def restore_artifact(job_id: str, version: int, user: User = Depends(auth),
+                     db: Session = Depends(get_db)) -> dict:
+    """Khôi phục một phiên bản làm kết quả hiện hành — CHỈ ĐỔI CON TRỎ.
+
+    File không đụng, version cũ vẫn còn; /result sau đó trả file của phiên bản
+    được chọn. Chỉ job `done` (kết quả "hiện hành" chỉ có ý nghĩa khi job xong).
+    """
+    from .artifacts import _sync_manifest_outputs
+    from .models import JobArtifact
+
+    job = _own_job(job_id, user, db)
+    if job.status != JobStatus.done:
+        raise HTTPException(status_code=409,
+                            detail=f"job {job.status.value} — kết quả hiện hành "
+                                   "chỉ đổi được khi job đã xong")
+    art = db.scalars(
+        select(JobArtifact).where(JobArtifact.job_id == job.id,
+                                  JobArtifact.kind == "result",
+                                  JobArtifact.version == version)).first()
+    if art is None:
+        raise HTTPException(status_code=404, detail=f"không có phiên bản v{version}")
+    job.result_s3_key = art.key
+    _sync_manifest_outputs(job.id, {"result_key": art.key})
+    db.commit()
+    _audit("job.artifact_restore", user_id=user.id,
+           target=f"{job_id}:v{version}")
+    return {"job_id": job.id, "result_key": art.key, "version": version}
+
+
+# Key RUNTIME do pipeline ghi vào params — KHÔNG phải tham số đầu vào, nhân
+# bản job không được kế thừa (kế thừa là job mới mang kết quả/khác của job cũ).
+_DUP_STRIP_KEYS = ("stage", "extra_outputs", "publish_error", "prompt_fallback",
+                   "stt_dropped", "stt_dropped_detail", "download_title",
+                   "download_duration", "download_uploader", "resume")
+
+
+@app.post("/v1/jobs/{job_id}/duplicate", status_code=201)
+def duplicate_job(job_id: str, body: dict | None = None,
+                  user: User = Depends(auth),
+                  db: Session = Depends(get_db)) -> dict:
+    """Nhân bản job thành job MỚI (GC3) — "Chạy lại với tham số khác".
+
+    - Mọi trạng thái được nhân bản (done/failed/interrupted…): job mới xếp
+      hàng riêng, KHÔNG copy kết quả/phiên bản.
+    - body = patch params (ví dụ đổi target_lang / voice_id) → trộn lên params
+      cũ rồi đi QUA ĐÚNG đường validate của tạo job (`_validate_job_in`) —
+      hai đường validate là nguồn bug kinh điển, dùng chung một đường.
+    """
+    job = _own_job(job_id, user, db)
+    merged = {k: v for k, v in (job.params or {}).items()
+              if k not in _DUP_STRIP_KEYS}
+    merged.update(body or {})
+    # `type` phải từ params gốc (body không được đổi type qua lưng — muốn loại
+    # khác thì tạo job mới từ đầu).
+    merged["type"] = job.type
+    ji = JobIn(**merged)
+    _validate_job_in(ji, user, db)
+    j2 = Job(user_id=user.id, type=ji.type,
+             params=ji.model_dump(exclude_none=True))
+    db.add(j2)
+    db.flush()
+    db.add(JobEvent(job_id=j2.id, user_id=user.id, kind="status",
+                    data={"status": JobStatus.queued.value,
+                          "duplicated_from": job.id}))
+    db.commit()
+    mode, task_id = dispatch(j2.id, j2.params)
+    j2.task_id = task_id
+    db.commit()
+    _audit("job.duplicate", user_id=user.id, target=f"{job_id}->{j2.id}")
+    return {"job_id": j2.id, "status": j2.status.value, "dispatch": mode,
+            "source_job_id": job.id}
+
+
 @app.delete("/v1/jobs/{job_id}")
 def delete_job(job_id: str, user: User = Depends(auth),
                db: Session = Depends(get_db)) -> dict:
@@ -1019,8 +1124,11 @@ def delete_job(job_id: str, user: User = Depends(auth),
             storage.delete(key)
         except Exception:  # noqa: BLE001
             pass
-    # GC1 — sự kiện vòng đời của job này dọn theo (không rò rỉ dữ liệu job chết).
+    # GC1/GC3 — sự kiện vòng đời + phiên bản kết quả của job này dọn theo
+    # (không rò rỉ dữ liệu job chết).
     db.query(JobEvent).filter(JobEvent.job_id == job_id).delete(
+        synchronize_session=False)
+    db.query(JobArtifact).filter(JobArtifact.job_id == job_id).delete(
         synchronize_session=False)
     db.delete(job)
     db.commit()

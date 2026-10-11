@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
+import { Copy, History, RotateCcw } from 'lucide-react';
 import { useApi } from '../hooks/useApi.jsx';
-import { cancelJob, deleteJob, getResult, retryJob, subscribeJobs } from '../api/jobs.js';
+import {
+  cancelJob, deleteJob, duplicateJob, getResult, listArtifacts, restoreArtifact,
+  retryJob, subscribeJobs,
+} from '../api/jobs.js';
 import { BASE } from '../api/client.js';
 
 export default function Jobs() {
@@ -9,6 +13,12 @@ export default function Jobs() {
   const [selectedJob, setSelectedJob] = useState(null);
   const [result, setResult] = useState(null);
   const [resultError, setResultError] = useState(null);
+  const [artifacts, setArtifacts] = useState([]);
+  const [dupOpen, setDupOpen] = useState(false);
+  const [dupPatch, setDupPatch] = useState('');
+  const [dupError, setDupError] = useState(null);
+  const [dupBusy, setDupBusy] = useState(false);
+  const [restoreBusy, setRestoreBusy] = useState(null);
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const resultCache = useRef({});
@@ -48,6 +58,7 @@ export default function Jobs() {
   const selectJob = (job) => {
     setResult(null);
     setResultError(null);
+    setArtifacts([]);
     if (!job || selectedJob?.id === job.id) {
       selectedIdRef.current = null;
       setSelectedJob(null);
@@ -75,6 +86,63 @@ export default function Jobs() {
       });
     return () => { alive = false; };
   }, [selectedJob?.id, selectedJob?.status]);
+
+  // GC3 — nạp phiên bản khi job done (chỉ hiện khi >1 phiên bản).
+  useEffect(() => {
+    if (!selectedJob || selectedJob.status !== 'done' || !selectedJob.resultKey) {
+      return undefined;
+    }
+    let alive = true;
+    listArtifacts(selectedJob.id)
+      .then((d) => { if (alive) setArtifacts(d.artifacts || []); })
+      .catch(() => { if (alive) setArtifacts([]); });
+    return () => { alive = false; };
+  }, [selectedJob?.id, selectedJob?.status, selectedJob?.resultKey]);
+
+  // GC3 — khôi phục phiên bản làm hiện hành.
+  const doRestore = async (job, version) => {
+    setRestoreBusy(version);
+    setActionError(null);
+    try {
+      await restoreArtifact(job.id, version);
+      resultCache.current[job.id] = null; // kết quả đổi — ép nạp lại
+      await fetchJobs();
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setRestoreBusy(null);
+    }
+  };
+
+  // GC3 — nhân bản job: patch là tham số muốn ĐỔI (JSON); {} = chạy lại nguyên.
+  const openDuplicate = (job) => {
+    setDupPatch('{}');
+    setDupError(null);
+    setDupOpen(true);
+    dupJobRef.current = job;
+  };
+  const dupJobRef = useRef(null);
+
+  const doDuplicate = async () => {
+    let patch = {};
+    try {
+      patch = dupPatch.trim() ? JSON.parse(dupPatch) : {};
+    } catch {
+      setDupError('JSON không đúng — ví dụ: {"target_lang": "ja"}');
+      return;
+    }
+    setDupBusy(true);
+    setDupError(null);
+    try {
+      await duplicateJob(dupJobRef.current.id, patch);
+      setDupOpen(false);
+      await fetchJobs();
+    } catch (err) {
+      setDupError(err.message);
+    } finally {
+      setDupBusy(false);
+    }
+  };
 
   const filteredJobs = jobs.filter((j) => {
     if (statusFilter !== 'all' && j.status !== statusFilter) return false;
@@ -453,6 +521,13 @@ export default function Jobs() {
                       {selectedJob.error}
                     </div>
                   )}
+                  <button
+                    onClick={() => openDuplicate(selectedJob)}
+                    title="Tạo job MỚI với tham số sửa lại — kết quả job cũ giữ nguyên"
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'var(--bg)', color: 'var(--primary)', border: '1px solid var(--border)', padding: '6px 12px', borderRadius: 'var(--radius)', fontSize: 'var(--text-xs)', fontWeight: 600, cursor: 'pointer', alignSelf: 'flex-start' }}
+                  >
+                    <Copy size={13} /> Nhân bản
+                  </button>
                 </div>
               </div>
 
@@ -499,6 +574,11 @@ export default function Jobs() {
                   >
                     Tải về máy ({result.filename})
                   </a>
+                  {result.version != null && (
+                    <span style={{ marginLeft: '8px', fontSize: 'var(--text-xs)', color: 'var(--text-dim)' }}>
+                      Phiên bản {result.version} (hiện hành)
+                    </span>
+                  )}
                 </div>
               )}
               {selectedJob.status === 'done' && !result && resultError && (
@@ -511,6 +591,33 @@ export default function Jobs() {
                   Đang tải kết quả...
                 </div>
               )}
+
+              {/* GC3 — lịch sử phiên bản (chỉ hiện khi >1 phiên bản) */}
+              {artifacts.length > 1 && (
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', fontWeight: 700, fontSize: 'var(--text-base)' }}>
+                    <History size={15} /> Các phiên bản kết quả
+                  </div>
+                  {artifacts.map((a) => (
+                    <div key={`${a.kind}-${a.version}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', padding: '5px 0', borderBottom: '1px solid var(--border)', fontSize: 'var(--text-sm)' }}>
+                      <span style={{ color: a.current ? 'var(--success)' : 'var(--text-dim)', fontWeight: a.current ? 600 : 400 }}>
+                        v{a.version} · {a.kind === 'subtitle' ? 'phụ đề song ngữ' : 'kết quả'}
+                        {a.current ? ' · đang dùng' : ''}
+                      </span>
+                      {a.kind === 'result' && !a.current && (
+                        <button
+                          disabled={restoreBusy !== null}
+                          onClick={() => doRestore(selectedJob, a.version)}
+                          title="Đặt phiên bản này làm kết quả hiện hành — file cũ vẫn còn"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: 'var(--bg)', color: 'var(--primary)', border: '1px solid var(--border)', padding: '4px 10px', borderRadius: 'var(--radius)', fontSize: 'var(--text-xs)', cursor: restoreBusy ? 'wait' : 'pointer' }}
+                        >
+                          <RotateCcw size={12} /> Khôi phục
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '20px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
@@ -520,6 +627,43 @@ export default function Jobs() {
           )}
         </div>
       </div>
+
+      {/* GC3 — dialog nhân bản job: patch JSON là tham số muốn ĐỔI */}
+      {dupOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }} onClick={() => setDupOpen(false)}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '16px', width: 'min(520px, 92vw)', maxHeight: '80vh', overflow: 'auto' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, marginBottom: '4px' }}>
+              <Copy size={15} /> Nhân bản job #{dupJobRef.current?.id}
+            </div>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '10px' }}>
+              Tạo job MỚI với tham số sửa lại — kết quả job cũ giữ nguyên. Điền
+              chỉ thứ muốn đổi, ví dụ <code>{'{"target_lang": "ja"}'}</code> hoặc
+              {' '}<code>{'{}`'}</code> để chạy lại nguyên tham số.
+            </p>
+            <textarea
+              value={dupPatch}
+              onChange={(e) => setDupPatch(e.target.value)}
+              spellCheck={false}
+              style={{ width: '100%', minHeight: '140px', fontFamily: 'ui-monospace, monospace', fontSize: 'var(--text-sm)', padding: '10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', resize: 'vertical' }}
+            />
+            {dupError && (
+              <div style={{ color: 'var(--danger)', fontSize: 'var(--text-xs)', marginTop: '6px' }}>{dupError}</div>
+            )}
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
+              <button onClick={() => setDupOpen(false)} style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: 'var(--radius)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+                Thôi
+              </button>
+              <button
+                disabled={dupBusy}
+                onClick={doDuplicate}
+                style={{ background: 'var(--primary)', color: 'var(--primary-contrast, #fff)', border: 'none', padding: '6px 14px', borderRadius: 'var(--radius)', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: dupBusy ? 'wait' : 'pointer', opacity: dupBusy ? 0.6 : 1 }}
+              >
+                {dupBusy ? 'Đang tạo...' : 'Tạo job mới'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -613,11 +613,25 @@ function jobHtml(j) {
     ? `<button class="ghost" onclick="cancelJob('${j.job_id}')">✕ Hủy</button>`
     : ((j.status === "failed" || j.status === "cancelled" || j.status === "interrupted")
        ? `<button class="ghost" onclick="retryJob('${j.job_id}')" title="Tiếp tục từ công đoạn đã xong">↻ Chạy lại</button>` : "");
+  // GC3 — nhân bản: tạo job MỚI nguyên tham số (UI inline là chế độ dự phòng,
+  // không có dialog sửa tham số — bản SPA có dialog JSON đầy đủ).
+  const dupBtn = `<button class="ghost" onclick="duplicateJob('${j.job_id}')" title="Tạo job mới nguyên tham số">⧉ Nhân bản</button>`;
   return `<div class="job"><div class="h">
     <b>${esc(j.type.toUpperCase())}</b><span class="mut">${esc(j.job_id)}</span>
     <span class="pill ${esc(j.status)}">${esc(j.status)}${j.status==="running" ? " "+j.progress+"%" : ""}</span>
-    ${stg}${act ? `<span style="margin-left:auto">${act}</span>` : ""}</div>
+    ${stg}${act ? `<span style="margin-left:auto">${act}</span>` : ""}${dupBtn}</div>
     ${err}${media}</div>`;
+}
+
+async function duplicateJob(id) {
+  // GC3 — nhân bản job thành job MỚI (không đụng kết quả cũ). UI inline chạy
+  // nguyên tham số; muốn đổi tham số hãy dùng bản SPA (dialog JSON).
+  if (!confirm("Tạo job MỚI với cùng tham số? Kết quả job cũ giữ nguyên.")) return;
+  const r = await fetch("/v1/jobs/" + id + "/duplicate", { method: "POST", headers: H(), credentials: "same-origin", body: "{}" });
+  const d = await r.json();
+  if (!r.ok) { flash("✗ " + (d.detail || r.status), "err"); return; }
+  flash("✔ Đã tạo job mới " + d.job_id + " từ " + id);
+  loadJobs();
 }
 
 async function cancelJob(id) {

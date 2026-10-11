@@ -49,6 +49,16 @@ class LocalStorage:
         """Local backend: direct path (zero copy). Remote backends copy to tmp."""
         return str(self._path(key))
 
+    def copy(self, src_key: str, dst_key: str) -> str:
+        """Sao chép object TRONG storage (GC3 — publish phiên bản không tải lại
+        file qua máy chủ). Local: copyfile; S3: copy_object phía server."""
+        src, dst = self._path(src_key), self._path(dst_key)
+        if not src.exists():
+            raise FileNotFoundError(f"storage key không tồn tại: {src_key!r}")
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dst)
+        return dst_key
+
     def delete(self, key: str) -> bool:
         """Gỡ một object. False nếu không tồn tại (caller làm best-effort)."""
         p = self._path(key)
@@ -120,6 +130,12 @@ class S3Storage:
         with os.fdopen(fd, "wb") as f:
             f.write(self.get(key))
         return tmp
+
+    def copy(self, src_key: str, dst_key: str) -> str:
+        """Sao chép object TRONG storage (GC3) — S3 copy_object phía server,
+        không tải dữ liệu qua máy chủ."""
+        self._client.copy_object(self.bucket, dst_key, self.bucket, src_key)
+        return dst_key
 
     def delete(self, key: str) -> bool:
         """Gỡ một object trên S3/MinIO (cùng hợp đồng với LocalStorage)."""

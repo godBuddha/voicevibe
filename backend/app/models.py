@@ -28,6 +28,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -349,6 +350,35 @@ class JobEvent(Base):
     user_id: Mapped[str] = mapped_column(String(12), index=True)
     kind: Mapped[str] = mapped_column(String(24))  # "status" | "progress"
     data: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[int] = mapped_column(BigInteger, default=_now, index=True)
+
+
+class JobArtifact(Base):
+    """Kết quả job theo PHIÊN BẢN (GC3, C3 của lộ trình C) — append-only.
+
+    Trước đây mỗi pipeline ghi đè file kết quả tên-cứng (dub.mp4, render.mp4…)
+    khi "Chạy lại" — kết quả cũ biến mất không báo trước. Giờ MỌI output được
+    publish thành phiên bản `out/result-v1.mp4, out/result-v2.mp4…` (KHÔNG đè);
+    `result_s3_key` là CON TRỎ chỉ phiên bản hiện hành — "Khôi phục" chỉ đổi
+    con trỏ, file cũ không đụng. UNIQUE(job_id, kind, version) là rào chắn cuối
+    chống đếm version trùng khi 2 luồng publish đồng thời.
+
+    kind = "result" (kết quả chính) | "subtitle" (phụ đề song ngữ của dub).
+    Job TTS không publish — file `jobs/tts/{hash}.wav` là CACHE DÙNG CHUNG
+    (nhiều job trỏ cùng file), versioning nó là nhân bản storage vô ích.
+    """
+
+    __tablename__ = "job_artifacts"
+    __table_args__ = (UniqueConstraint("job_id", "kind", "version",
+                                       name="uq_job_artifact_version"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(24))
+    version: Mapped[int] = mapped_column(Integer)
+    key: Mapped[str] = mapped_column(String(512))
+    filename: Mapped[str] = mapped_column(String(255))
+    size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     created_at: Mapped[int] = mapped_column(BigInteger, default=_now, index=True)
 
 

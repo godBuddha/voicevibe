@@ -92,6 +92,7 @@ jobs:
             "tests/test_summary.py"
             "tests/test_jobstate.py"
             "tests/test_jobs_events.py"
+            "tests/test_job_artifacts.py"
             "app.pipelines.dub --selftest"
             "app.pipelines.stt --selftest"
             "app.pipelines.translate --selftest"

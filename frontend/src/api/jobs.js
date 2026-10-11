@@ -137,6 +137,24 @@ export function subscribeJobs(onChange) {
   };
 }
 
+// ---- GC3: phiên bản kết quả + nhân bản job ----
+
+// Danh sách phiên bản kết quả (append-only) — cờ `current` = đang hiện hành.
+export async function listArtifacts(jobId) {
+  return api.get(`/v1/jobs/${jobId}/artifacts`);
+}
+
+// Khôi phục phiên bản làm kết quả hiện hành (chỉ đổi con trỏ, file không đụng).
+export async function restoreArtifact(jobId, version) {
+  return api.post(`/v1/jobs/${jobId}/artifacts/${version}/restore`);
+}
+
+// Nhân bản job thành job mới — patch là tham số muốn đổi (JSON, có thể {}).
+export async function duplicateJob(jobId, patch = {}) {
+  const res = await api.post(`/v1/jobs/${jobId}/duplicate`, { body: patch });
+  return { ...res, jobId: res.job_id };
+}
+
 // Bước 4: kết quả. Text (SRT/TXT ≤64KB) → backend gửi kèm `content`. Media →
 // fetch blob (cookie đi kèm) → objectURL, chắc chắn phát được không phụ thuộc
 // cách <audio>/<video> gửi cookie cross-origin.

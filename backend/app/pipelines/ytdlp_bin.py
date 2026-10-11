@@ -55,6 +55,16 @@ def binary_path(channel: str, media_root: str | None = None) -> str:
     return os.path.join(bin_dir(media_root), name)
 
 
+def runtime_tmpdir(media_root: str | None = None) -> str:
+    """Thư mục PyInstaller nhả libs ra khi chạy binary (bẫy thật 11/10: rootfs
+    read_only + /tmp NOEXEC → 'libz.so.1: failed to map segment'). `--runtime-
+    tmpdir` là tùy chọn của bootloader PyInstaller — trỏ về volume media (exec
+    OK) và bootloader NHẬN TỰ nó, yt-dlp không thấy flag này."""
+    p = os.path.join(bin_dir(media_root), "tmp")
+    os.makedirs(p, exist_ok=True)
+    return p
+
+
 def read_state(channel: str, media_root: str | None = None) -> dict:
     """Trạng thái lần kiểm cuối — {version, checked_at, sha256, asset_size}."""
     try:
@@ -84,13 +94,15 @@ def _default_runner(argv: list[str]) -> tuple[int, str, str]:
 
 def binary_version(channel: str, media_root: str | None = None,
                    *, runner=None) -> str | None:
-    """Version của binary tại chỗ — None nếu thiếu/hỏng (không chạy được)."""
+    """Version của binary tại chỗ — None nếu thiếu/hỏng (không chạy được).
+    Probe QUA `--runtime-tmpdir` (bẫy /tmp noexec — xem docstring trên)."""
     path = binary_path(channel, media_root)
     if not os.path.isfile(path):
         return None
     run = runner or _default_runner
     try:
-        code, out, _err = run([path, "--version"])
+        code, out, _err = run([path, "--runtime-tmpdir",
+                               runtime_tmpdir(media_root), "--version"])
         return out or None if code == 0 else None
     except Exception:  # noqa: BLE001 — binary hỏng là chuyện thường
         return None
@@ -111,7 +123,8 @@ def resolve_prefix(channel: str, media_root: str | None = None, *,
         return _bin_cache["prefix"]
     ver = binary_version(channel, media_root, runner=runner)
     if ver:
-        _bin_cache["prefix"] = [binary_path(channel, media_root)]
+        _bin_cache["prefix"] = [binary_path(channel, media_root),
+                                "--runtime-tmpdir", runtime_tmpdir(media_root)]
         _bin_cache["at"] = now
         return _bin_cache["prefix"]
     _bin_cache["prefix"] = None

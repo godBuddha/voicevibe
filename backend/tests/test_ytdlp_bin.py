@@ -136,7 +136,9 @@ def ok_runner(argv):
 
 YB.reset_cache()
 pfx = YB.resolve_prefix("stable", str(WORK / "media"), runner=ok_runner)
-assert pfx == [old_binary], pfx
+assert pfx[0] == old_binary, pfx
+assert "--runtime-tmpdir" in pfx and pfx[pfx.index("--runtime-tmpdir") + 1].endswith("/tmp"), \
+    "bẫy /tmp noexec: prefix phải kèm --runtime-tmpdir trỏ volume"
 first_n = calls["n"]
 YB.resolve_prefix("stable", str(WORK / "media"), runner=ok_runner)
 assert calls["n"] == first_n, "TTL cache phải chặn probe lặp"
@@ -258,7 +260,7 @@ try:
     set_setting("download.ytdlp_channel", "stable")
     YB.reset_cache()
     head = DLM.resolve_prefix()
-    assert head == [old_binary], f"channel stable phải dùng binary — got {head}"
+    assert head[0] == old_binary, f"channel stable phải dùng binary — got {head}"
     # channel off → pip
     set_setting("download.ytdlp_channel", "off")
     YB.reset_cache()

@@ -173,6 +173,9 @@ def refresh(channel: str, *, force: bool = False, http_get=None,
     mục → verify sha256 → os.replace nguyên tử.
     """
     now = now or time.time()
+    http_get = http_get or _default_http_get  # injectable cho test — dòng này
+    # phải nằm TRƯỚC mọi lệnh gọi (bug thật: fetch_release tự chèn mặc định
+    # nhưng bước tải binary dưới lại dùng thẳng tham số None).
     state = read_state(channel, media_root)
     if not force and state.get("checked_at") and \
             now - state["checked_at"] < STALE_S:

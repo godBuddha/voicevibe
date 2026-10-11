@@ -32,6 +32,7 @@ os.environ.pop("VOICEVIBE_ADMIN_KEY", None)
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 import hashlib  # noqa: E402
+import time  # noqa: E402
 
 from app.pipelines import download as DLM  # noqa: E402
 from app.pipelines import ytdlp_bin as YB  # noqa: E402
@@ -270,5 +271,21 @@ finally:
     DLM._probe_json = real_probe_run
 YB.reset_cache()
 print("9. E2E prefix theo setting: stable→binary, off→pip . OK")
+
+# --------------------------------- 10. REGRESSION: refresh KHÔNG truyền http_get
+# (bug thật trên stack 11/10: fetch_release tự chèn mặc định nhưng bước tải
+# binary dưới dùng thẳng tham số None → 'NoneType' object is not callable).
+YB.reset_cache()
+http_get = fake_http_factory(stable_rel, ASSET_BYTES)
+real_default = YB._default_http_get
+YB._default_http_get = http_get
+try:
+    res = YB.refresh("stable", force=True, media_root=str(WORK / "media"),
+                     now=time.time() + 10 ** 6)
+    assert res["version"] == "2026.10.05", res
+finally:
+    YB._default_http_get = real_default
+YB.reset_cache()
+print("10. regression: refresh không truyền http_get ........ OK")
 
 print("YTDLP BIN SUITE PASSED")

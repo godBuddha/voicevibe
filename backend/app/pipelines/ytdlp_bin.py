@@ -57,12 +57,23 @@ def binary_path(channel: str, media_root: str | None = None) -> str:
 
 def runtime_tmpdir(media_root: str | None = None) -> str:
     """Thư mục PyInstaller nhả libs ra khi chạy binary (bẫy thật 11/10: rootfs
-    read_only + /tmp NOEXEC → 'libz.so.1: failed to map segment'). `--runtime-
-    tmpdir` là tùy chọn của bootloader PyInstaller — trỏ về volume media (exec
-    OK) và bootloader NHẬN TỰ nó, yt-dlp không thấy flag này."""
+    read_only + /tmp NOEXEC → 'libz.so.1: failed to map segment'). PyInstaller
+    bootloader chọn thư mục tạm theo env TMPDIR/TEMP/TMP (flag --runtime-tmpdir
+    bị bootloader bản 2026 BỎ QUA — đã thử thật, extract vẫn vào /tmp), nên
+    mọi subprocess chạy binary PHẢI kèm env TMPDIR trỏ về volume media (exec
+    OK) — xem `spawn_env_for_argv`."""
     p = os.path.join(bin_dir(media_root), "tmp")
     os.makedirs(p, exist_ok=True)
     return p
+
+
+def spawn_env_for_argv(argv: list[str], media_root: str | None = None) -> dict | None:
+    """Env bổ sung cho subprocess chạy yt-dlp: binary PyInstaller cần TMPDIR
+    exec-được (bẫy /tmp noexec); pip library thì không đụng (trả None)."""
+    head = os.path.basename((argv or [""])[0])
+    if head in ("yt-dlp", "yt-dlp-nightly"):
+        return {"TMPDIR": runtime_tmpdir(media_root)}
+    return None
 
 
 def read_state(channel: str, media_root: str | None = None) -> dict:
@@ -95,14 +106,19 @@ def _default_runner(argv: list[str]) -> tuple[int, str, str]:
 def binary_version(channel: str, media_root: str | None = None,
                    *, runner=None) -> str | None:
     """Version của binary tại chỗ — None nếu thiếu/hỏng (không chạy được).
-    Probe QUA `--runtime-tmpdir` (bẫy /tmp noexec — xem docstring trên)."""
+    subprocess kèm env TMPDIR trỏ volume (bẫy /tmp noexec — xem docstring
+    runtime_tmpdir)."""
     path = binary_path(channel, media_root)
     if not os.path.isfile(path):
         return None
-    run = runner or _default_runner
     try:
-        code, out, _err = run([path, "--runtime-tmpdir",
-                               runtime_tmpdir(media_root), "--version"])
+        if runner is None:
+            env = {**os.environ, "TMPDIR": runtime_tmpdir(media_root)}
+            p = subprocess.run([path, "--version"], capture_output=True,
+                               text=True, timeout=15, env=env)
+            code, out = p.returncode, p.stdout.strip()
+        else:
+            code, out, _err = runner([path, "--version"])
         return out or None if code == 0 else None
     except Exception:  # noqa: BLE001 — binary hỏng là chuyện thường
         return None
@@ -123,8 +139,7 @@ def resolve_prefix(channel: str, media_root: str | None = None, *,
         return _bin_cache["prefix"]
     ver = binary_version(channel, media_root, runner=runner)
     if ver:
-        _bin_cache["prefix"] = [binary_path(channel, media_root),
-                                "--runtime-tmpdir", runtime_tmpdir(media_root)]
+        _bin_cache["prefix"] = [binary_path(channel, media_root)]
         _bin_cache["at"] = now
         return _bin_cache["prefix"]
     _bin_cache["prefix"] = None

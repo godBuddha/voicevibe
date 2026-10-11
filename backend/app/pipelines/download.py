@@ -233,7 +233,15 @@ def _probe_json(argv: list[str], *, timeout: float = PROBE_TIMEOUT_S,
     Contract của runner: (code, stdout, stderr) — như subprocess.run.
     """
     if runner is None:
-        res = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
+        from . import ytdlp_bin
+        # Bẫy GC4 (thật): binary PyInstaller nhả libs vào TMPDIR rồi mmap
+        # PROT_EXEC — /tmp container NOEXEC → chết 'failed to map segment'.
+        # Binary mode → TMPDIR trỏ volume media (exec OK).
+        env_extra = ytdlp_bin.spawn_env_for_argv(argv)
+        res = subprocess.run(argv, capture_output=True, text=True,
+                             timeout=timeout,
+                             env=({**os.environ, **env_extra}
+                                  if env_extra else None))
         code, out, err = res.returncode, res.stdout, res.stderr
     else:
         code, out, err = runner(argv)
@@ -396,9 +404,13 @@ def _run_stream(argv: list[str], *, workdir: str, streams_seen: int,
         return code, err_tail
 
     err_lines: list[str] = []
+    from . import ytdlp_bin
+    env_extra = ytdlp_bin.spawn_env_for_argv(argv)  # bẫy /tmp noexec (GC4)
     proc = subprocess.Popen(argv, cwd=workdir, start_new_session=True,
                             stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-                            text=True)
+                            text=True,
+                            env=({**os.environ, **env_extra}
+                                 if env_extra else None))
     stream_idx = 0
     assert proc.stderr is not None
     for line in proc.stderr:

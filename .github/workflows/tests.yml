@@ -90,6 +90,7 @@ jobs:
             "tests/test_render.py"
             "tests/test_media_ownership.py"
             "tests/test_summary.py"
+            "tests/test_jobstate.py"
             "app.pipelines.dub --selftest"
             "app.pipelines.stt --selftest"
             "app.pipelines.translate --selftest"

@@ -114,6 +114,11 @@ export default function Jobs() {
       bg: 'var(--bg)',
       label: 'Đã hủy',
     },
+    interrupted: {
+      color: 'var(--warning)',
+      bg: 'var(--warning-light)',
+      label: 'Bị gián đoạn',
+    },
   };
 
   const mapType = {
@@ -224,6 +229,7 @@ export default function Jobs() {
             <option value="done">Hoàn thành</option>
             <option value="failed">Thất bại</option>
             <option value="cancelled">Đã hủy</option>
+            <option value="interrupted">Bị gián đoạn</option>
           </select>
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -339,7 +345,7 @@ export default function Jobs() {
                             </div>
                           </div>
                         )}
-                        {job.status === 'failed' && job.error && (
+                        {(job.status === 'failed' || job.status === 'interrupted') && job.error && (
                           <div style={{ marginTop: '8px', fontSize: 'var(--text-xs)', color: 'var(--danger)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {job.error}
                           </div>
@@ -361,7 +367,7 @@ export default function Jobs() {
                               {isBusy ? 'Đang hủy...' : 'Hủy job'}
                             </button>
                           )}
-                          {!isActive && (job.status === 'failed' || job.status === 'cancelled') && (
+                          {!isActive && (job.status === 'failed' || job.status === 'cancelled' || job.status === 'interrupted') && (
                             <button
                               disabled={isBusy}
                               onClick={(e) => doRetry(job, e)}

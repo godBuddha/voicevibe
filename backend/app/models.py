@@ -304,6 +304,10 @@ class JobStatus(str, enum.Enum):
     done = "done"
     failed = "failed"
     cancelled = "cancelled"
+    # GC1: worker/api dừng giữa đường (khởi động lại, container chết) — sweep
+    # đánh dấu, người dùng bấm "Chạy lại" để tiếp tục từ sổ tay đã xong. ĐẶT
+    # CUỐI danh sách: migrations.py thêm giá trị vào ENUM Postgres theo thứ tự.
+    interrupted = "interrupted"
 
 
 class Job(Base):
@@ -320,10 +324,32 @@ class Job(Base):
     # Celery task id — cần để HỦY được job đang chờ/đang chạy (revoke theo id).
     # KHÔNG có cột này thì không có cách nào ra lệnh cho Celery quăng task.
     task_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    started_at: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    finished_at: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     created_at: Mapped[int] = mapped_column(BigInteger, default=_now)
     updated_at: Mapped[int] = mapped_column(BigInteger, default=_now, onupdate=_now)
 
     user: Mapped[User] = relationship()
+
+
+class JobEvent(Base):
+    """Sự kiện vòng đời job (GC1) — nguồn dữ liệu của SSE (GC2) + lịch sử.
+
+    `id` autoincrement TOÀN CỤC là cursor của luồng SSE: client gửi lại
+    Last-Event-ID, server phát tiếp mọi sự kiện có id lớn hơn — không trùng,
+    không sót. `user_id` CỐ Ý không FK (pattern AuditLog): lịch sử phải sống
+    sót khi tài khoản bị xoá; xoá job thì xoá events theo job_id trong
+    `delete_job` — không rò rỉ dữ liệu của job đã chết.
+    """
+
+    __tablename__ = "job_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    job_id: Mapped[str] = mapped_column(String(12), index=True)
+    user_id: Mapped[str] = mapped_column(String(12), index=True)
+    kind: Mapped[str] = mapped_column(String(24))  # "status" | "progress"
+    data: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[int] = mapped_column(BigInteger, default=_now, index=True)
 
 
 class Setting(Base):

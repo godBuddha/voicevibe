@@ -22,6 +22,24 @@ from .migrations import ensure_schema as _ensure_schema  # noqa: E402
 
 _ensure_schema(_engine)
 
+
+def _sweep_boot() -> None:
+    """GC1 — quét job mồ côi lúc khởi động: api/worker dừng giữa đường để lại
+    job `running`/`queued` treo mãi; đánh dấu `interrupted` để người dùng thấy
+    và "Chạy lại" tiếp tục từ sổ tay đã xong. Idempotent, lỗi không chặn boot."""
+    try:
+        from .db import SessionLocal
+        from .jobstate import sweep_orphans
+
+        with SessionLocal() as db:
+            sweep_orphans(db)
+            db.commit()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+_sweep_boot()
+
 celery_app = Celery("voicevibe", broker=REDIS_URL, backend=REDIS_URL)
 celery_app.conf.update(
     task_serializer="json",
@@ -49,15 +67,13 @@ PIPELINES: dict[str, str] = {
 
 
 def _set_failed(job, exc: Exception, db) -> None:
-    """Mark failed — job miễn phí (self-host), không trừ, không hoàn credit."""
+    """Mark failed — qua `transition` (GC1): guard không đè cancelled/done nằm
+    ở máy trạng thái; job `interrupted` vẫn được phép chuyển thành failed vì
+    thông tin lỗi thật có giá trị hơn nhãn "gián đoạn"."""
+    from .jobstate import transition
     from .models import JobStatus
 
-    if job.status == JobStatus.cancelled:
-        # Đã hủy — không ghi đè thành failed.
-        return
-    job.status = JobStatus.failed
-    job.error = str(exc)[:500]
-    job.progress = 100
+    transition(db, job, JobStatus.failed, error=str(exc)[:500], progress=100)
 
 
 def _notify(url: str | None, payload: dict) -> None:
@@ -224,14 +240,19 @@ def _abort_probe(job_id: str, ttl: float = 2.0):
 
 def _record_progress(job_id: str, pct: int, msg: str) -> None:
     """Phơi tiến độ pipeline vào job (progress + params.stage) — pattern
-    `_record_stt_stats`: thông tin phụ, lỗi không được giết job."""
+    `_record_stt_stats`: thông tin phụ, lỗi không được giết job.
+
+    GC1: sự kiện progress (throttle bội-5/đổi công đoạn) ghi TRƯỚC khi update
+    row Job — helper đọc giá trị cũ từ `job` để so, gọi sau update là mất so."""
     try:
         from .db import SessionLocal
+        from .jobstate import record_progress_event
         from .models import Job
 
         with SessionLocal() as db:
             job = db.get(Job, job_id)
             if job is not None:
+                record_progress_event(db, job, pct, msg)
                 job.progress = max(int(job.progress or 0), int(pct))
                 job.params = {**(job.params or {}), "stage": str(msg)[:80]}
                 db.commit()
@@ -282,6 +303,7 @@ def _run_dub(job_id: str, params: dict) -> dict:
     để xóa job dọn sạch một phát.
     """
     from .db import SessionLocal
+    from .jobstate import transition
     from .models import Job, JobStatus
     from .pipelines.dub_pipeline import dub_audio
     from .pipelines.manifest import JobCancelled, work_dir
@@ -295,8 +317,7 @@ def _run_dub(job_id: str, params: dict) -> dict:
             return {"ok": False, "error": "job not found"}
         if _aborted(db, job_id):
             return {"ok": False, "error": "cancelled"}
-        job.status = JobStatus.running
-        job.progress = 10
+        transition(db, job, JobStatus.running, progress=10)
         owner_id = job.user_id
         db.commit()
     try:
@@ -349,15 +370,11 @@ def _run_dub(job_id: str, params: dict) -> dict:
             _record_progress(job_id, 100, "phụ đề song ngữ: " + subs_key)
         with SessionLocal() as db:
             job = db.get(Job, job_id)
-            job.status = JobStatus.done
-            job.progress = 100
-            job.result_s3_key = key
-            job.error = None
-            if subs_key:
-                job.params = {**(job.params or {}),
-                              "extra_outputs": [{"kind": "subtitle",
-                                                 "key": subs_key,
-                                                 "filename": "bilingual.srt"}]}
+            transition(db, job, JobStatus.done, progress=100, result_key=key,
+                       extra_params=({"extra_outputs": [{"kind": "subtitle",
+                                                         "key": subs_key,
+                                                         "filename": "bilingual.srt"}]}
+                                     if subs_key else None))
             db.commit()
         _notify(params.get("webhook_url"),
                 {"job_id": job_id, "status": "done", "result_key": key})
@@ -366,14 +383,13 @@ def _run_dub(job_id: str, params: dict) -> dict:
         with SessionLocal() as db:
             job = db.get(Job, job_id)
             if job is not None:
-                # Ép cancelled: hủy đã đặt cờ trên DB TRƯỚC rồi worker mới thấy,
-                # nhưng task requeue/race có thể vừa set running lại — guard này
-                # không cho trạng thái sống sót. Kèm lời nhắc để nút Chạy lại có
-                # ngữ nghĩa "tiếp tục từ công đoạn đã xong".
-                if job.status != JobStatus.cancelled:
-                    job.status = JobStatus.cancelled
-                job.error = ("Đã hủy giữa đường — bấm Chạy lại để tiếp tục "
-                             "từ công đoạn đã xong")
+                # Guard "không đè" nằm ở transition (GC1): cancel endpoint đã
+                # gạch DB trước rồi → transition(cancelled→cancelled) False, giữ
+                # nguyên thông điệp của endpoint. Kèm lời nhắc để nút Chạy lại
+                # có ngữ nghĩa "tiếp tục từ công đoạn đã xong".
+                transition(db, job, JobStatus.cancelled,
+                           error=("Đã hủy giữa đường — bấm Chạy lại để tiếp tục "
+                                  "từ công đoạn đã xong"))
                 db.commit()
         return {"ok": False, "error": "cancelled"}
     except Exception as exc:  # noqa: BLE001
@@ -393,6 +409,7 @@ def _run_download(job_id: str, params: dict) -> dict:
     Marker resume nằm trong workdir bền — nút Chạy lại KHÔNG tải lại video.
     """
     from .db import SessionLocal
+    from .jobstate import transition
     from .models import Job, JobStatus
     from .pipelines.download import ensure_downloaded
     from .pipelines.manifest import JobCancelled, work_dir
@@ -407,8 +424,7 @@ def _run_download(job_id: str, params: dict) -> dict:
             return {"ok": False, "error": "job not found"}
         if _aborted(db, job_id):
             return {"ok": False, "error": "cancelled"}
-        job.status = JobStatus.running
-        job.progress = 5
+        transition(db, job, JobStatus.running, progress=5)
         db.commit()
     try:
         storage = get_storage()
@@ -427,15 +443,11 @@ def _run_download(job_id: str, params: dict) -> dict:
                                                 f"source.{ext}"))
         with SessionLocal() as db:
             job = db.get(Job, job_id)
-            job.status = JobStatus.done
-            job.progress = 100
-            job.result_s3_key = key
-            job.error = None
             # metadata cho /v1/jobs + trang Jobs hiển thị title/duration
-            job.params = {**(job.params or {}),
-                          "download_title": marker.get("title") or "",
-                          "download_duration": marker.get("duration"),
-                          "download_uploader": marker.get("uploader") or ""}
+            transition(db, job, JobStatus.done, progress=100, result_key=key,
+                       extra_params={"download_title": marker.get("title") or "",
+                                     "download_duration": marker.get("duration"),
+                                     "download_uploader": marker.get("uploader") or ""})
             db.commit()
         _notify(params.get("webhook_url"),
                 {"job_id": job_id, "status": "done", "result_key": key})
@@ -444,9 +456,8 @@ def _run_download(job_id: str, params: dict) -> dict:
         with SessionLocal() as db:
             job = db.get(Job, job_id)
             if job is not None:
-                if job.status != JobStatus.cancelled:
-                    job.status = JobStatus.cancelled
-                job.error = "Đã hủy trong lúc tải — bấm Chạy lại để tải lại"
+                transition(db, job, JobStatus.cancelled,
+                           error="Đã hủy trong lúc tải — bấm Chạy lại để tải lại")
                 db.commit()
         return {"ok": False, "error": "cancelled"}
     except Exception as exc:  # noqa: BLE001
@@ -466,6 +477,7 @@ def _run_render(job_id: str, params: dict) -> dict:
     (rủi ro số 8 của kế hoạch).
     """
     from .db import SessionLocal
+    from .jobstate import transition
     from .models import Job, JobStatus
     from .pipelines.manifest import JobCancelled, work_dir
     from .pipelines.render import load_cues_from_text, run_render
@@ -477,8 +489,7 @@ def _run_render(job_id: str, params: dict) -> dict:
             return {"ok": False, "error": "job not found"}
         if _aborted(db, job_id):
             return {"ok": False, "error": "cancelled"}
-        job.status = JobStatus.running
-        job.progress = 5
+        transition(db, job, JobStatus.running, progress=5)
         owner_id = job.user_id
         db.commit()
     try:
@@ -517,10 +528,7 @@ def _run_render(job_id: str, params: dict) -> dict:
         )
         with SessionLocal() as db:
             job = db.get(Job, job_id)
-            job.status = JobStatus.done
-            job.progress = 100
-            job.result_s3_key = key
-            job.error = None
+            transition(db, job, JobStatus.done, progress=100, result_key=key)
             db.commit()
         _notify(params.get("webhook_url"),
                 {"job_id": job_id, "status": "done", "result_key": key})
@@ -529,10 +537,9 @@ def _run_render(job_id: str, params: dict) -> dict:
         with SessionLocal() as db:
             job = db.get(Job, job_id)
             if job is not None:
-                if job.status != JobStatus.cancelled:
-                    job.status = JobStatus.cancelled
-                job.error = ("Đã hủy giữa đường — bấm Chạy lại để tiếp tục "
-                             "từ công đoạn đã xong")
+                transition(db, job, JobStatus.cancelled,
+                           error=("Đã hủy giữa đường — bấm Chạy lại để tiếp tục "
+                                  "từ công đoạn đã xong"))
                 db.commit()
         return {"ok": False, "error": "cancelled"}
     except Exception as exc:  # noqa: BLE001
@@ -553,6 +560,7 @@ def _run_summary(job_id: str, params: dict) -> dict:
     model chat thì FAIL RÕ ở lúc tạo thông điệp (không đoán).
     """
     from .db import SessionLocal
+    from .jobstate import transition
     from .models import Job, JobStatus
     from .pipelines.manifest import (JobCancelled, Manifest, atomic_write_json,
                                      params_fingerprint, work_dir)
@@ -565,8 +573,7 @@ def _run_summary(job_id: str, params: dict) -> dict:
             return {"ok": False, "error": "job not found"}
         if _aborted(db, job_id):
             return {"ok": False, "error": "cancelled"}
-        job.status = JobStatus.running
-        job.progress = 5
+        transition(db, job, JobStatus.running, progress=5)
         owner_id = job.user_id
         db.commit()
     try:
@@ -619,10 +626,7 @@ def _run_summary(job_id: str, params: dict) -> dict:
         storage.put(key, out.encode("utf-8"))
         with SessionLocal() as db:
             job = db.get(Job, job_id)
-            job.status = JobStatus.done
-            job.progress = 100
-            job.result_s3_key = key
-            job.error = None
+            transition(db, job, JobStatus.done, progress=100, result_key=key)
             db.commit()
         _notify(params.get("webhook_url"),
                 {"job_id": job_id, "status": "done", "result_key": key})
@@ -631,10 +635,9 @@ def _run_summary(job_id: str, params: dict) -> dict:
         with SessionLocal() as db:
             job = db.get(Job, job_id)
             if job is not None:
-                if job.status != JobStatus.cancelled:
-                    job.status = JobStatus.cancelled
-                job.error = ("Đã hủy giữa đường — bấm Chạy lại để tiếp tục "
-                             "từ công đoạn đã xong")
+                transition(db, job, JobStatus.cancelled,
+                           error=("Đã hủy giữa đường — bấm Chạy lại để tiếp tục "
+                                  "từ công đoạn đã xong"))
                 db.commit()
         return {"ok": False, "error": "cancelled"}
     except Exception as exc:  # noqa: BLE001
@@ -649,6 +652,7 @@ def _run_summary(job_id: str, params: dict) -> dict:
 def _run_stt(job_id: str, params: dict) -> dict:
     """Real D3 pipeline: media -> transcript with speakers -> SRT in storage."""
     from .db import SessionLocal
+    from .jobstate import transition
     from .models import Job, JobStatus
     from .pipelines.stt import diarize, merge, to_srt, transcribe
     from .storage import get_storage
@@ -659,8 +663,7 @@ def _run_stt(job_id: str, params: dict) -> dict:
             return {"ok": False, "error": "job not found"}
         if _aborted(db, job_id):
             return {"ok": False, "error": "cancelled"}
-        job.status = JobStatus.running
-        job.progress = 10
+        transition(db, job, JobStatus.running, progress=10)
         db.commit()
     try:
         storage = get_storage()
@@ -682,10 +685,7 @@ def _run_stt(job_id: str, params: dict) -> dict:
         storage.put(key, srt.encode("utf-8"))
         with SessionLocal() as db:
             job = db.get(Job, job_id)
-            job.status = JobStatus.done
-            job.progress = 100
-            job.result_s3_key = key
-            job.error = None
+            transition(db, job, JobStatus.done, progress=100, result_key=key)
             db.commit()
         _notify(params.get("webhook_url"),
                 {"job_id": job_id, "status": "done", "result_key": key})
@@ -706,6 +706,7 @@ def _run_subtitle(job_id: str, params: dict) -> dict:
     cùng một đường, cùng một cách kiểm lỗi. Khác ở bước xuất và ở chỗ có thể dịch.
     """
     from .db import SessionLocal
+    from .jobstate import transition
     from .models import Job, JobStatus
     from .pipelines.stt import diarize, merge, transcribe
     from .pipelines.subtitle import DEFAULT_FORMAT, extension, render
@@ -717,8 +718,7 @@ def _run_subtitle(job_id: str, params: dict) -> dict:
             return {"ok": False, "error": "job not found"}
         if _aborted(db, job_id):
             return {"ok": False, "error": "cancelled"}
-        job.status = JobStatus.running
-        job.progress = 10
+        transition(db, job, JobStatus.running, progress=10)
         db.commit()
     try:
         storage = get_storage()
@@ -781,10 +781,7 @@ def _run_subtitle(job_id: str, params: dict) -> dict:
 
         with SessionLocal() as db:
             job = db.get(Job, job_id)
-            job.status = JobStatus.done
-            job.progress = 100
-            job.result_s3_key = key
-            job.error = None
+            transition(db, job, JobStatus.done, progress=100, result_key=key)
             db.commit()
         _notify(params.get("webhook_url"),
                 {"job_id": job_id, "status": "done", "result_key": key})
@@ -801,6 +798,7 @@ def _run_subtitle(job_id: str, params: dict) -> dict:
 def _run_tts(job_id: str, params: dict) -> dict:
     """Real D4 pipeline: text (+ voice profile) -> WAV in media storage."""
     from .db import SessionLocal
+    from .jobstate import transition
     from .models import Job, JobStatus, Voice
     from .pipelines.tts import synthesize_with_voice
     from .storage import get_storage
@@ -811,8 +809,7 @@ def _run_tts(job_id: str, params: dict) -> dict:
             return {"ok": False, "error": "job not found"}
         if _aborted(db, job_id):
             return {"ok": False, "error": "cancelled"}
-        job.status = JobStatus.running
-        job.progress = 10
+        transition(db, job, JobStatus.running, progress=10)
         db.commit()
         try:
             voice = db.get(Voice, params["voice_id"]) if params.get("voice_id") else None
@@ -822,10 +819,7 @@ def _run_tts(job_id: str, params: dict) -> dict:
                 raise PermissionError("voice profile does not belong to you")
             out_key = synthesize_with_voice(params["text"], voice, get_storage(),
                                             backend=params.get("tts_backend"))
-            job.status = JobStatus.done
-            job.progress = 100
-            job.result_s3_key = out_key
-            job.error = None
+            transition(db, job, JobStatus.done, progress=100, result_key=out_key)
             db.commit()
             _notify(params.get("webhook_url"),
                     {"job_id": job_id, "status": "done", "result_key": out_key})
@@ -839,6 +833,7 @@ def _run_tts(job_id: str, params: dict) -> dict:
 def _run_translate(job_id: str, params: dict) -> dict:
     """Real D5 translate pipeline: text -> translated text (storage .txt)."""
     from .db import SessionLocal
+    from .jobstate import transition
     from .models import Job, JobStatus
     from .pipelines.translate import build_translator
     from .storage import get_storage
@@ -850,8 +845,7 @@ def _run_translate(job_id: str, params: dict) -> dict:
         if _aborted(db, job_id):
             return {"ok": False, "error": "cancelled"}
         owner_id = job.user_id   # chụp TRƯỚC session đóng — prompt override cần nó
-        job.status = JobStatus.running
-        job.progress = 10
+        transition(db, job, JobStatus.running, progress=10)
         db.commit()
     try:
         source = params.get("source_lang") or "vi"
@@ -869,10 +863,7 @@ def _run_translate(job_id: str, params: dict) -> dict:
         get_storage().put(key, out.encode("utf-8"))
         with SessionLocal() as db:
             job = db.get(Job, job_id)
-            job.status = JobStatus.done
-            job.progress = 100
-            job.result_s3_key = key
-            job.error = None
+            transition(db, job, JobStatus.done, progress=100, result_key=key)
             db.commit()
         _notify(params.get("webhook_url"),
                 {"job_id": job_id, "status": "done", "result_key": key})
@@ -889,6 +880,7 @@ def _run_translate(job_id: str, params: dict) -> dict:
 def _run_stub(job_id: str, params: dict) -> dict:
     """Placeholder for pipelines not implemented yet."""
     from .db import SessionLocal
+    from .jobstate import transition
     from .models import Job, JobStatus
 
     with SessionLocal() as db:
@@ -897,13 +889,10 @@ def _run_stub(job_id: str, params: dict) -> dict:
             return {"ok": False, "error": "job not found"}
         if _aborted(db, job_id):
             return {"ok": False, "error": "cancelled"}
-        job.status = JobStatus.running
-        job.progress = 10
+        transition(db, job, JobStatus.running, progress=10)
         db.commit()
-        job.status = JobStatus.done
-        job.progress = 100
-        job.result_s3_key = f"jobs/{job_id}/output"
-        job.error = None
+        transition(db, job, JobStatus.done, progress=100,
+                   result_key=f"jobs/{job_id}/output")
         db.commit()
     note = PIPELINES.get(params.get("type", ""), "D5")
     return {"ok": True, "note": f"stub — real pipeline lands {note}"}
@@ -911,6 +900,18 @@ def _run_stub(job_id: str, params: dict) -> dict:
 
 @celery_app.task(name="pipeline.run", bind=True, max_retries=2, default_retry_delay=30)
 def run_pipeline(self, job_id: str, params: dict) -> dict:
+    # Lease (GC1): task nhặt job phải "giữ nóc" nguyên tử trước khi chạy —
+    # task redeliver sau retry tạo task mới sẽ thấy lease đã có chủ và bỏ qua
+    # (trước đây 2 task có thể chạy song song cùng 1 job).
+    try:
+        from .db import SessionLocal
+        from .jobstate import claim_job
+
+        with SessionLocal() as db:
+            if not claim_job(db, job_id, getattr(self.request, "id", None) or ""):
+                return {"ok": False, "skipped": "lease held by another task"}
+    except Exception:  # noqa: BLE001 — lease hụt không được giết job (inline mode
+        pass           # không đi qua đây; DB hụt 1 nhịp thì cứ cho chạy)
     return dispatch_inline(job_id, params)
 
 

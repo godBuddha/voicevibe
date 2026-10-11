@@ -124,6 +124,7 @@ __THEME_CSS__
   .pill.running { background:var(--pill-run-bg); color:var(--pill-run-fg); }
   .pill.failed { background:var(--pill-fail-bg); color:var(--err); }
   .pill.queued { background:var(--pill-queue-bg); color:var(--mut); }
+  .pill.interrupted { background:var(--pill-run-bg); color:var(--warn); }
   audio, video { width:100%; margin-top:10px; border-radius:10px; }
   .donut-wrap { display:flex; gap:12px; align-items:center; }
   .legend { font-size:13px; } .legend i { display:inline-block; width:10px; height:10px;
@@ -606,11 +607,11 @@ function jobHtml(j) {
   // đoạn 2/5" thay vì chỉ số % trơn.
   const stg = (j.params && j.params.stage && (j.status === "running" || j.status === "queued"))
     ? `<span class="mut" style="margin-left:6px">— ${esc(j.params.stage)}</span>` : "";
-  // Hành động: Hủy (còn hoạt động) / Chạy lại (hỏng hoặc đã hủy — tiếp tục từ
-  // công đoạn đã xong nhờ sổ tay công đoạn, không nấu lại từ đầu).
+  // Hành động: Hủy (còn hoạt động) / Chạy lại (hỏng, đã hủy hoặc bị gián đoạn —
+  // tiếp tục từ công đoạn đã xong nhờ sổ tay công đoạn, không nấu lại từ đầu).
   const act = (j.status === "queued" || j.status === "running")
     ? `<button class="ghost" onclick="cancelJob('${j.job_id}')">✕ Hủy</button>`
-    : ((j.status === "failed" || j.status === "cancelled")
+    : ((j.status === "failed" || j.status === "cancelled" || j.status === "interrupted")
        ? `<button class="ghost" onclick="retryJob('${j.job_id}')" title="Tiếp tục từ công đoạn đã xong">↻ Chạy lại</button>` : "");
   return `<div class="job"><div class="h">
     <b>${esc(j.type.toUpperCase())}</b><span class="mut">${esc(j.job_id)}</span>

@@ -48,6 +48,7 @@ const STATUS_LABELS = {
   running: { label: 'Đang chạy', Icon: Timer, color: 'var(--info)' },
   done: { label: 'Hoàn thành', Icon: CheckCheck, color: 'var(--success)' },
   failed: { label: 'Thất bại', Icon: CircleAlert, color: 'var(--danger)' },
+  interrupted: { label: 'Bị gián đoạn', Icon: CircleAlert, color: 'var(--warning)' },
 };
 
 export default function Topbar({ sidebarHidden, onToggleSidebar }) {
@@ -80,7 +81,7 @@ export default function Topbar({ sidebarHidden, onToggleSidebar }) {
           for (const j of list) {
             const before = prevStatusRef.current[j.job_id];
             if (before && before !== j.status
-                && (j.status === 'done' || j.status === 'failed')) {
+                && (j.status === 'done' || j.status === 'failed' || j.status === 'interrupted')) {
               const s = STATUS_LABELS[j.status];
               new Notification(`VoiceVibe — ${s.label}`, {
                 body: `${s.label}: job ${(j.params?.media_url || j.params?.text || j.type || '').toString().slice(0, 60)}`,

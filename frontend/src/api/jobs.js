@@ -23,17 +23,18 @@ export async function createJob(payload) {
   return { ...res, jobId: res.job_id };
 }
 
-// Bước 3: chờ job chạy xong. resolve khi `done`/`failed`/`cancelled` hoặc hết
-// giờ — KHÔNG ném lỗi khi failed (trang cần hiện `error` của job). Trả shape
-// đã adapt (id/progress{percent}/error) để trang không tự bóc JSON.
-// `cancelled` cũng phải dừng vòng: trước đây job bị hủy bên ngoài khiến vòng
-// poll chạy tới hết timeout vô ích.
+// Bước 3: chờ job chạy xong. resolve khi `done`/`failed`/`cancelled`/
+// `interrupted` (GC1 — job mồ côi) hoặc hết giờ — KHÔNG ném lỗi khi failed
+// (trang cần hiện `error` của job). Trả shape đã adapt (id/progress{percent}/
+// error) để trang không tự bóc JSON. `cancelled` cũng phải dừng vòng: trước
+// đây job bị hủy bên ngoài khiến vòng poll chạy tới hết timeout vô ích.
 export async function pollJob(jobId, { onUpdate, timeoutMs = 600000, intervalMs = 2000 } = {}) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const job = adaptJob(await api.get(`/v1/jobs/${jobId}`));
     onUpdate?.(job);
-    if (job.status === 'done' || job.status === 'failed' || job.status === 'cancelled') return job;
+    if (job.status === 'done' || job.status === 'failed'
+        || job.status === 'cancelled' || job.status === 'interrupted') return job;
     if (Date.now() > deadline) return job;
     await new Promise((r) => setTimeout(r, intervalMs));
   }

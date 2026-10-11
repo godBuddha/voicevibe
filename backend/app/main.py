@@ -28,11 +28,12 @@ from .admin_ui import ADMIN_HTML
 from .app_ui import APP_HTML
 from .auth_ui import LOGIN_HTML, SETUP_HTML
 from .db import engine as _engine
-from .db import get_db
+from .db import get_db, SessionLocal
 from .migrations import ensure_schema
 from .models import (
     ApiKey,
     Job,
+    JobEvent,
     JobStatus,
     MediaObject,
     PromptLibrary,
@@ -41,6 +42,7 @@ from .models import (
     User,
     Voice,
 )
+from .jobstate import sweep_orphans, sweep_should_run
 from .pipelines.subtitle import FORMATS as SUBTITLE_FORMATS
 from .pipelines.download import QUALITIES as _DOWNLOAD_QUALITIES
 from .pipelines.download import validate_url as _download_validate_url
@@ -115,6 +117,36 @@ if _CORS_ORIGINS:
 # Auto-migration: tạo bảng thiếu + THÊM CỘT thiếu vào bảng đã tồn tại (create_all một
 # mình không làm được việc sau). Idempotent — xem app/migrations.py.
 ensure_schema(_engine)
+
+
+# GC1 — quét job mồ côi lúc boot: api/worker dừng giữa đường để lại job
+# running/queued treo mãi; đánh dấu interrupted để người dùng thấy và bấm
+# "Chạy lại". Worker cũng tự sweep khi boot (tasks.py) — idempotent.
+def _sweep_boot() -> None:
+    try:
+        with SessionLocal() as db:
+            sweep_orphans(db)
+            db.commit()
+    except Exception:  # noqa: BLE001 — sweep không được chặn boot
+        pass
+
+
+_sweep_boot()
+
+_LAST_SWEEP = [0.0]   # throttle sweep-on-read theo tiến trình (monotonic)
+
+
+def _maybe_sweep(db: Session, user_id: str | None = None) -> None:
+    """Sweep-on-read (GC1): người dùng mở trang là đủ để job mồ côi được đánh
+    dấu — không thread nền. Lỗi sweep KHÔNG được giết request đọc."""
+    try:
+        if sweep_should_run(_LAST_SWEEP[0]):
+            _LAST_SWEEP[0] = time.monotonic()
+            sweep_orphans(db, user_id=user_id)
+            db.commit()
+    except Exception:  # noqa: BLE001
+        db.rollback()
+
 
 # Prompt hệ thống: tạo row cho các task còn thiếu để nút "Khôi phục mặc định" luôn có đích.
 seed_prompts()
@@ -331,6 +363,11 @@ def create_job(
     # flush cần thiết: Job.id do Python sinh (_uid) nhưng chỉ được gán lúc flush —
     # dispatch(j.id) bên dưới cần giá trị thật.
     db.flush()
+    # GC1 — sự kiện "tạo job": transition không phát được (queued→queued không
+    # phải chuyển trạng thái) nên ghi trực tiếp — nguồn của SSE + lịch sử.
+    db.add(JobEvent(job_id=j.id, user_id=user.id, kind="status",
+                    data={"status": JobStatus.queued.value}))
+    db.flush()
     db.commit()
     mode, task_id = dispatch(j.id, j.params)
     # task_id để HỦY được sau này — lưu ngay cả khi dispatch inline (None).
@@ -343,15 +380,19 @@ def create_job(
 def get_job(
     job_id: str, user: User = Depends(auth), db: Session = Depends(get_db)
 ) -> dict:
+    _maybe_sweep(db, user.id)
     j = db.get(Job, job_id)
     if j is None or j.user_id != user.id:
         raise HTTPException(status_code=404, detail="job not found")
     # params + updated_at: UI cần hiển thị "file nào / text nào" và mốc hoàn thành
-    # — không có hai field này panel chi tiết chỉ ra N/A vĩnh viễn.
+    # — không có hai field này panel chi tiết chỉ ra N/A vĩnh viễn. GC1 thêm
+    # result_key (list đã trả, single-get lọt — bug nhỏ) + mốc chạy thật.
     return {
         "job_id": j.id, "type": j.type, "status": j.status.value,
         "progress": j.progress, "error": j.error,
         "params": j.params, "updated_at": j.updated_at,
+        "result_key": j.result_s3_key,
+        "started_at": j.started_at, "finished_at": j.finished_at,
     }
 
 
@@ -806,6 +847,7 @@ def serve_media(key: str, request: Request, response: Response,
 @app.get("/v1/jobs")
 def list_jobs(limit: int = 20, user: User = Depends(auth),
               db: Session = Depends(get_db)) -> dict:
+    _maybe_sweep(db, user.id)
     rows = db.scalars(
         select(Job).where(Job.user_id == user.id)
         .order_by(Job.created_at.desc()).limit(min(limit, 100))
@@ -836,10 +878,12 @@ def cancel_job(job_id: str, user: User = Depends(auth),
       đang chạy → worker dừng giữa đường. Guard `_aborted` trong tasks.py
       chặn trường hợp task vẫn nhặt được sau hủy (requeue) — nó tự thoát mà
       không ghi đè trạng thái.
-    - Job đã done/failed/cancelled → 409: không còn gì để hủy.
+    - Job đã done/failed/cancelled/interrupted → 409: không còn gì để hủy
+      (interrupted là trạng thái kết thúc — hủy nó chỉ là đổi nhãn).
     """
     job = _own_job(job_id, user, db)
-    if job.status in (JobStatus.done, JobStatus.failed, JobStatus.cancelled):
+    if job.status in (JobStatus.done, JobStatus.failed, JobStatus.cancelled,
+                      JobStatus.interrupted):
         raise HTTPException(status_code=409,
                             detail=f"job {job.status.value} rồi — không hủy được nữa")
     if job.task_id:
@@ -849,9 +893,10 @@ def cancel_job(job_id: str, user: User = Depends(auth),
             celery_app.control.revoke(job.task_id, terminate=True)
         except Exception:  # noqa: BLE001 — broker chết vẫn phải hủy được trên DB
             pass
-    job.status = JobStatus.cancelled
-    job.error = "Đã hủy bởi người dùng"
-    job.progress = 100
+    # GC1 — qua transition: guard + JobEvent (SSE thấy hủy ngay) nằm ở một chỗ.
+    from .jobstate import transition
+    transition(db, job, JobStatus.cancelled,
+               error="Đã hủy bởi người dùng", progress=100)
     db.commit()
     _audit("job.cancel", user_id=user.id, target=job.id)
     return {"job_id": job.id, "status": "cancelled"}
@@ -860,14 +905,14 @@ def cancel_job(job_id: str, user: User = Depends(auth),
 @app.post("/v1/jobs/{job_id}/retry")
 def retry_job(job_id: str, user: User = Depends(auth),
               db: Session = Depends(get_db)) -> dict:
-    """Chạy lại job đã hỏng/đã hủy — TIẾP TỤC từ công đoạn đã xong (A1).
+    """Chạy lại job đã hỏng/đã hủy/bị gián đoạn — TIẾP TỤC từ công đoạn đã xong (A1).
 
-    Chỉ job failed/cancelled mới được chạy lại (queued/running → 409 — đang
-    chạy; done → 409 — muốn làm lại thì tạo job mới). Giữ nguyên `params` +
-    `result_s3_key`: kết quả cũ vẫn tải được tới khi lần chạy mới hoàn thành
-    (endpoint /result chỉ trả khi done — không có cửa sổ bất nhất). Sổ tay
-    công đoạn trong `media/jobs/{id}/work/` là thứ quyết định chạy lại từ đâu —
-    endpoint này chỉ xếp hàng lại.
+    Job failed/cancelled/interrupted được chạy lại (queued/running → 409 — đang
+    chạy; done → 409 — muốn làm lại thì tạo job mới / dùng "Nhân bản" GC3).
+    Giữ nguyên `params` + `result_s3_key`: kết quả cũ vẫn tải được tới khi lần
+    chạy mới hoàn thành (endpoint /result chỉ trả khi done — không có cửa sổ
+    bất nhất). Sổ tay công đoạn trong `media/jobs/{id}/work/` là thứ quyết định
+    chạy lại từ đâu — endpoint này chỉ xếp hàng lại.
     """
     job = _own_job(job_id, user, db)
     if job.status == JobStatus.done:
@@ -876,9 +921,9 @@ def retry_job(job_id: str, user: User = Depends(auth),
     if job.status in (JobStatus.queued, JobStatus.running):
         raise HTTPException(status_code=409,
                             detail="job đang chờ/chạy — hủy trước nếu muốn làm lại")
-    job.status = JobStatus.queued
-    job.progress = 0
-    job.error = None
+    # GC1 — qua transition (queued→reset progress/error/finished_at + JobEvent).
+    from .jobstate import transition
+    transition(db, job, JobStatus.queued)
     db.commit()
     mode, task_id = dispatch(job.id, job.params)
     job.task_id = task_id
@@ -916,6 +961,9 @@ def delete_job(job_id: str, user: User = Depends(auth),
             storage.delete(key)
         except Exception:  # noqa: BLE001
             pass
+    # GC1 — sự kiện vòng đời của job này dọn theo (không rò rỉ dữ liệu job chết).
+    db.query(JobEvent).filter(JobEvent.job_id == job_id).delete(
+        synchronize_session=False)
     db.delete(job)
     db.commit()
     _audit("job.delete", user_id=user.id, target=job_id)

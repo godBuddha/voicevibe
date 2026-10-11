@@ -18,7 +18,8 @@ import time
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import (FileResponse, HTMLResponse, RedirectResponse,
+                               StreamingResponse)
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -43,6 +44,7 @@ from .models import (
     Voice,
 )
 from .jobstate import sweep_orphans, sweep_should_run
+from .job_events import job_event_stream
 from .pipelines.subtitle import FORMATS as SUBTITLE_FORMATS
 from .pipelines.download import QUALITIES as _DOWNLOAD_QUALITIES
 from .pipelines.download import validate_url as _download_validate_url
@@ -374,6 +376,62 @@ def create_job(
     j.task_id = task_id
     db.commit()
     return {"job_id": j.id, "status": j.status.value, "dispatch": mode}
+
+
+# --- SSE (GC2): PHẢI đăng ký TRƯỚC /v1/jobs/{job_id} — FastAPI khớp route theo
+# thứ tự khai báo, ngược lại "events" bị nuốt làm job_id (404 chết người).
+_SSE_CAP = 3                  # kết nối SSE tối đa MỖI user (self-host 1 tiến trình)
+_SSE_COUNT: dict[str, int] = {}
+
+
+def _sse_acquire(user_id: str) -> bool:
+    """Cap kết nối in-process — 3 tab là hơn đủ. Thuần hàm để test trực tiếp."""
+    if _SSE_COUNT.get(user_id, 0) >= _SSE_CAP:
+        return False
+    _SSE_COUNT[user_id] = _SSE_COUNT.get(user_id, 0) + 1
+    return True
+
+
+def _sse_release(user_id: str) -> None:
+    _SSE_COUNT[user_id] = max(0, _SSE_COUNT.get(user_id, 0) - 1)
+
+
+@app.get("/v1/jobs/events")
+def job_events(request: Request, api_key: str = "",
+               db: Session = Depends(get_db)) -> StreamingResponse:
+    """SSE tiến độ job — thay polling list 5s/30s (GC2).
+
+    - Auth: cookie phiên HOẶC `?api_key=` (mirror /media — EventSource không
+      đặt được X-API-Key header; API key trong URL chỉ nằm trong log của chính
+      bạn — browser nên dùng cookie).
+    - Cursor khởi đầu = header `Last-Event-ID` (EventSource tự gửi khi
+      reconnect): mất kết nối phát TIẾP, không trùng không sót.
+    - Headers: `X-Accel-Buffering: no` (nginx không đệm), `Cache-Control`.
+    """
+    user = A.user_from_api_key(db, api_key, rate_limit=False) if api_key else None
+    if user is None:
+        user = A.auth_optional(request, None, db)
+    if user is None:
+        raise HTTPException(status_code=401, detail="cần đăng nhập")
+    if not _sse_acquire(user.id):
+        raise HTTPException(
+            status_code=429,
+            detail="quá nhiều kết nối tiến độ (tối đa 3) — đóng bớt tab")
+    cursor = 0
+    last_id = request.headers.get("last-event-id")
+    if last_id and last_id.isdigit():
+        cursor = int(last_id)
+
+    async def stream():
+        try:
+            async for chunk in job_event_stream(user.id, cursor):
+                yield chunk
+        finally:
+            _sse_release(user.id)
+
+    return StreamingResponse(
+        stream(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.get("/v1/jobs/{job_id}")

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useApi } from '../hooks/useApi.jsx';
-import { cancelJob, deleteJob, getResult, retryJob } from '../api/jobs.js';
+import { cancelJob, deleteJob, getResult, retryJob, subscribeJobs } from '../api/jobs.js';
 import { BASE } from '../api/client.js';
 
 export default function Jobs() {
@@ -35,14 +35,13 @@ export default function Jobs() {
     fetchJobs();
   }, [api]);
 
-  // Tự refresh khi còn job đang chờ/chạy (trước đây phải bấm tay F5 mới thấy
-  // tiến độ). Dừng khi không còn job nào đang hoạt động.
-  const hasActive = jobs.some((j) => j.status === 'queued' || j.status === 'running');
+  // GC2 — SSE: server phát tín hiệu khi job đổi → refetch list. Giữ 1 safety
+  // refetch 60s (SSE chết mà fallback cũng lỗi thì trang vẫn tự cập nhật).
   useEffect(() => {
-    if (!hasActive) return undefined;
-    const t = setInterval(fetchJobs, 5000);
-    return () => clearInterval(t);
-  }, [hasActive]);
+    const off = subscribeJobs(() => fetchJobs());
+    const t = setInterval(fetchJobs, 60000);
+    return () => { off(); clearInterval(t); };
+  }, [api]);
 
   // Chọn job → nạp kết quả (đã cache). Effect cũng bắt được thời điểm job đang
   // chọn vừa chuyển sang `done` sau một lượt refresh.

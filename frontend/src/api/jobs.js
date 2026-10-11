@@ -71,6 +71,72 @@ export async function deleteJob(jobId) {
   return api.del(`/v1/jobs/${jobId}`);
 }
 
+// ---- GC2: SSE tiến độ job — thay polling list (Jobs 5s / Topbar 30s) ----
+// MỘT kết nối EventSource chung cho cả app (singleton): server phát tín hiệu
+// "job_ids đổi" → các trang tự refetch list. Sau (re)connect ép refetch một
+// lần (onopen) — nếu không, list trắng tới khi có job đổi trạng thái. Fallback:
+// EventSource lỗi lặp >3 lần/30 giây (proxy chặn, mạng lởm) → tự đóng và về
+// polling 5s — trang Jobs không bao giờ chết vì SSE.
+let _es = null;
+const _handlers = new Set();
+const _fails = [];
+let _fallback = null;
+
+function _notify(jobIds) {
+  for (const h of _handlers) {
+    try { h(jobIds); } catch (e) { console.error('subscribeJobs handler', e); }
+  }
+}
+
+function _startFallback() {
+  if (_fallback) return;
+  console.warn('SSE không ổn định — về chế độ poll 5 giây');
+  _fallback = setInterval(() => _notify(null), 5000);
+}
+
+function _stopFallback() {
+  if (_fallback) { clearInterval(_fallback); _fallback = null; }
+}
+
+function _connect() {
+  if (_es) _es.close();
+  _es = new EventSource('/v1/jobs/events');
+  _es.addEventListener('change', (ev) => {
+    _fails.length = 0;
+    _stopFallback();
+    let ids = null;
+    try { ids = JSON.parse(ev.data).job_ids; } catch { /* tín hiệu rỗng vẫn refetch */ }
+    _notify(ids);
+  });
+  _es.onopen = () => {
+    _fails.length = 0;
+    _notify(null); // refetch ngay sau (re)connect — Last-Event-ID lo phần tiếp diễn
+  };
+  _es.onerror = () => {
+    const now = Date.now();
+    _fails.push(now);
+    while (_fails.length && now - _fails[0] > 30000) _fails.shift();
+    if (_fails.length > 3) {
+      _es.close();
+      _es = null;
+      _startFallback();
+    }
+    // EventSource tự reconnect trước khi đạt ngưỡng — không làm gì thêm.
+  };
+}
+
+export function subscribeJobs(onChange) {
+  _handlers.add(onChange);
+  if (!_es && !_fallback) _connect();
+  return () => {
+    _handlers.delete(onChange);
+    if (!_handlers.size) {
+      if (_es) { _es.close(); _es = null; }
+      _stopFallback();
+    }
+  };
+}
+
 // Bước 4: kết quả. Text (SRT/TXT ≤64KB) → backend gửi kèm `content`. Media →
 // fetch blob (cookie đi kèm) → objectURL, chắc chắn phát được không phụ thuộc
 // cách <audio>/<video> gửi cookie cross-origin.

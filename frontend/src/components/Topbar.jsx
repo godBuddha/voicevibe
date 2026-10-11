@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme.jsx';
 import { useAuth } from '../hooks/useAuth.jsx';
+import { subscribeJobs } from '../api/jobs.js';
 
 // Nút icon vuông nhỏ 28px — chuẩn compact: đủ vùng bấm, không chiếm chỗ.
 const iconBtn = {
@@ -62,8 +63,9 @@ export default function Topbar({ sidebarHidden, onToggleSidebar }) {
   const prevStatusRef = useRef({});
   const wrapRef = useRef(null);
 
-  // Chuông THẬT: GET /v1/jobs mỗi 30s (đủ nhẹ, pattern Jobs.jsx) — badge đếm
-  // job chưa xong, dropdown liệt kê, thông báo trình duyệt khi bật pref.
+  // Chuông THẬT (GC2): subscribe SSE chung — server phát tín hiệu khi job đổi
+  // → refetch list. Badge đếm job chưa xong, dropdown liệt kê, thông báo trình
+  // duyệt khi bật pref. Giữ 1 poll 60s dự phòng (SSE + fallback đều chết).
   useEffect(() => {
     let alive = true;
     const poll = async () => {
@@ -97,8 +99,9 @@ export default function Topbar({ sidebarHidden, onToggleSidebar }) {
       }
     };
     poll();
-    const t = setInterval(poll, 30000);
-    return () => { alive = false; clearInterval(t); };
+    const off = subscribeJobs(() => poll());
+    const t = setInterval(poll, 60000);
+    return () => { alive = false; off(); clearInterval(t); };
   }, []);
 
   // Bấm ra ngoài → đóng dropdown.

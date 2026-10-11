@@ -1189,6 +1189,61 @@ def admin_delete(key: str, admin: User | None = Depends(admin_auth)) -> dict:
     return {"key": key, "deleted": delete_setting(key)}
 
 
+# ------------------------------------------------------- GC4: cập nhật yt-dlp
+
+
+@app.get("/v1/admin/ytdlp")
+def admin_ytdlp_status(admin: User | None = Depends(admin_auth)) -> dict:
+    """Trạng thái yt-dlp: version của thư viện pip + binary tự cập nhật (GC4).
+
+    KHÔNG gọi mạng — mọi thứ đọc từ đĩa (binary --version) và state file nên
+    luôn trả nhanh; "latest" trống nghĩa là chưa từng kiểm (bấm nút cập nhật).
+    """
+    from .pipelines import ytdlp_bin
+
+    channel = (get_setting("download.ytdlp_channel") or "off").strip().lower() or "off"
+    st = ytdlp_bin.read_state(channel)
+    return {
+        "channel": channel,
+        "pip_version": ytdlp_bin.pip_version(),
+        "binary": {
+            "path": ytdlp_bin.binary_path(channel) if channel != "off" else None,
+            "version": ytdlp_bin.binary_version(channel) if channel != "off" else None,
+        },
+        "latest": st.get("version"),
+        "last_check": st.get("checked_at"),
+    }
+
+
+@app.post("/v1/admin/ytdlp/update")
+def admin_ytdlp_update(body: dict, admin: User | None = Depends(admin_auth)) -> dict:
+    """Tải binary yt-dlp mới ngay (kênh stable/nightly) — chạy ĐỒNG BỘ vì admin
+    chủ đích bấm. body: {channel?: "stable"|"nightly", force?: bool}.
+    Lỗi mạng/checksum → 502 với thông điệp giữ nguyên bản cũ.
+    """
+    from .pipelines import ytdlp_bin
+
+    if not _check_rate(f"ytdlp:{admin.id}", 5):
+        raise HTTPException(status_code=429, detail="thử lại sau ít phút")
+    channel = (body.get("channel") or
+               get_setting("download.ytdlp_channel") or "").strip().lower()
+    if channel not in ("stable", "nightly"):
+        raise HTTPException(status_code=422,
+                            detail="channel phải là stable hoặc nightly "
+                                   "(off = dùng thư viện pip, không tải gì)")
+    force = bool(body.get("force", True))
+    if body.get("channel"):
+        set_setting("download.ytdlp_channel", channel)
+    try:
+        result = ytdlp_bin.refresh(channel, force=force)
+    except Exception as exc:  # noqa: BLE001 — mạng/checksum → 502 rõ ràng
+        raise HTTPException(status_code=502, detail=str(exc)[:300]) from exc
+    _audit("ytdlp.update", user_id=admin.id, target=channel,
+           detail=str(result.get("version")))
+    return {"channel": channel, "version": result.get("version"),
+            "path": result.get("path"), "skipped": result.get("skipped")}
+
+
 # ------------------------------------------------------- Day 6: API keys mgmt
 
 

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { DownloadCloud } from 'lucide-react';
 import { useApi } from '../../hooks/useApi.jsx';
 
 export default function AdminSettings({ embedded = false }) {
@@ -11,10 +12,39 @@ export default function AdminSettings({ embedded = false }) {
   const [newKey, setNewKey] = useState('');
   const [newValue, setNewValue] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
+  // GC4 — trạng thái cập nhật yt-dlp (card phụ trong nhóm download)
+  const [ytdlp, setYtdlp] = useState(null);
+  const [ytdlpBusy, setYtdlpBusy] = useState(false);
+  const [ytdlpMsg, setYtdlpMsg] = useState(null);
 
   useEffect(() => {
     loadSettings();
   }, [api]);
+
+  // GC4 — card phụ: lỗi nuốt lặng (không được phá trang settings).
+  const loadYtdlp = async () => {
+    try {
+      setYtdlp(await api.get('/v1/admin/ytdlp'));
+    } catch { /* card phụ — im lặng */ }
+  };
+  useEffect(() => { loadYtdlp(); }, [api]);
+
+  const updateYtdlp = async (channel) => {
+    setYtdlpBusy(true);
+    setYtdlpMsg(null);
+    try {
+      const res = await api.post('/v1/admin/ytdlp/update',
+        { body: { channel, force: true } });
+      setYtdlpMsg(res.skipped
+        ? `Đã là bản mới: ${res.version || '(chưa kiểm)'}`
+        : `Đã cập nhật lên ${res.version}`);
+      await loadYtdlp();
+    } catch (err) {
+      setYtdlpMsg('Lỗi: ' + err.message);
+    } finally {
+      setYtdlpBusy(false);
+    }
+  };
 
   const loadSettings = async () => {
     try {
@@ -265,7 +295,26 @@ export default function AdminSettings({ embedded = false }) {
                     </div>
                   </div>
                   <div>
-                    {editing === row.key ? (
+                    {row.key === 'download.ytdlp_channel' ? (
+                      // GC4 — kênh cập nhật: select 3 mức, đổi là LƯU NGAY
+                      // (không qua flow Sửa — núm 3 lựa chọn, input text dễ gõ sai).
+                      <select
+                        value={String(row.value || 'off')}
+                        disabled={loading}
+                        onChange={(e) => updateSetting(row, e.target.value)}
+                        style={{
+                          width: '100%', padding: '6px 10px',
+                          borderRadius: 'var(--radius-xs)',
+                          border: '1px solid var(--border)',
+                          fontSize: 'var(--text-sm)',
+                          background: 'var(--surface)', color: 'var(--text)',
+                        }}
+                      >
+                        <option value="off">off — dùng thư viện pip (mặc định)</option>
+                        <option value="stable">stable — binary chính thức (khuyến nghị)</option>
+                        <option value="nightly">nightly — bản vá YouTube nhanh nhất</option>
+                      </select>
+                    ) : editing === row.key ? (
                       <div>
                         <input
                           type={row.is_secret ? 'password' : 'text'}
@@ -388,6 +437,41 @@ export default function AdminSettings({ embedded = false }) {
               );
             })}
           </div>
+
+          {/* GC4 — card cập nhật yt-dlp (chỉ trong nhóm download) */}
+          {category === 'download' && ytdlp && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', padding: '10px', background: 'var(--bg)', borderRadius: 'var(--radius)', marginTop: '2px' }}>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-dim)', lineHeight: 1.6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 700, color: 'var(--text)' }}>
+                  <DownloadCloud size={13} /> yt-dlp
+                </div>
+                <div>Thư viện pip: <b>{ytdlp.pip_version || '?'}</b></div>
+                <div>
+                  Kênh {ytdlp.channel}: {ytdlp.channel === 'off'
+                    ? 'dùng thư viện pip'
+                    : (ytdlp.binary.version
+                      ? `binary ${ytdlp.binary.version}`
+                      : 'chưa có binary — bấm cập nhật để tải')}
+                </div>
+                <div>Bản mới nhất đã thấy: <b>{ytdlp.latest || 'chưa kiểm'}</b></div>
+                {ytdlpMsg && <div style={{ color: ytdlpMsg.startsWith('Lỗi') ? 'var(--danger)' : 'var(--success)' }}>{ytdlpMsg}</div>}
+              </div>
+              {ytdlp.channel !== 'off' && (
+                <button
+                  disabled={ytdlpBusy}
+                  onClick={() => updateYtdlp(ytdlp.channel)}
+                  style={{
+                    background: 'var(--primary-light)', color: 'var(--primary)',
+                    border: 'none', padding: '6px 12px', borderRadius: 'var(--radius)',
+                    fontSize: 'var(--text-xs)', fontWeight: 600, whiteSpace: 'nowrap',
+                    cursor: ytdlpBusy ? 'wait' : 'pointer', opacity: ytdlpBusy ? 0.6 : 1,
+                  }}
+                >
+                  {ytdlpBusy ? 'Đang tải...' : 'Kiểm tra & cập nhật ngay'}
+                </button>
+              )}
+            </div>
+          )}
         </div>
       ))}
     </div>

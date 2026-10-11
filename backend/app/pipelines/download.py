@@ -70,7 +70,8 @@ SOCKET_TIMEOUT_S = 15  # per-connection — chống treo vĩnh viễn trên mạ
 # youwee `ytdlp.rs:472-621` — message gốc tiếng Anh, dịch tiếng Việt kèm gợi ý.
 ERROR_MAP: list[tuple[str, str]] = [
     ("this version of yt-dlp has been deprecated",
-     "yt-dlp đã quá cũ. Cập nhật trong container: pip install -U yt-dlp"),
+     "yt-dlp đã quá cũ. Bật «Cập nhật yt-dlp» (kênh stable) trong Cài đặt → "
+     "Tải video từ link, hoặc nâng gói trong container: pip install -U yt-dlp"),
     ("sign in to confirm your age",
      "Video giới hạn độ tuổi — cần cookies đăng nhập (Cài đặt → Tải video từ link)."),
     ("sign in to confirm",
@@ -154,13 +155,42 @@ def _yt_extractor_args(url: str) -> list[str]:
     return []
 
 
+# ------------------------------------------------------- GC4: chọn yt-dlp từ đâu
+def resolve_prefix() -> list[str]:
+    """argv tiền tố theo kênh cập nhật đã cấu hình (GC4): "off" → pip library
+    (mặc định), "stable"/"nightly" → binary tự cập nhật trong volume media.
+    Đọc setting LAZY (import bên trong) để module không phụ thuộc DB lúc import."""
+    from ..settings_service import get_setting
+    from . import ytdlp_bin
+
+    return ytdlp_bin.resolve_prefix(
+        (get_setting("download.ytdlp_channel") or "off").strip().lower() or "off")
+
+
+def _maybe_autorefresh() -> None:
+    """Kick kiểm bản mới nền (≤1 lần/ngày) — lỗi KHÔNG được giết job."""
+    try:
+        from ..settings_service import get_setting
+        from . import ytdlp_bin
+
+        ytdlp_bin.maybe_autorefresh(
+            (get_setting("download.ytdlp_channel") or "off").strip().lower() or "off")
+    except Exception:  # noqa: BLE001 — nâng cấp nền, không giết job
+        pass
+
+
 def build_argv(url: str, dest_dir: str, quality: str, *,
-               cookies_file: str | None = None, proxy: str | None = None) -> list[str]:
-    """Lệnh yt-dlp đầy đủ. `--newline` để mỗi progress là MỘT dòng (parse %)."""
+               cookies_file: str | None = None, proxy: str | None = None,
+               prefix: list[str] | None = None) -> list[str]:
+    """Lệnh yt-dlp đầy đủ. `--newline` để mỗi progress là MỘT dòng (parse %).
+
+    `prefix` (GC4): None → tự chọn theo kênh (binary tự cập nhật hoặc pip) —
+    selftest/test truyền prefix tường minh để không đụng môi trường thật.
+    """
     if quality not in FORMAT_LADDER:
         raise ValueError(f"quality phải là một trong {list(QUALITIES)}")
     argv = [
-        sys.executable, "-m", "yt_dlp",
+        *(prefix if prefix is not None else resolve_prefix()),
         "--newline", "--no-warnings", "--no-playlist",
         "--socket-timeout", str(SOCKET_TIMEOUT_S),
         "--retries", "3", "--fragment-retries", "3",
@@ -181,10 +211,12 @@ def build_argv(url: str, dest_dir: str, quality: str, *,
 
 
 def probe_argv(url: str, *, cookies_file: str | None = None,
-               proxy: str | None = None) -> list[str]:
-    argv = [sys.executable, "-m", "yt_dlp",
-            "--dump-single-json", "--skip-download", "--no-playlist",
-            "--no-warnings", "--socket-timeout", str(SOCKET_TIMEOUT_S)]
+               proxy: str | None = None,
+               prefix: list[str] | None = None) -> list[str]:
+    argv = [
+        *(prefix if prefix is not None else resolve_prefix()),
+        "--dump-single-json", "--skip-download", "--no-playlist",
+        "--no-warnings", "--socket-timeout", str(SOCKET_TIMEOUT_S)]
     if cookies_file:
         argv += ["--cookies", cookies_file]
     if proxy:
@@ -277,6 +309,12 @@ def ensure_downloaded(url: str, workdir: str, quality: str = "1080", *,
     """
     from .manifest import MANIFEST_NAME
 
+    # GC4 — kick kiểm bản yt-dlp mới NỀN (≤1 lần/ngày, thread daemon): job này
+    # vẫn chạy bằng binary hiện tại, lần tải SAU dùng bản mới. validate/marker
+    # đứng trước: job resume ẩn danh không đụng mạng bản cập nhật vô ích? Không
+    # — autorefresh là một call API nhẹ + phải đặt trước probe để probe cũng
+    # được hưởng binary mới nhất có thể.
+    _maybe_autorefresh()
     url = validate_url(url)
     if quality not in FORMAT_LADDER:
         raise ValueError(f"quality phải là một trong {list(QUALITIES)}")

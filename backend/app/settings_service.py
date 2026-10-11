@@ -65,6 +65,13 @@ SETTING_DEFS: list[dict] = [
     {"key": "download.proxy", "category": "download", "secret": True,
      "label": "Proxy cho yt-dlp (http/socks5, có thể chứa user:pass)",
      "default": ""},
+    # GC4 — yt-dlp gãy theo YouTube (YouTube đổi giao diện, yt-dlp phải vá theo):
+    # kênh "stable" tải binary chính thức từ GitHub release vào volume media
+    # (volume sống qua restart container, pip upgrade trong container thì KHÔNG).
+    # "off" = dùng thư viện pip cài theo image (mặc định, không có mạng cũng chạy).
+    {"key": "download.ytdlp_channel", "category": "download", "secret": False,
+     "label": "Kênh cập nhật yt-dlp: off (mặc định) | stable | nightly",
+     "default": "off"},
 ]
 
 

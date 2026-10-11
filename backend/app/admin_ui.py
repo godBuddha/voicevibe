@@ -149,6 +149,7 @@ async function load() {
     render((await r.json()).settings);
   } catch (e) { /* api() đã điều hướng khi 401/403 */ }
   loadSystem();
+  loadYtdlp();
 }
 
 // Card TÌNH TRẠNG HỆ THỐNG (read-only) — GET /v1/admin/system, KHÔNG chứa secret.
@@ -181,6 +182,21 @@ function render(settings) {
     html += `<div class="card"><h2>${esc(cat)}</h2>`;
     for (const s of by[cat]) {
       const val = s.value == null ? "" : s.value;
+      if (s.key === "download.ytdlp_channel") {
+        // GC4 — kênh cập nhật: select 3 mức, đổi là LƯU NGAY (núm 3 lựa chọn,
+        // input text dễ gõ sai).
+        html += `<div class="row">
+          <div class="k"><b>${esc(s.label)}</b><span>${esc(s.key)}</span></div>
+          <select id="in-${esc(s.key)}">
+            <option value="off" ${val === "off" ? "selected" : ""}>off — thư viện pip (mặc định)</option>
+            <option value="stable" ${val === "stable" ? "selected" : ""}>stable — binary chính thức</option>
+            <option value="nightly" ${val === "nightly" ? "selected" : ""}>nightly — bản vá nhanh nhất</option>
+          </select>
+          <span class="tag">${esc(s.source)}</span>
+          <button onclick="save('${esc(s.key)}', false)">Lưu</button>
+        </div>`;
+        continue;
+      }
       html += `<div class="row">
         <div class="k"><b>${esc(s.label)}</b><span>${esc(s.key)}</span></div>
         <input id="in-${esc(s.key)}" type="${s.is_secret ? "password" : "text"}" value="${esc(val)}">
@@ -188,6 +204,13 @@ function render(settings) {
         <button onclick="save('${esc(s.key)}', ${s.is_secret})">Lưu</button>
         ${s.set_in_db ? `<button class="ghost" onclick="del('${esc(s.key)}')">Xóa</button>` : ""}
       </div>`;
+    }
+    if (cat === "download") {
+      // GC4 — card phụ cập nhật yt-dlp: lỗi nuốt lặng, không phá trang settings.
+      html += `<div class="row" id="ytdlp-card"><div class="k"><b>yt-dlp</b>
+        <span>thư viện pip <span id="ytdlp-pip">?</span> · kênh <span id="ytdlp-ch">?</span></span></div>
+        <span class="mut" id="ytdlp-info">đang tải…</span>
+        <button id="ytdlp-btn" style="display:none" onclick="ytdlpUpdate()">Kiểm tra &amp; cập nhật ngay</button></div>`;
     }
     html += "</div>";
   }
@@ -219,6 +242,39 @@ async function addCustom() {
                       { method: "PUT", body: JSON.stringify({ value: v, is_secret: false }) });
   flash(r.ok ? "✔ thêm " + k : "✗ lỗi");
   load();
+}
+
+// GC4 — cập nhật yt-dlp: card phụ, lỗi nuốt lặng (không phá trang settings).
+async function loadYtdlp() {
+  try {
+    const r = await api("/v1/admin/ytdlp");
+    if (!r.ok) return;
+    const d = await r.json();
+    $("ytdlp-pip").textContent = d.pip_version || "?";
+    $("ytdlp-ch").textContent = d.channel;
+    const info = d.channel === "off"
+      ? "dùng thư viện pip — bật kênh stable để tự cập nhật"
+      : (d.binary?.version ? "binary " + d.binary.version : "chưa có binary")
+        + " · bản mới nhất đã thấy: " + (d.latest || "chưa kiểm");
+    $("ytdlp-info").textContent = info;
+    $("ytdlp-btn").style.display = d.channel === "off" ? "none" : "";
+  } catch (e) { /* im lặng — card phụ không được phá trang settings */ }
+}
+async function ytdlpUpdate() {
+  const btn = $("ytdlp-btn");
+  btn.disabled = true;
+  $("ytdlp-info").textContent = "đang tải bản mới…";
+  try {
+    const r = await api("/v1/admin/ytdlp/update",
+                        { method: "POST", body: JSON.stringify({ force: true }) });
+    const d = await r.json();
+    $("ytdlp-info").textContent = r.ok
+      ? (d.skipped ? "Đã là bản mới: " + (d.version || "(chưa kiểm)") : "Đã cập nhật lên " + d.version)
+      : "Lỗi: " + (d.detail || r.status);
+    if (r.ok) flash("✔ yt-dlp: " + (d.version || d.skipped));
+  } catch (e) { $("ytdlp-info").textContent = "Lỗi mạng — giữ nguyên bản cũ"; }
+  btn.disabled = false;
+  loadYtdlp();
 }
 
 // ------------------------------------------------------------ quản lý người dùng

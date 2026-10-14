@@ -142,12 +142,18 @@ try:
     arts = r.json()["artifacts"]
     res1 = [a for a in arts if a["kind"] == "result"]
     assert len(res1) == 1 and res1[0]["version"] == 1 and res1[0]["current"], arts
-    # chạy lại (đổi key nội dung bằng lần 2 của fake) → v2 + subs v1
+    # chạy lại (đổi key nội dung bằng lần 2 của fake) → v2 + subs v1. Job done
+    # KHÔNG re-queue được (guard done→∅ — Nhân bản mới là đường chạy lại) — dựng
+    # trạng thái failed thẳng DB (pattern mk_job) rồi đi đường retry hợp lệ.
+    # transition PHẢI trả True: no-op lặng lẽ ở đây là test tự lừa — v2 trước
+    # đây chỉ sinh được nhờ bug publish-vô-điều-kiện sau transition bị chặn.
     with SessionLocal() as db:
         j = db.get(Job, D1)
         from app.models import JobStatus
         from app.jobstate import transition
-        transition(db, j, JobStatus.queued)
+        j.status = JobStatus.failed
+        db.commit()
+        assert transition(db, j, JobStatus.queued), "failed→queued phải được phép"
         db.commit()
         dparams = j.params
     TK.dispatch_inline(D1, dparams)

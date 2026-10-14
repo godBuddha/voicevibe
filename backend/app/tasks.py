@@ -81,6 +81,9 @@ def _publish_outputs(db, job, result_key: str, subs_key: str | None = None) -> N
 
     Publish là NÂNG CẤP: helper tự nuốt lỗi (publish_result/publish_subs giữ
     key tên-cứng khi lỗi) — job vẫn done, KHÔNG giết kết quả đã có.
+    CHỈ được gọi khi `transition(done)` vừa trả True — job vừa bị hủy thì
+    transition trả False, publish lúc này sẽ gắn kết quả vào job đã hủy
+    (test_jobstate §6 neo).
     Job TTS KHÔNG đi qua đây — file `jobs/tts/{hash}.wav` là cache dùng chung
     (nhiều job trỏ cùng file), versioning nó là nhân bản storage vô ích.
     """
@@ -385,15 +388,18 @@ def _run_dub(job_id: str, params: dict) -> dict:
             _record_progress(job_id, 100, "phụ đề song ngữ: " + subs_key)
         with SessionLocal() as db:
             job = db.get(Job, job_id)
-            transition(db, job, JobStatus.done, progress=100, result_key=key,
-                       extra_params=({"extra_outputs": [{"kind": "subtitle",
-                                                         "key": subs_key,
-                                                         "filename": "bilingual.srt"}]}
-                                     if subs_key else None))
-            _publish_outputs(db, job, key, subs_key)
+            ok = transition(db, job, JobStatus.done, progress=100,
+                            result_key=key,
+                            extra_params=({"extra_outputs": [{"kind": "subtitle",
+                                                              "key": subs_key,
+                                                              "filename": "bilingual.srt"}]}
+                                          if subs_key else None))
+            if ok:
+                _publish_outputs(db, job, key, subs_key)
             db.commit()
-        _notify(params.get("webhook_url"),
-                {"job_id": job_id, "status": "done", "result_key": key})
+        if ok:
+            _notify(params.get("webhook_url"),
+                    {"job_id": job_id, "status": "done", "result_key": key})
         return {"ok": True, "key": key}
     except JobCancelled:
         with SessionLocal() as db:
@@ -460,14 +466,17 @@ def _run_download(job_id: str, params: dict) -> dict:
         with SessionLocal() as db:
             job = db.get(Job, job_id)
             # metadata cho /v1/jobs + trang Jobs hiển thị title/duration
-            transition(db, job, JobStatus.done, progress=100, result_key=key,
-                       extra_params={"download_title": marker.get("title") or "",
-                                     "download_duration": marker.get("duration"),
-                                     "download_uploader": marker.get("uploader") or ""})
-            _publish_outputs(db, job, key)
+            ok = transition(db, job, JobStatus.done, progress=100,
+                            result_key=key,
+                            extra_params={"download_title": marker.get("title") or "",
+                                          "download_duration": marker.get("duration"),
+                                          "download_uploader": marker.get("uploader") or ""})
+            if ok:
+                _publish_outputs(db, job, key)
             db.commit()
-        _notify(params.get("webhook_url"),
-                {"job_id": job_id, "status": "done", "result_key": key})
+        if ok:
+            _notify(params.get("webhook_url"),
+                    {"job_id": job_id, "status": "done", "result_key": key})
         return {"ok": True, "key": key}
     except JobCancelled:
         with SessionLocal() as db:
@@ -545,11 +554,14 @@ def _run_render(job_id: str, params: dict) -> dict:
         )
         with SessionLocal() as db:
             job = db.get(Job, job_id)
-            transition(db, job, JobStatus.done, progress=100, result_key=key)
-            _publish_outputs(db, job, key)
+            ok = transition(db, job, JobStatus.done, progress=100,
+                            result_key=key)
+            if ok:
+                _publish_outputs(db, job, key)
             db.commit()
-        _notify(params.get("webhook_url"),
-                {"job_id": job_id, "status": "done", "result_key": key})
+        if ok:
+            _notify(params.get("webhook_url"),
+                    {"job_id": job_id, "status": "done", "result_key": key})
         return {"ok": True, "key": key}
     except JobCancelled:
         with SessionLocal() as db:
@@ -644,11 +656,14 @@ def _run_summary(job_id: str, params: dict) -> dict:
         storage.put(key, out.encode("utf-8"))
         with SessionLocal() as db:
             job = db.get(Job, job_id)
-            transition(db, job, JobStatus.done, progress=100, result_key=key)
-            _publish_outputs(db, job, key)
+            ok = transition(db, job, JobStatus.done, progress=100,
+                            result_key=key)
+            if ok:
+                _publish_outputs(db, job, key)
             db.commit()
-        _notify(params.get("webhook_url"),
-                {"job_id": job_id, "status": "done", "result_key": key})
+        if ok:
+            _notify(params.get("webhook_url"),
+                    {"job_id": job_id, "status": "done", "result_key": key})
         return {"ok": True, "key": key}
     except JobCancelled:
         with SessionLocal() as db:
@@ -704,11 +719,14 @@ def _run_stt(job_id: str, params: dict) -> dict:
         storage.put(key, srt.encode("utf-8"))
         with SessionLocal() as db:
             job = db.get(Job, job_id)
-            transition(db, job, JobStatus.done, progress=100, result_key=key)
-            _publish_outputs(db, job, key)
+            ok = transition(db, job, JobStatus.done, progress=100,
+                            result_key=key)
+            if ok:
+                _publish_outputs(db, job, key)
             db.commit()
-        _notify(params.get("webhook_url"),
-                {"job_id": job_id, "status": "done", "result_key": key})
+        if ok:
+            _notify(params.get("webhook_url"),
+                    {"job_id": job_id, "status": "done", "result_key": key})
         return {"ok": True, "key": key}
     except Exception as exc:  # noqa: BLE001
         with SessionLocal() as db:
@@ -801,11 +819,14 @@ def _run_subtitle(job_id: str, params: dict) -> dict:
 
         with SessionLocal() as db:
             job = db.get(Job, job_id)
-            transition(db, job, JobStatus.done, progress=100, result_key=key)
-            _publish_outputs(db, job, key)
+            ok = transition(db, job, JobStatus.done, progress=100,
+                            result_key=key)
+            if ok:
+                _publish_outputs(db, job, key)
             db.commit()
-        _notify(params.get("webhook_url"),
-                {"job_id": job_id, "status": "done", "result_key": key})
+        if ok:
+            _notify(params.get("webhook_url"),
+                    {"job_id": job_id, "status": "done", "result_key": key})
         return {"ok": True, "key": key}
     except Exception as exc:  # noqa: BLE001
         with SessionLocal() as db:
@@ -840,10 +861,12 @@ def _run_tts(job_id: str, params: dict) -> dict:
                 raise PermissionError("voice profile does not belong to you")
             out_key = synthesize_with_voice(params["text"], voice, get_storage(),
                                             backend=params.get("tts_backend"))
-            transition(db, job, JobStatus.done, progress=100, result_key=out_key)
+            ok = transition(db, job, JobStatus.done, progress=100,
+                            result_key=out_key)
             db.commit()
-            _notify(params.get("webhook_url"),
-                    {"job_id": job_id, "status": "done", "result_key": out_key})
+            if ok:
+                _notify(params.get("webhook_url"),
+                        {"job_id": job_id, "status": "done", "result_key": out_key})
             return {"ok": True, "key": out_key}
         except Exception as exc:  # noqa: BLE001 — any failure -> job.failed
             _set_failed(job, exc, db)
@@ -884,11 +907,14 @@ def _run_translate(job_id: str, params: dict) -> dict:
         get_storage().put(key, out.encode("utf-8"))
         with SessionLocal() as db:
             job = db.get(Job, job_id)
-            transition(db, job, JobStatus.done, progress=100, result_key=key)
-            _publish_outputs(db, job, key)
+            ok = transition(db, job, JobStatus.done, progress=100,
+                            result_key=key)
+            if ok:
+                _publish_outputs(db, job, key)
             db.commit()
-        _notify(params.get("webhook_url"),
-                {"job_id": job_id, "status": "done", "result_key": key})
+        if ok:
+            _notify(params.get("webhook_url"),
+                    {"job_id": job_id, "status": "done", "result_key": key})
         return {"ok": True, "key": key}
     except Exception as exc:  # noqa: BLE001
         with SessionLocal() as db:

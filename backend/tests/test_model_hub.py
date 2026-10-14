@@ -440,12 +440,23 @@ class _Boom:
         raise AssertionError("không cấu hình cloud thì không được gọi HTTP")
 
 
-STTP.transcribe = STTP.transcribe  # giữ hàm; đường local sẽ import faster_whisper — thiếu
+STTP.transcribe = STTP.transcribe  # giữ hàm; đường local sẽ import faster_whisper
+# Kẹp môi trường: image worker CÓ faster_whisper (+ model cache) — chạy thật sẽ
+# nạp model large-v3 (vài phút) rồi chết decode file giả (av InvalidData, test
+# chỉ "xanh" được nơi KHÔNG cài faster_whisper như CI). Test này chỉ cần hợp
+# đồng "không cloud → KHÔNG phát request": ép import faster_whisper chết để
+# hành vi GIỐNG NHAU mọi môi trường, không đụng mạng.
+import sys  # noqa: E402
+
+sys.modules["faster_whisper"] = None  # import → ImportError, nhánh except bắt
 try:
     STTP.transcribe(FAKE_WAV)
 except ImportError:
-    pass  # faster_whisper chưa cài trên môi trường test — chấp nhận (đúng đường local)
-assert len(STT_BODIES) == 0, "không cloud không được phát request"
+    pass  # đúng đường local: chết ngay ở import — không request nào được phát
+else:
+    raise AssertionError("đường local phải chết ở import faster_whisper")
+finally:
+    sys.modules.pop("faster_whisper", None)
 _OA.httpx = saved_httpx
 STTP._cloud_stt = saved_cloud
 print("15. runtime STT: cloud đúng model / không cloud 0 request OK")

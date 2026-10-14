@@ -109,6 +109,15 @@ Model cho Tóm tắt gán ở **Model Hub → công đoạn "summarize"** (mặc
 bộ model Dịch thuật). Đa giọng đọc edge có ToS Microsoft — mặc định hệ
 vẫn là local VieNeu.
 
+### Giai đoạn C — nền móng vận hành (10/2026)
+
+| # | Tính năng | Trang / cách dùng |
+|---|---|---|
+| C1 | **Máy trạng thái job + job "dở dang"** | Job bị ngắt giữa chừng (khởi động lại máy/container) được đánh dấu `interrupted` khi hệ bật lại — nút **Chạy lại** chạy tiếp sạch sẽ; hủy job đã xong trả lỗi 409 rõ ràng |
+| C2 | **Cập nhật trực tiếp (SSE)** | Bảng job + badge đếm tự đổ mới theo thời gian thực, **không cần bấm tải lại** — giảm tải cho server (bỏ polling 5s/lần) |
+| C3 | **Lưu nhiều phiên bản kết quả** | Mỗi lần chạy lại tạo 1 **version** mới, không đè mất kết quả cũ; **Nhân bản job** copy nguyên cấu hình thành job mới để chỉnh sửa nhẹ rồi chạy |
+| C4 | **Tự cập nhật yt-dlp** | yt-dlp hỏng dần khi YouTube đổi API — hệ tự cập nhật qua kênh `stable`/`nightly` (chọn trong Cài đặt → tải video), không cần vào container chạy tay |
+
 ### Cài đặt — Settings Hub `/settings`
 
 **Control Center cho cả người dùng lẫn quản trị viên**, phân nhóm theo **scope** (mỗi

@@ -111,16 +111,24 @@ for (const [name, route, authed, theme] of SHOTS) {
   // useTheme đọc localStorage 'theme' ĐÚNG LÚC KHỞI TẠO state — đặt qua
   // evaluateOnNewDocument để giá trị có sẵn trước khi app mount (đặt sau mount
   // chỉ đổi attribute DOM, React state vẫn cũ).
-  await page.evaluateOnNewDocument((t) => {
+  // GC5: flag 'authenticated' cũng đặt Ở ĐÂY — chạy TRƯỚC mọi script của app,
+  // protectedLoader (router) thấy flag ngay từ lần match đầu. Cách cũ (goto →
+  // evaluate set flag → goto lần 2) có cửa sổ race: goto đầu rơi vào redirect
+  // /login của guard, evaluate trượt Document cũ — trang mount với guard
+  // quyết định theo trạng thái lộn xộn (toàn bộ ảnh authed thành trang login,
+  // md5 trùng hàng loạt — 01-dashboard may ra ok vì là trang đầu sau setCookie).
+  await page.evaluateOnNewDocument((t, authed) => {
     localStorage.setItem('theme', t || 'light');
-  }, theme);
+    if (authed) localStorage.setItem('authenticated', 'true');
+  }, theme, !!authed);
+  // GC5: đóng SSE của trang trước (window.__vv_close_es do jobs.js đăng ký) —
+  // Chrome HTTP/1 ~6 slot/host, EventSource mở mãi chiếm 1 slot → goto sau
+  // treo chờ slot (Navigation timeout 30s — audit đã chứng minh và vá cùng cơ
+  // chế). evaluate sẽ ném lỗi trên trang vừa điều hướng — nuốt an toàn.
+  await page.evaluate(() => {
+    try { window.__vv_close_es && window.__vv_close_es(); } catch { /* chưa mount */ }
+  }).catch(() => {});
   await page.goto(`${BASE}${route}`, { waitUntil: 'load', timeout: 30000 });
-  if (authed) {
-    // SPA không có server-render: mỗi goto là một app mới — đảm bảo cờ còn nằm
-    // trong localStorage của profile này.
-    await page.evaluate(() => localStorage.setItem('authenticated', 'true'));
-    await page.goto(`${BASE}${route}`, { waitUntil: 'load', timeout: 30000 });
-  }
   if (theme) {
     // Đặt theme TRƯỚC khi chụp và đợi transition kết thúc — tránh viền
     // chuyển màu nửa vời trong ảnh.
@@ -130,9 +138,11 @@ for (const [name, route, authed, theme] of SHOTS) {
     await new Promise((r) => setTimeout(r, 400));
   }
   // 'load' thay 'networkidle0' (GC2): SSE giữ kết nối MÃI — networkidle không
-  // bao giờ ổn nên trang chỉ chờ load event. Settle 500ms đủ cho fetch list
-  // (api nội bộ < 50ms) trước khi chụp.
-  await new Promise((r) => setTimeout(r, 500));
+  // bao giờ ổn nên trang chỉ chờ load event. Settle: fetch list + /v1/auth/me
+  // (useAuth mount) phải XONG trước khi chụp — 500ms từng bắt đúng khoảnh
+  // khắc trang chưa xác thực xong (cả bộ ảnh thành trang login, md5 trùng
+  // hàng loạt — GC5). 2500ms an toàn với api đang bận sweep/SSE.
+  await new Promise((r) => setTimeout(r, 2500));
   await page.screenshot({ path: path.join(OUT, `${name}.png`) });
   console.log(`shot ${name} ← ${route}${theme ? ` (${theme})` : ''}`);
 }

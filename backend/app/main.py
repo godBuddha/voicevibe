@@ -390,20 +390,52 @@ def create_job(
 
 # --- SSE (GC2): PHẢI đăng ký TRƯỚC /v1/jobs/{job_id} — FastAPI khớp route theo
 # thứ tự khai báo, ngược lại "events" bị nuốt làm job_id (404 chết người).
-_SSE_CAP = 3                  # kết nối SSE tối đa MỖI user (self-host 1 tiến trình)
+_SSE_CAP = 1                  # 1 kết nối MỖI user — mở mới evict cũ (EventSource reconnect tự lo)
 _SSE_COUNT: dict[str, int] = {}
+# Cờ "yêu cầu đóng" + định danh kết nối (id tăng dần) — khi user mở kết nối
+# mới vượt cap, kết nối CŨ NHẤT bị evict (đuổi): client mở mới luôn là tab
+# đang cần stream; tab cũ còn sống sẽ tự reconnect (EventSource) và khi đó
+# evict xoay vòng. GC5: audit mở 22 trang liên tiếp nhanh hơn server nhận
+# biết client ngắt → slot rò → 429 khắp nơi — evict hóa giải đúng chỗ.
+_SSE_EVICTIONS: set[int] = set()
+_SSE_GEN = [0]
+_SSE_OLDEST: dict[str, int] = {}
 
 
-def _sse_acquire(user_id: str) -> bool:
-    """Cap kết nối in-process — 3 tab là hơn đủ. Thuần hàm để test trực tiếp."""
-    if _SSE_COUNT.get(user_id, 0) >= _SSE_CAP:
-        return False
+def _sse_acquire(user_id: str) -> int | None:
+    """Cap kết nối in-process — 1 kết nối MỖI user (evict khi mở mới).
+
+    GC5 bài học thật: 22 trang audit mở liên tiếp + stream giữ 600s + query
+    mỗi giây/kết nối → cạn connection pool (QueuePool 5+10 timeout 30s) →
+    500 hàng loạt. EventSource MỘT LẦN Mount mỗi trang: kết nối cũ của cùng
+    user luôn là kết nối tab/page trước đã bỏ đi — evict là hành vi đúng,
+    giữ slot mới cho tab hiện tại. Thuần hàm để test trực tiếp.
+    """
+    gen = _SSE_GEN[0] + 1
+    while _SSE_COUNT.get(user_id, 0) >= _SSE_CAP:
+        victim = _SSE_OLDEST.get(user_id)
+        if victim is None:
+            return None
+        _SSE_EVICTIONS.add(victim)
+        _SSE_COUNT[user_id] = max(0, _SSE_COUNT[user_id] - 1)
+        del _SSE_OLDEST[user_id]
+    _SSE_GEN[0] = gen
     _SSE_COUNT[user_id] = _SSE_COUNT.get(user_id, 0) + 1
-    return True
+    _SSE_OLDEST[user_id] = gen
+    return gen
 
 
-def _sse_release(user_id: str) -> None:
+def _sse_release(user_id: str, gen: int | None = None) -> None:
     _SSE_COUNT[user_id] = max(0, _SSE_COUNT.get(user_id, 0) - 1)
+    if gen is not None and _SSE_OLDEST.get(user_id) == gen:
+        del _SSE_OLDEST[user_id]
+    if gen is not None:
+        _SSE_EVICTIONS.discard(gen)
+
+
+def _sse_evicted(gen: int | None) -> bool:
+    """True nếu kết nối (id) đã bị evict — stream tự kết thúc để nhả slot."""
+    return gen is not None and gen in _SSE_EVICTIONS
 
 
 @app.get("/v1/jobs/events")
@@ -423,7 +455,8 @@ def job_events(request: Request, api_key: str = "",
         user = A.auth_optional(request, None, db)
     if user is None:
         raise HTTPException(status_code=401, detail="cần đăng nhập")
-    if not _sse_acquire(user.id):
+    gen = _sse_acquire(user.id)
+    if gen is None:
         raise HTTPException(
             status_code=429,
             detail="quá nhiều kết nối tiến độ (tối đa 3) — đóng bớt tab")
@@ -435,9 +468,11 @@ def job_events(request: Request, api_key: str = "",
     async def stream():
         try:
             async for chunk in job_event_stream(user.id, cursor):
+                if _sse_evicted(gen):
+                    break  # tab mới hơn chiếm chỗ — nhả slot, tab này tự reconnect
                 yield chunk
         finally:
-            _sse_release(user.id)
+            _sse_release(user.id, gen)
 
     return StreamingResponse(
         stream(), media_type="text/event-stream",

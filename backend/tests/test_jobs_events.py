@@ -40,7 +40,8 @@ from app import ratelimit as RL  # noqa: E402
 from app.db import SessionLocal  # noqa: E402
 from app.job_events import job_event_stream  # noqa: E402
 from app.main import (  # noqa: E402
-    _SSE_COUNT, _sse_acquire, _sse_release, app,
+    _SSE_COUNT, _SSE_EVICTIONS, _SSE_GEN, _SSE_OLDEST,
+    _sse_acquire, _sse_evicted, _sse_release, app,
 )
 from app.models import Job, JobEvent, User  # noqa: E402
 
@@ -156,15 +157,28 @@ finally:
     MAIN.job_event_stream = real_stream
 print("4. endpoint: 401 sai credential / 200 + headers .... OK")
 
-# --------------------------------- 5. cap 3 kết nối/user (hàm thuần)
-_SSE_COUNT.clear()
-assert _sse_acquire("u1") and _sse_acquire("u1") and _sse_acquire("u1")
-assert not _sse_acquire("u1"), "lần thứ 4 phải bị chặn"
-assert _sse_acquire("u2"), "user khác không bị ảnh hưởng"
-_sse_release("u1")
-assert _sse_acquire("u1"), "nhả 1 slot phải lấy lại được"
-_SSE_COUNT.clear()
-print("5. cap 3 kết nối/user: acquire/release ............. OK")
+# --------------------------------- 5. cap 1 kết nối/user + evict khi mở mới
+# GC5 bài học thật: stream giữ 600s + query mỗi giây/kết nối → nhiều kết nối
+# cùng lúc cạn connection pool (500 hàng loạt trong audit). Hợp đồng mới: MỖI
+# user 1 kết nối — mở kết nối mới khi còn kết nối cũ → kết nối CŨ bị evict
+# (đuổi), slot giao cho kết nối MỚI (tab hiện tại). None chỉ khi user không có
+# kết nối nào để evict.
+from app.main import _SSE_EVICTIONS, _SSE_GEN, _SSE_OLDEST  # noqa: E402
+_SSE_COUNT.clear(); _SSE_OLDEST.clear(); _SSE_EVICTIONS.clear(); _SSE_GEN[0] = 0
+g1 = _sse_acquire("u1")
+assert g1 is not None
+g2 = _sse_acquire("u1")
+assert g2 is not None, "mở mới phải được phục vụ (evict cũ)"
+assert g1 in _SSE_EVICTIONS and _sse_evicted(g1), "kết nối cũ phải bị evict"
+assert not _sse_evicted(g2), "kết nối mới không bị evict"
+assert _SSE_COUNT["u1"] == 1, f"chỉ 1 slot/user — got {_SSE_COUNT['u1']}"
+assert _SSE_OLDEST["u1"] == g2
+assert _sse_acquire("u2") is not None, "user khác không bị ảnh hưởng"
+_sse_release("u1", g2)
+assert not _sse_evicted(g2), "release phải xoá cờ evict của chính nó"
+assert _sse_acquire("u1") is not None, "nhả slot phải lấy lại được"
+_SSE_COUNT.clear(); _SSE_OLDEST.clear(); _SSE_EVICTIONS.clear()
+print("5. cap 1/user + evict khi mở mới .................. OK")
 
 # --------------------------------- 6. throttle sweep trong luồng SSE không nổ
 # sweep tất cả users không được đụng job terminal + không giết stream

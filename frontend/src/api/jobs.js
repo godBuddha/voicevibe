@@ -81,6 +81,17 @@ let _es = null;
 const _handlers = new Set();
 const _fails = [];
 let _fallback = null;
+// Kết nối hiện tại ĐÃ TỪNG mở thành công chưa (GC5). Server chủ động đóng sau
+// 10 phút lifetime → EventSource tự reconnect là THIẾT KẾ — cờ này KHÔNG reset
+// khi reconnect, chỉ reset khi tạo EventSource mới. Nhờ vậy phân biệt được:
+//   - chưa từng mở nổi (401 sai phiên / 429 quá cap / proxy chặn) → lỗi chết,
+//     EventSource sẽ tự reconnect VÔ HẠN → phải tự đóng ngay;
+//   - đã từng mở, mạng chớp mắt → theo failWindow cũ (3 lỗi/30 giây).
+let _everOpened = false;
+
+function _authed() {
+  try { return localStorage.getItem('authenticated') === 'true'; } catch { return false; }
+}
 
 function _notify(jobIds) {
   for (const h of _handlers) {
@@ -100,7 +111,11 @@ function _stopFallback() {
 
 function _connect() {
   if (_es) _es.close();
+  // Chưa đăng nhập thì KHÔNG mở SSE — EventSource 401 sẽ tự reconnect vô hạn
+  // (console lỗi 401 dồn dập trên trang login — audit GC5 bắt được).
+  if (!_authed()) return;
   _es = new EventSource('/v1/jobs/events');
+  _everOpened = false;
   _es.addEventListener('change', (ev) => {
     _fails.length = 0;
     _stopFallback();
@@ -109,10 +124,21 @@ function _connect() {
     _notify(ids);
   });
   _es.onopen = () => {
+    _everOpened = true;
     _fails.length = 0;
     _notify(null); // refetch ngay sau (re)connect — Last-Event-ID lo phần tiếp diễn
   };
   _es.onerror = () => {
+    if (!_everOpened) {
+      // Chưa từng mở nổi: 401 sai phiên / 429 quá cap kết nối / proxy chặn.
+      // Đóng ngay, về polling 5s nếu đang đăng nhập; chưa đăng nhập thì thôi
+      // (đừng tạo thêm 401 trên trang login).
+      _es.close();
+      _es = null;
+      _fails.length = 0;
+      if (_authed()) _startFallback();
+      return;
+    }
     const now = Date.now();
     _fails.push(now);
     while (_fails.length && now - _fails[0] > 30000) _fails.shift();
@@ -135,6 +161,20 @@ export function subscribeJobs(onChange) {
       _stopFallback();
     }
   };
+}
+
+// GC5 #2 — công cụ dò (spa_audit) dùng: đóng SSE ngay trong trang cũ TRƯỚC
+// khi điều hướng tới trang mới, nhả slot HTTP/1 của Chrome (SSE mở mãi chiếm
+// 1 trong ~6 kết nối/host → fetch sau chờ slot → navigation timeout cận biên
+// khi audit chạy chuỗi dày đặc). Trình duyệt thật KHÔNG gọi hàm này — chỉ
+// script dò chạy chuỗi goto liên tiếp cần.
+export function closeJobsStreamNow() {
+  if (_es) { _es.close(); _es = null; }
+  _stopFallback();
+}
+
+if (typeof window !== 'undefined') {
+  try { window.__vv_close_es = closeJobsStreamNow; } catch { /* SSR */ }
 }
 
 // ---- GC3: phiên bản kết quả + nhân bản job ----

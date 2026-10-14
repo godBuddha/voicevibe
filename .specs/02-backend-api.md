@@ -10,6 +10,15 @@ Lỗi chuẩn HTTP: 401 (key sai) · 402 (thiếu credits) · 404 · 409 (job ch
 | GET | /v1/jobs?limit=20 | List jobs của user (mới nhất trước) |
 | GET | /v1/jobs/{id} | Trạng thái: `{status, progress, error, credits_charged}` |
 | GET | /v1/jobs/{id}/result | `{download_url}` — chỉ khi done, else 409 |
+| GET | /v1/jobs/events | **SSE** (text/event-stream): luồng sự kiện realtime mọi job của user — `event: job` data `{job_id, status, progress, stage}`. Dùng cho badge đếm + bảng tự cập nhật không cần tải lại trang |
+| POST | /v1/jobs/{id}/cancel | Hủy job (mọi trạng thái trừ done) → 200; done → 409 |
+| POST | /v1/jobs/{id}/retry | Chạy lại: `failed` · `cancelled` · **`interrupted`** → về `queued`, xoá nợ error/progress/finished_at (giữ kết quả cũ tải được) |
+| GET | /v1/jobs/{id}/artifacts | Danh sách **phiên bản kết quả** (mỗi lần chạy = 1 version): `[{version, run_id, key, size, created_at, note}]` |
+| POST | /v1/jobs/{id}/artifacts/{version}/restore | Trả kết quả của 1 version về làm "hiện tại" của job |
+| POST | /v1/jobs/{id}/duplicate | **Nhân bản job**: copy nguyên params thành job mới `queued` (không copy kết quả) → 201 `{job_id}` |
+| DELETE | /v1/jobs/{id} | Xoá job + dọn `delete_prefix("jobs/{id}/")` + xoá JobEvents theo; job `interrupted` vẫn xoá được |
+
+Trạng thái job đầy đủ: `queued → running → done | failed | cancelled | **interrupted**` (interrupted = server/workspace khởi động lại giữa chừng job đang chạy — tự thấy lúc boot, retry là chạy lại).
 
 ## Media
 | Method | Path | Mô tả |

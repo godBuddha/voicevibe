@@ -253,9 +253,14 @@ assert r.status_code in (200, 202)
 print("6. _validate_job_in: create_job hành vi giữ nguyên .. OK")
 
 # --------------------------------- 7. TTS KHÔNG publish (cache dùng chung)
-from app.pipelines.tts import synthesize_with_voice as real_tts  # noqa: E402
+from app.pipelines import tts as TTSMOD  # noqa: E402
 
-TK.synthesize_with_voice = lambda *a, **k: "jobs/tts/cache01.wav"
+real_tts = TTSMOD.synthesize_with_voice
+# _run_tts import HÀM CỤC BỘ (`from .pipelines.tts import synthesize_with_voice`
+# trong thân hàm) — patch cấp module TK (app.tasks) là CHẾT: CI run 38607344168
+# chạy TTS thật → thiếu deps model → job failed. Patch đúng NƠI import nhìn vào
+# (module pipelines.tts) — synth giả không đụng model/network, mọi môi trường.
+TTSMOD.synthesize_with_voice = lambda *a, **k: "jobs/tts/cache01.wav"
 try:
     get_storage().put("jobs/tts/cache01.wav", b"tts")
     r = c.post("/v1/jobs", json={"type": "tts", "text": "xin chào"})
@@ -265,7 +270,7 @@ try:
     arts = c.get(f"/v1/jobs/{T1}/artifacts").json()["artifacts"]
     assert arts == [], f"tts không publish — got {arts}"
 finally:
-    TK.synthesize_with_voice = real_tts
+    TTSMOD.synthesize_with_voice = real_tts
 print("7. tts: không publish (cache dùng chung) ............ OK")
 
 print("JOB ARTIFACTS SUITE PASSED")

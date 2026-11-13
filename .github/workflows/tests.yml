@@ -23,6 +23,37 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build
+      # GD3 — unit test module thuần (adapt/client/parseSrt): 2 bug thật đã
+      # bắt được (adaptJob progress undefined, client payload null). Vitest
+      # node-env, không jsdom — nhanh, không nhân bản spa_audit.
+      - run: npm test
+
+  redis-selftests:
+    # GD3 — rate limiter Redis-path: test tự chọn nhánh khi có REDIS_URL
+    # (khẳng định hạn mức CHIA SẺ giữa 2 tiến trình — thứ in-memory không
+    # chứng minh được). Service redis:7 + healthcheck để job không start
+    # khi Redis chưa sẵn sàng.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: pip install redis
+      - run: REDIS_URL=redis://localhost:6379/0 python tests/test_ratelimit.py
 
   offline-selftests:
     # Tất cả test chạy offline — KHÔNG cần GPU, không tải model AI.

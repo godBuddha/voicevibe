@@ -526,7 +526,10 @@ docker compose --profile proxy up -d
 
 Không đặt `APP_DOMAIN` thì Caddy dùng chứng chỉ **tự ký cho localhost** — chỉ hợp
 để thử, không dùng thật. Chạy sau Cloudflare Tunnel / LB sẵn có thì bỏ qua profile
-`proxy` và trỏ tunnel vào `127.0.0.1:8000`.
+`proxy` và trỏ tunnel vào `127.0.0.1:8000`. (Ghi chú 13/11/2026: profile `proxy`
+đã được verify cấu hình trong CI (`docker compose --profile proxy config`) nhưng
+**chưa từng chạy lên server thật có tên miền** — lần đầu bật nhớ kiểm chứng chỉ
+Let's Encrypt phát hành được trước khi trỏ DNS đám đông.)
 
 > **Vì sao không còn MinIO.** Bản trước có `minio` + `minio-init`; ảnh `minio/minio`
 > đã bị **xoá khỏi Docker Hub** nên stack không pull nổi image nào — `docker compose

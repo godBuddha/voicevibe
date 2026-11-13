@@ -260,7 +260,7 @@ Khi ship weights CC-BY-NC, **hạn chế NC đi theo người nhận**: ai self-
 | 1 | Bộ chống hallucination cho Whisper | faster-whisper (MIT) | `app/pipelines/stt.py::segment_is_hallucination` | ✅ **xong** — 3 tín hiệu xác suất của model + nhãn `[Music]`; 14 ca test |
 | 2 | SRT/VTT/ASS + phụ đề song ngữ | pysubs2 (MIT) | `app/pipelines/subtitle.py` | ✅ **xong** — 3 định dạng, song ngữ, xác minh trên GPU |
 | 3 | Chuẩn hoá cue (gộp theo dấu câu/khoảng lặng) | stable-ts (MIT) | `stt.py::merge` + segment hậu kỳ | ⬜ chưa |
-| 4 | **Track nhạc nền thật** (tách stem) | Demucs (MIT) | `app/pipelines/dub_pipeline.py::_make_bed` | ⬜ chưa (cần thêm dep ~2GB) |
+| 4 | **Track nhạc nền thật** (tách stem) | Demucs (MIT) | `app/pipelines/dub_pipeline.py::_separate_vocals` | ✅ ĐÃ LÀM — `demucs.api` htdemucs 4-stem, fallback giảm âm lượng khi chưa cài dep; test `test_background.py`; **re-verify audio trên GPU box còn ngừng** (SSH 38.48.44.154:3047 connection refused 13/11/2026 — box tắt/đổi IP; chạy lại `backend/scripts/d7_smoke.py` khi box sống, kỳ vọng log `bed_mode: htdemucs`) |
 | 5 | Vòng lặp re-translate cho `needs_shorter_text` | VideoLingo (Apache-2.0) | `dub_pipeline.py::_retranslate_pass` | ✅ **xong** — đo trên audio thật; 9 ca test + LLM thật |
 | 6 | Retime phụ đề lên audio đã dub | ffsubsync (MIT) | stage mới sau mix | ⬜ chưa |
 | 7 | Waveform đa track cho UI chính | wavesurfer.js (BSD-3) | `backend/app/app_ui.py` | ⬜ chưa |
@@ -275,3 +275,8 @@ biến** (ngắn hơn, khác bản cũ, audio ngắn hơn), không bao giờ là
 
 **Khi copy code permissive:** giữ nguyên header copyright của tác giả gốc, ghi nguồn
 trong file (hoặc `NOTICE`), và nêu rõ license — MIT/Apache/BSD đều yêu cầu điều này.
+## Thêm Giai đoạn D (13/11/2026)
+- **vitest ^3.2.4 (MIT)** — devDep của SPA, unit test module thuần
+  (adapt/client/parseSrt — node-env, không jsdom). License MIT kiểm ở
+  npmjs.com/package/vitest 13/11/2026. Đã bắt 2 bug thật: adaptJob progress
+  undefined crash trang Jobs; client payload null crash nhánh lỗi.

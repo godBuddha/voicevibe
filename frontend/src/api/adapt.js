@@ -26,7 +26,10 @@ export function adaptJob(j) {
   let progress;
   if (j.progress && typeof j.progress === 'object') {
     progress = j.progress; // đã ở dạng {percent, message}
-  } else if (j.progress !== null && j.progress !== undefined) {
+  } else {
+    // progress null/undefined CŨNG phải là 0% — job mới chưa chạy là ca thật
+    // (trang Jobs đọc progress.percent không guard → crash nếu undefined;
+    // vitest GD3 bắt được ca này — trước đây chỉ set khi progress có số).
     progress = { percent: Number(j.progress) || 0, message: '' };
   }
   const p = j.params || {};

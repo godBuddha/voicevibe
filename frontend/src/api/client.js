@@ -36,9 +36,11 @@ async function request(method, path, options = {}) {
   // Đọc body MỘT lần. 401 cũng mang detail tiếng Việt ("Email hoặc mật khẩu
   // không đúng") — trước đây nhánh 401 ném 'Unauthorized' TRƯỚC khi kịp đọc
   // body, trang đăng nhập hiện chữ không liên quan thay vì lý do thật.
+  // Payload có thể là null JSON (`json.loads("null")`) — guard ?? {} để nhánh
+  // lỗi dưới đọc detail không crash (vitest GD3 bắt được).
   let payload = {};
   try {
-    payload = await res.json();
+    payload = (await res.json()) ?? {};
   } catch { /* 204/không body */ }
 
   if (res.status === 401) {

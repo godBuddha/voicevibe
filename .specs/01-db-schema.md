@@ -33,13 +33,16 @@ Engine: SQLAlchemy 2.0 (Postgres prod / SQLite dev — tự tạo bảng lúc st
 |---|---|---|
 | id | String(12) PK | |
 | user_id | FK users.id, INDEX | |
-| type | String(16) | tts \| stt \| translate \| dub \| subtitle |
-| status | Enum | queued → running → done \| failed |
+| type | String(16) | tts \| stt \| translate \| dub \| subtitle \| download \| render \| summary (+ ffmpeg GD1) |
+| status | Enum | queued → running → done \| failed \| cancelled \| **interrupted** (GC1) |
 | progress | Integer | 0–100 |
-| params | JSON | tham số job |
+| params | JSON | tham số job (runtime keys: stage/resume/… không kế thừa khi nhân bản) |
 | result_s3_key | String(512) NULL | storage key kết quả |
 | error | Text NULL | |
-| credits_charged | Integer | ghi nhận lúc tạo job |
+| task_id | String(64) NULL | Celery revoke (GC1) |
+| started_at / finished_at | BigInteger NULL | GC1 — mốc chạy thật |
+| revision | Integer | GD4 — tăng MỖI lần transition() THÀNH CÔNG / claim_job thắng lease / actions set_params; agent dùng làm `expected_revision` (409 = đọc lại) |
+| created_at / updated_at | BigInteger | |
 
 ### credit_ledger (append-only)
 | Cột | Kiểu | Ghi chú |

@@ -511,6 +511,14 @@ export default function Jobs() {
                     <span style={{ color: 'var(--text-dim)' }}>Ngày tạo</span>
                     <span style={{ fontWeight: 600 }}>{formatDate(selectedJob.createdAt)}</span>
                   </div>
+                  {/* GD4 — revision: số lần job đã đổi; API agent dùng làm
+                      expected_revision khi hành động (409 = có ai đổi trước) */}
+                  {typeof selectedJob.revision === 'number' && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text-dim)' }}>Phiên bản (revision)</span>
+                      <span style={{ fontWeight: 600 }}>{selectedJob.revision}</span>
+                    </div>
+                  )}
                   {selectedJob.status === 'done' && selectedJob.updatedAt && (                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--text-dim)' }}>Hoàn thành</span>
                       <span style={{ fontWeight: 600 }}>{formatDate(selectedJob.updatedAt)}</span>

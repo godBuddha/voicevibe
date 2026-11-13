@@ -93,6 +93,7 @@ jobs:
             "tests/test_jobstate.py"
             "tests/test_jobs_events.py"
             "tests/test_job_artifacts.py"
+            "tests/test_job_actions.py"
             "tests/test_ytdlp_bin.py"
             "tests/test_glossary.py"
             "app.pipelines.dub --selftest"

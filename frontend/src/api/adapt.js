@@ -44,6 +44,9 @@ export function adaptJob(j) {
     progress,
     resultKey: j.result_key || null,
     error: j.error || null,
+    // GD4 — revision tăng mỗi lần job đổi (transition/lease/set_params);
+    // agent đọc để gửi expected_revision trong /actions (409 = đọc lại).
+    revision: typeof j.revision === 'number' ? j.revision : undefined,
     createdAt: j.created_at ? new Date(j.created_at * 1000) : undefined,
     // Mới: đủ dữ liệu thật cho panel chi tiết (file/hoàn thành) — trước đây
     // job.file/completedAt không bao giờ có.

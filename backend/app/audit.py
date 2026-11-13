@@ -47,6 +47,7 @@ ACTIONS: tuple[str, ...] = (
     "job.cancel",
     "job.retry",
     "job.delete",
+    "job.set_params",  # GD4 — agent/user đổi tham số job qua /actions
     "config.import",
 )
 

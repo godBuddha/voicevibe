@@ -18,8 +18,8 @@ import time
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import (FileResponse, HTMLResponse, RedirectResponse,
-                               StreamingResponse)
+from fastapi.responses import (FileResponse, HTMLResponse, JSONResponse,
+                               RedirectResponse, StreamingResponse)
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -519,6 +519,7 @@ def get_job(
         "params": j.params, "updated_at": j.updated_at,
         "result_key": j.result_s3_key,
         "started_at": j.started_at, "finished_at": j.finished_at,
+        "revision": int(j.revision or 0),  # GD4 — agent dùng cho expected_revision
     }
 
 
@@ -1004,11 +1005,8 @@ def _own_job(job_id: str, user: User, db: Session) -> Job:
     return job
 
 
-@app.post("/v1/jobs/{job_id}/cancel")
-def cancel_job(job_id: str, user: User = Depends(auth),
-               db: Session = Depends(get_db)) -> dict:
-    """Hủy job đang chờ/đang chạy. Job miễn phí (self-host) — không trừ, không
-    hoàn credit.
+def _do_cancel(db: Session, job: Job, user: User) -> dict:
+    """Thân HỦY — dùng chung cho endpoint /cancel và /actions (GD4).
 
     - Hủy = gạch trên DB luôn (nhanh, chắc chắn đổi trạng thái) KÈM revoke
       task Celery theo task_id nếu có: đang chờ → bị vứt không bao giờ chạy;
@@ -1018,7 +1016,6 @@ def cancel_job(job_id: str, user: User = Depends(auth),
     - Job đã done/failed/cancelled/interrupted → 409: không còn gì để hủy
       (interrupted là trạng thái kết thúc — hủy nó chỉ là đổi nhãn).
     """
-    job = _own_job(job_id, user, db)
     if job.status in (JobStatus.done, JobStatus.failed, JobStatus.cancelled,
                       JobStatus.interrupted):
         raise HTTPException(status_code=409,
@@ -1039,19 +1036,16 @@ def cancel_job(job_id: str, user: User = Depends(auth),
     return {"job_id": job.id, "status": "cancelled"}
 
 
-@app.post("/v1/jobs/{job_id}/retry")
-def retry_job(job_id: str, user: User = Depends(auth),
-              db: Session = Depends(get_db)) -> dict:
-    """Chạy lại job đã hỏng/đã hủy/bị gián đoạn — TIẾP TỤC từ công đoạn đã xong (A1).
+@app.post("/v1/jobs/{job_id}/cancel")
+def cancel_job(job_id: str, user: User = Depends(auth),
+               db: Session = Depends(get_db)) -> dict:
+    """Hủy job đang chờ/đang chạy. Job miễn phí (self-host) — không trừ, không
+    hoàn credit."""
+    return _do_cancel(db, _own_job(job_id, user, db), user)
 
-    Job failed/cancelled/interrupted được chạy lại (queued/running → 409 — đang
-    chạy; done → 409 — muốn làm lại thì tạo job mới / dùng "Nhân bản" GC3).
-    Giữ nguyên `params` + `result_s3_key`: kết quả cũ vẫn tải được tới khi lần
-    chạy mới hoàn thành (endpoint /result chỉ trả khi done — không có cửa sổ
-    bất nhất). Sổ tay công đoạn trong `media/jobs/{id}/work/` là thứ quyết định
-    chạy lại từ đâu — endpoint này chỉ xếp hàng lại.
-    """
-    job = _own_job(job_id, user, db)
+
+def _do_retry(db: Session, job: Job, user: User) -> dict:
+    """Thân CHẠY LẠI — dùng chung cho endpoint /retry và /actions (GD4)."""
     if job.status == JobStatus.done:
         raise HTTPException(status_code=409,
                             detail="job đã xong — muốn làm lại hãy tạo job mới")
@@ -1067,6 +1061,122 @@ def retry_job(job_id: str, user: User = Depends(auth),
     db.commit()
     _audit("job.retry", user_id=user.id, target=job.id)
     return {"job_id": job.id, "status": "queued", "dispatch": mode}
+
+
+@app.post("/v1/jobs/{job_id}/retry")
+def retry_job(job_id: str, user: User = Depends(auth),
+              db: Session = Depends(get_db)) -> dict:
+    """Chạy lại job đã hỏng/đã hủy/bị gián đoạn — TIẾP TỤC từ công đoạn đã xong (A1).
+
+    Job failed/cancelled/interrupted được chạy lại (queued/running → 409 — đang
+    chạy; done → 409 — muốn làm lại thì tạo job mới / dùng "Nhân bản" GC3).
+    Giữ nguyên `params` + `result_s3_key`: kết quả cũ vẫn tải được tới khi lần
+    chạy mới hoàn thành (endpoint /result chỉ trả khi done — không có cửa sổ
+    bất nhất). Sổ tay công đoạn trong `media/jobs/{id}/work/` là thứ quyết định
+    chạy lại từ đâu — endpoint này chỉ xếp hàng lại.
+    """
+    return _do_retry(db, _own_job(job_id, user, db), user)
+
+
+# --- GD4 (C5): endpoint ACTION cho AI agent — CÕNG CỘNG TỐI QUAN (optimistic
+# concurrency) theo pattern creator/service.ts của OpenCreator (Apache-2.0):
+# đọc job lấy `revision` → gửi hành động kèm `expected_revision`; lệch → 409
+# trả revision mới (có ai đó đổi job trước — đọc lại rồi thử, đừng hành động
+# theo bản cũ). Mọi thay đổi (user HOẶC agent) đi qua CÙNG một cổng — không có
+# đường riêng "cho agent" nào đủ yếu để bỏ qua guard máy trạng thái.
+class JobActionIn(BaseModel):
+    action: str = Field(
+        ..., description="cancel | retry | duplicate | set_params")
+    patch: dict | None = Field(
+        None, description="set_params: tham số muốn đổi (JSON); duplicate: "
+                           "patch trộn lên params gốc khi nhân bản")
+    expected_revision: int | None = Field(
+        None, description="chỉ hành động khi revision của job vẫn là số này — "
+                          "lệch → 409 kèm revision mới")
+
+
+@app.post("/v1/jobs/{job_id}/actions")
+def job_actions(job_id: str, body: JobActionIn, user: User = Depends(auth),
+                db: Session = Depends(get_db)) -> dict:
+    """Hành động trên job — CỔNG DUY NHẤT cho cả người dùng và AI agent.
+
+    Agent điển hình 3 bước:
+        1. GET  /v1/jobs/{id}                       → revision=4
+        2. POST /v1/jobs/{id}/actions               body {"action":"set_params",
+             "patch":{"target_lang":"en"},"expected_revision":4}
+        3. 200 → xong; 409 → đọc revision mới, quay lại bước 2.
+
+    `set_params` CHỈ trên job đã kết thúc (failed/cancelled/interrupted):
+    dispatch gửi params SNAPSHOT trong tham số task — sửa params job
+    queued/running là vô nghĩa (task đang xếp hàng cầm bản cũ); job done →
+    dùng "Nhân bản" (tạo job mới chạy lại với tham số khác). Sửa xong job
+    VỪNG status — chạy lại bằng action "retry" (2 lượt gọi rõ ràng hơn
+    sửa-rồi-chạy-một-đạt, và mỗi lượt đều có event + audit riêng).
+    Auth: session cookie HOẶC X-API-Key (key trong /v1/keys) — agent dùng key.
+    """
+    job = _own_job(job_id, user, db)
+    if (body.expected_revision is not None
+            and int(job.revision or 0) != body.expected_revision):
+        # JSONResponse thay HTTPException: hợp đồng 409 PHẢI kèm revision mới
+        # (agent đọc rồi hành động lại — HTTPException chỉ mang `detail`).
+        return JSONResponse(
+            status_code=409,
+            content={
+                "detail": (f"job đã đổi từ revision {body.expected_revision} "
+                           f"thành {int(job.revision or 0)} — có ai đó (hoặc "
+                           "bạn) vừa hành động trước; đọc lại job rồi thử"),
+                "revision": int(job.revision or 0),
+            },
+        )
+
+    if body.action == "set_params":
+        if job.status not in (JobStatus.failed, JobStatus.cancelled,
+                              JobStatus.interrupted):
+            if job.status in (JobStatus.queued, JobStatus.running):
+                raise HTTPException(
+                    status_code=409,
+                    detail="job đang chờ/chạy — hủy trước nếu muốn đổi tham số "
+                           "(đổi là vô nghĩa: task cầm snapshot tham số cũ)")
+            # done/terminal còn lại
+            raise HTTPException(
+                status_code=409,
+                detail="job đã xong — đổi tham số hãy dùng action «duplicate» "
+                       "(tạo job mới chạy lại)")
+        patch = dict(body.patch or {})
+        if not patch:
+            raise HTTPException(status_code=422,
+                                detail="set_params cần patch (tham số muốn đổi)")
+        merged = {k: v for k, v in (job.params or {}).items()
+                  if k not in _DUP_STRIP_KEYS}
+        merged.update(patch)
+        merged["type"] = job.type
+        # Đúng nguyên tắc GC3: "hai đường validate là nguồn bug kinh điển" —
+        # set_params đi QUA ĐÚNG đường validate của tạo job.
+        ji = JobIn(**merged)
+        _validate_job_in(ji, user, db)
+        job.params = ji.model_dump(exclude_none=True)
+        job.revision = int(job.revision or 0) + 1
+        # Event kind="action": SSE (job_events không lọc kind) phát tín hiệu
+        # "job_ids đổi" → trang Jobs tự refetch thấy params mới.
+        db.add(JobEvent(job_id=job.id, user_id=user.id, kind="action",
+                        data={"action": "set_params",
+                              "patch_keys": sorted(patch)},
+                        created_at=int(time.time())))
+        db.commit()
+        _audit("job.set_params", user_id=user.id, target=job.id)
+        return {"job_id": job.id, "status": job.status.value,
+                "revision": int(job.revision)}
+
+    if body.action == "cancel":
+        return _do_cancel(db, job, user)
+    if body.action == "retry":
+        return _do_retry(db, job, user)
+    if body.action == "duplicate":
+        return _do_duplicate(db, job, body.patch, user)
+    raise HTTPException(
+        status_code=422,
+        detail=(f"action lạ: {body.action!r} — chọn một trong "
+                "cancel | retry | duplicate | set_params"))
 
 
 @app.get("/v1/jobs/{job_id}/artifacts")
@@ -1116,22 +1226,12 @@ _DUP_STRIP_KEYS = ("stage", "extra_outputs", "publish_error", "prompt_fallback",
                    "download_duration", "download_uploader", "resume")
 
 
-@app.post("/v1/jobs/{job_id}/duplicate", status_code=201)
-def duplicate_job(job_id: str, body: dict | None = None,
-                  user: User = Depends(auth),
-                  db: Session = Depends(get_db)) -> dict:
-    """Nhân bản job thành job MỚI (GC3) — "Chạy lại với tham số khác".
-
-    - Mọi trạng thái được nhân bản (done/failed/interrupted…): job mới xếp
-      hàng riêng, KHÔNG copy kết quả/phiên bản.
-    - body = patch params (ví dụ đổi target_lang / voice_id) → trộn lên params
-      cũ rồi đi QUA ĐÚNG đường validate của tạo job (`_validate_job_in`) —
-      hai đường validate là nguồn bug kinh điển, dùng chung một đường.
-    """
-    job = _own_job(job_id, user, db)
+def _do_duplicate(db: Session, job: Job, body_patch: dict | None,
+                  user: User) -> dict:
+    """Thân NHÂN BẢN — dùng chung cho endpoint /duplicate và /actions (GD4)."""
     merged = {k: v for k, v in (job.params or {}).items()
               if k not in _DUP_STRIP_KEYS}
-    merged.update(body or {})
+    merged.update(body_patch or {})
     # `type` phải từ params gốc (body không được đổi type qua lưng — muốn loại
     # khác thì tạo job mới từ đầu).
     merged["type"] = job.type
@@ -1148,9 +1248,24 @@ def duplicate_job(job_id: str, body: dict | None = None,
     mode, task_id = dispatch(j2.id, j2.params)
     j2.task_id = task_id
     db.commit()
-    _audit("job.duplicate", user_id=user.id, target=f"{job_id}->{j2.id}")
+    _audit("job.duplicate", user_id=user.id, target=f"{job.id}->{j2.id}")
     return {"job_id": j2.id, "status": j2.status.value, "dispatch": mode,
             "source_job_id": job.id}
+
+
+@app.post("/v1/jobs/{job_id}/duplicate", status_code=201)
+def duplicate_job(job_id: str, body: dict | None = None,
+                  user: User = Depends(auth),
+                  db: Session = Depends(get_db)) -> dict:
+    """Nhân bản job thành job MỚI (GC3) — "Chạy lại với tham số khác".
+
+    - Mọi trạng thái được nhân bản (done/failed/interrupted…): job mới xếp
+      hàng riêng, KHÔNG copy kết quả/phiên bản.
+    - body = patch params (ví dụ đổi target_lang / voice_id) → trộn lên params
+      cũ rồi đi QUA ĐÚNG đường validate của tạo job (`_validate_job_in`) —
+      hai đường validate là nguồn bug kinh điển, dùng chung một đường.
+    """
+    return _do_duplicate(db, _own_job(job_id, user, db), body, user)
 
 
 @app.delete("/v1/jobs/{job_id}")

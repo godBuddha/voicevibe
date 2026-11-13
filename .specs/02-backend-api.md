@@ -16,6 +16,7 @@ Lỗi chuẩn HTTP: 401 (key sai) · 402 (thiếu credits) · 404 · 409 (job ch
 | GET | /v1/jobs/{id}/artifacts | Danh sách **phiên bản kết quả** (mỗi lần chạy = 1 version): `[{version, run_id, key, size, created_at, note}]` |
 | POST | /v1/jobs/{id}/artifacts/{version}/restore | Trả kết quả của 1 version về làm "hiện tại" của job |
 | POST | /v1/jobs/{id}/duplicate | **Nhân bản job**: copy nguyên params thành job mới `queued` (không copy kết quả) → 201 `{job_id}` |
+| POST | /v1/jobs/{id}/actions | **GD4 (C5)** — cổng hành động cho user + AI agent: `cancel`/`retry`/`duplicate`/`set_params`. `expected_revision` lệch → **409 `{detail, revision}`** (optimistic concurrency — đọc lại rồi thử). `set_params` CHỈ trên job terminal `failed/cancelled/interrupted` (dispatch cầm snapshot params — sửa job đang chờ/chạy vô nghĩa; done → dùng duplicate); đi qua `_validate_job_in` (chặn 422 sai tham số); Ghi JobEvent `kind="action"` (SSE refetch) + audit `job.set_params`. Auth: cookie **hoặc X-API-Key** (key /v1/keys — agent dùng đường này). Ví dụ agent 3 bước: `GET /v1/jobs/{id}` → `revision=4`; `POST /v1/jobs/{id}/actions {"action":"set_params","patch":{"target_lang":"en"},"expected_revision":4}`; 200 xong / 409 → đọc revision mới quay lại bước 2 |
 | DELETE | /v1/jobs/{id} | Xoá job + dọn `delete_prefix("jobs/{id}/")` + xoá JobEvents theo; job `interrupted` vẫn xoá được |
 
 Trạng thái job đầy đủ: `queued → running → done | failed | cancelled | **interrupted**` (interrupted = server/workspace khởi động lại giữa chừng job đang chạy — tự thấy lúc boot, retry là chạy lại).

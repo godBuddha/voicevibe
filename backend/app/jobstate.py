@@ -78,6 +78,11 @@ def transition(db, job: Job, to: JobStatus, *, error: str | None = None,
         return False
     now = _now()
     job.status = to
+    # GD4 — optimistic concurrency: revision tăng MỖI lần chuyển trạng thái
+    # THÀNH CÔNG (guard False không đụng — revision bất biến). Agent/API đọc
+    # `revision` rồi gửi `expected_revision` khi hành động; lệch là có người
+    # khác đổi job trước → 409 trả revision mới, đọc lại rồi thử.
+    job.revision = int(job.revision or 0) + 1
     if to is JobStatus.running and job.started_at is None:
         job.started_at = now
     if to in TERMINAL:
@@ -176,7 +181,8 @@ def claim_job(db, job_id: str, task_id: str, *,
                     task_id=task_id,
                     started_at=func.coalesce(Job.started_at, now),
                     updated_at=now,
-                    error=None)
+                    error=None,
+                    revision=Job.revision + 1)  # GD4 — lease cũng là một đổi
             .execution_options(synchronize_session=False))
     res = db.execute(stmt)
     if res.rowcount != 1:

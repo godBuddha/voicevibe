@@ -327,6 +327,11 @@ class Job(Base):
     task_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     started_at: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     finished_at: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    # GD4 (C5) — optimistic concurrency: tăng mỗi lần transition() THÀNH CÔNG,
+    # claim_job thắng lease, hoặc actions set_params. Agent/API đọc revision
+    # rồi gửi `expected_revision`; lệch → 409 trả revision mới (ai đó đổi job
+    # trước — đọc lại rồi thử lại, đừng mù quáng hành động theo bản cũ).
+    revision: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[int] = mapped_column(BigInteger, default=_now)
     updated_at: Mapped[int] = mapped_column(BigInteger, default=_now, onupdate=_now)
 

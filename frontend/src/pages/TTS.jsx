@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { AudioWaveform } from 'lucide-react';
 import { useApi } from '../hooks/useApi.jsx';
 import { createJob, pollJob, getResult } from '../api/jobs.js';
 
@@ -226,8 +227,10 @@ export default function TTS() {
             }}
           >
             <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
-              <div style={{ fontSize: '48px', marginBottom: '10px' }}>声波</div>
-              <div style={{ fontSize: 'var(--text-sm)' }}>Waveform sẽ hiển thị tại đây sau khi tạo</div>
+              {/* GF2: chữ "声波" (tiếng Trung) leftover từ mock — thay icon
+                  Lucide + chữ Việt hoàn toàn (UI phải thuần tiếng Việt). */}
+              <AudioWaveform size={44} strokeWidth={1.6} style={{ marginBottom: '10px', opacity: 0.45 }} />
+              <div style={{ fontSize: 'var(--text-sm)' }}>Sóng âm sẽ hiển thị tại đây sau khi tạo</div>
             </div>
           </div>
 

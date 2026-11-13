@@ -23,6 +23,7 @@ export default function TranslateText() {
   // vv_prompt_pick = "Dùng cho dịch" ở trang Prompt gắn sẵn lựa chọn (đọc 1 lần).
   const [prompts, setPrompts] = useState([]);
   const [promptId, setPromptId] = useState('');
+  const [glossary, setGlossary] = useState(''); // GD2 — thuật ngữ bắt buộc
 
   useEffect(() => {
     (async () => {
@@ -62,6 +63,8 @@ export default function TranslateText() {
         source_lang: sourceLang,
         target_lang: targetLang,
         ...(promptId ? { prompt_id: promptId } : {}),
+        // GD2 — thuật ngữ bắt buộc: mỗi dòng "gốc=bản dịch" hệ luôn dịch theo.
+        ...(glossary.trim() ? { glossary } : {}),
       });
       const done = await pollJob(created.jobId, { onUpdate: setJob });
       if (done.status === 'failed') {
@@ -167,6 +170,25 @@ export default function TranslateText() {
               </Link>
             </div>
           )}
+
+          {/* GD2 — thuật ngữ bắt buộc: LLM luôn dịch theo danh sách, vi phạm chỉ cảnh báo */}
+          <div>
+            <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '6px', fontWeight: 600 }}>
+              Thuật ngữ bắt buộc (mỗi dòng: gốc=bản dịch)
+            </label>
+            <textarea
+              value={glossary}
+              onChange={(e) => setGlossary(e.target.value)}
+              placeholder={'OpenAI=OpenAI (công ty)\nGióng=Thánh Gióng'}
+              rows={3}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: '8px 10px', borderRadius: 'var(--radius)',
+                border: '1px solid var(--border)', fontSize: 'var(--text-sm)',
+                background: 'var(--bg)', color: 'var(--text)', resize: 'vertical',
+              }}
+            />
+          </div>
 
           {/* Văn bản nguồn */}
           <div>

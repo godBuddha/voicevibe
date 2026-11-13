@@ -49,6 +49,7 @@ from .job_events import job_event_stream
 from .pipelines.subtitle import FORMATS as SUBTITLE_FORMATS
 from .pipelines.download import QUALITIES as _DOWNLOAD_QUALITIES
 from .pipelines.download import validate_url as _download_validate_url
+from .pipelines.glossary import parse_glossary as _parse_glossary
 from .prompt_library import router as prompt_library_router
 from .prompts import seed_prompts
 from .providers_api import router as ai_admin_router
@@ -239,6 +240,11 @@ class JobIn(BaseModel):
     with_subs: bool = Field(
         False, description="dub (B4b): xuất thêm phụ đề song ngữ bilingual.srt "
                            "kèm video — tái dùng được cho job render")
+    # --- GD2: thuật ngữ bắt buộc (translate/dub/subtitle dùng đường dịch batch)
+    glossary: str | None = Field(
+        None, description="thuật ngữ bắt buộc — mỗi dòng 'gốc=bản dịch' "
+                          "(dòng # là chú thích); LLM luôn dịch theo danh sách "
+                          "này, vi phạm chỉ cảnh báo trong job")
 
 
 class VoiceIn(BaseModel):
@@ -344,6 +350,23 @@ def _validate_job_in(job: JobIn, user: User, db: Session) -> None:
                 status_code=422,
                 detail="chỉ chọn MỘT nguồn phụ đề: subtitle_key hoặc "
                        "subtitle_job_id")
+
+    if job.glossary:
+        # GD2 — thuật ngữ bắt buộc: chỉ job có khâu DỊCH dùng được (translate/
+        # dub/subtitle) — type khác + glossary là gửi nhầm, chặn thay vì bỏ
+        # qua âm thầm (bài học pydantic nuốt field). Sai format cũng phải chặn
+        # LÚC TẠO JOB, không để worker chết giữa đường — ValueError kèm số
+        # dòng hiển thị nguyên văn.
+        if job.type not in ("translate", "dub", "subtitle"):
+            raise HTTPException(
+                status_code=422,
+                detail="glossary (thuật ngữ) chỉ dùng cho job translate, "
+                       "dub hoặc subtitle")
+        try:
+            _parse_glossary(job.glossary)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=422, detail=f"Thuật ngữ sai định dạng: {exc}") from exc
 
     if job.voice_id:
         voice = db.get(Voice, job.voice_id)

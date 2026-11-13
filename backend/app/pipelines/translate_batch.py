@@ -119,17 +119,27 @@ class BatchTranslator:
     checkpoint_path: str | None = None
     progress_cb: object | None = None          # fn(pct:int, msg:str)
     abort_check: object | None = None          # fn() -> bool
+    # GD2 — thuật ngữ bắt buộc: text thô dạng "gốc=bản dịch" (mỗi dòng một cặp).
+    # Đã validate lúc tạo job (main._validate_job_in) nên worker parse an toàn.
+    glossary: str | None = None
 
     warnings: list[str] = field(default_factory=list, init=False)
 
     # ---- hệ prompt ----
     @property
     def system(self) -> str:
-        if self.system_prompt is not None:
-            return self.system_prompt
-        return P.render("translate_batch", source=self.source, target=self.target,
-                        batch_size=self.config.batch_size,
-                        context_count=self.config.context_sentences)
+        base = self.system_prompt
+        if base is None:
+            base = P.render("translate_batch", source=self.source, target=self.target,
+                            batch_size=self.config.batch_size,
+                            context_count=self.config.context_sentences)
+        # GD2 — glossary là ràng buộc cứng: nối SAU CÙNG kể cả khi job chọn
+        # prompt cá nhân, để override không xoá nhầm danh sách thuật ngữ.
+        if self.glossary:
+            from .glossary import glossary_block, parse_glossary
+
+            base = f"{base}\n\n{glossary_block(parse_glossary(self.glossary))}"
+        return base
 
     def _user_message(self, items: list[tuple[int, str]], before: list[str],
                       after: list[str], n: int) -> str:
@@ -250,7 +260,15 @@ class BatchTranslator:
             done = sum(1 for t in translated if t is not None)
             self._report(40 + 20 * (done / n), f"dịch {done - done_before}/{len(pending)}")
         self._report(60, f"dịch xong {n}/{n}")
-        return [t or origins[i] for i, t in enumerate(translated)]
+        out = [t or origins[i] for i, t in enumerate(translated)]
+        # GD2 — kiểm bộ thuật ngữ: vi phạm chỉ CẢNH BÁO (LLM không tôn trọng
+        # ràng buộc là chuyện đã biết), bản dịch vẫn được dùng cho job.
+        if self.glossary:
+            from .glossary import check_translations, parse_glossary
+
+            self.warnings.extend(
+                check_translations(origins, out, parse_glossary(self.glossary)))
+        return out
 
     def _abort(self) -> None:
         if self.abort_check is not None and self.abort_check():

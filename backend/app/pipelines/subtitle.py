@@ -36,6 +36,13 @@ MIN_CUE_DURATION = 0.3
 # cue theo ranh giới từ với mốc giờ word-level (seg.words) chính xác tới chữ.
 MAX_WORDS_PER_CUE = 12
 
+# GD2 — phụ đề dễ đọc: mỗi dòng có hạn ký tự và mỗi cue có hạn "tốc độ đọc"
+# (cps = ký tự/giây). Chỉ bật khi caller CẤU HÌNH (render(..., max_line_chars=…)
+# — None nghĩa là giữ nguyên hành vi cũ cho mọi caller hiện có + selftest
+# (không phá SRT đang ổn).
+DEFAULT_MAX_LINE_CHARS = 42
+DEFAULT_MAX_CPS = 21.0
+
 
 @dataclass
 class Cue:
@@ -140,6 +147,116 @@ def normalize_cues(cues: list[Cue], *, min_duration: float = MIN_CUE_DURATION,
     return cues
 
 
+def _wrap_line(line: str, max_chars: int, warnings: list[str]) -> list[str]:
+    """Chia một dòng dài thành nhiều dòng ≤ max_chars theo ranh giới TỪ (greedy).
+    Một từ đơn lẻ dài hơn hạn → giữ nguyên + cảnh báo (cắt giữa từ tệ hơn)."""
+    if len(line) <= max_chars:
+        return [line]
+    out: list[str] = []
+    cur = ""
+    for word in line.split(" "):
+        cand = f"{cur} {word}" if cur else word
+        if len(cand) <= max_chars or not cur:
+            cur = cand
+        else:
+            out.append(cur)
+            cur = word
+    if cur:
+        out.append(cur)
+    for chunk in out:
+        if len(chunk) > max_chars:
+            warnings.append(
+                f"dòng có một từ dài hơn {max_chars} ký tự — giữ nguyên: "
+                f"«{chunk[:24]}…»")
+    return out
+
+
+def _split_index(text: str, ratio: float) -> int:
+    """Vị trí ký tự tách gần `ratio`·len(text) tại ranh giới TỪ. Trả -1 khi
+    không tách được (ít hơn 2 từ)."""
+    words = text.split(" ")
+    if len(words) < 2:
+        return -1
+    target = max(1, min(len(text) - 1, round(ratio * len(text))))
+    best, best_diff, pos = -1, 1 << 30, 0
+    for k, word in enumerate(words[:-1]):
+        pos += len(word) + (1 if k else 0)
+        diff = abs(pos - target)
+        if diff < best_diff:
+            best, best_diff = pos, diff
+    return best
+
+
+def enforce_limits(cues: list[Cue], *, max_line_chars: int, max_cps: float,
+                   warnings: list[str] | None = None) -> list[Cue]:
+    """GD2 — ép phụ đề vào khung dễ đọc, trả danh sách cue (đã normalize lại):
+
+      1. **Chia dòng**: dòng vượt `max_line_chars` → wrap theo ranh giới từ.
+      2. **Tốc độ đọc**: cue hiển thị nhanh hơn `max_cps` ký tự/giây → phải có
+         THÊM THỜI GIAN. Tách cue làm hai là không đủ (ký tự và thời gian cùng
+         chia đôi → cps nguyên vẹn) — cần MƯỢN thời gian từ khoảng trống ngay
+         trước/sau cue (không đụng mốc cue lân cận: mượn xong phía sau thì
+         normalize đẩy cue kế nhẹ theo). Sau đó mới tách theo ranh giới từ gần
+         giữa, thời gian chia theo tỷ lệ ký tự.
+      3. Không đủ chỗ trống / dòng ít hơn 2 từ → GIỮ NGUYÊN + cảnh báo
+         (phụ đề hơi nhanh còn hơn job chết — pattern "thông tin phụ").
+
+    Áp trên TỪNG dòng — cue song ngữ tách cả hai dòng theo cùng tỷ lệ ký tự;
+    dòng không tách được về nửa đầu + cảnh báo.
+    """
+    warn = warnings if warnings is not None else []
+    out: list[Cue] = []
+    for i, cue in enumerate(cues):
+        lines = [part for line in cue.lines
+                 for part in _wrap_line(line, max_line_chars, warn)]
+        dur = cue.end - cue.start
+        total = sum(len(ln) for ln in lines)
+        if dur <= 0 or max_cps <= 0 or total / dur <= max_cps:
+            cue.lines = lines
+            out.append(cue)
+            continue
+        # ---- mượn thời gian từ khoảng trống trước/sau (đủ cần là nghỉ)
+        needed = total / max_cps
+        extra = needed - dur
+        next_start = cues[i + 1].start if i + 1 < len(cues) else cue.end + 10.0
+        room_after = max(0.0, next_start - cue.end)
+        room_before = max(0.0, cue.start - (out[-1].end if out else 0.0))
+        borrow_after = min(extra, room_after)
+        borrow_before = min(extra - borrow_after, room_before)
+        lo, hi = cue.start - borrow_before, cue.end + borrow_after
+        if hi - lo < needed - 1e-9:
+            warn.append(
+                f"cue {i + 1} đọc nhanh ({total / dur:.0f} ký tự/giây) nhưng "
+                "không đủ chỗ trống để kéo dài — giữ nguyên mốc giờ")
+            lo, hi = cue.start, cue.end
+        # ---- tách theo ranh giới từ (nếu tách được)
+        first = lines[0] if lines else ""
+        cut = _split_index(first, 0.5)
+        if cut > 0:
+            ratio = cut / max(1, len(first))
+            mid = lo + (hi - lo) * ratio
+            a, b = [], []
+            for ln in lines:
+                part = _split_index(ln, ratio)
+                if part > 0:
+                    a.append(ln[:part].strip())
+                    b.append(ln[part:].strip())
+                else:
+                    warn.append("một dòng phụ không tách được khi chia cue — "
+                                "gộp về nửa đầu")
+                    a.append(ln)
+                    b.append("")
+            out.append(Cue(start=lo, end=mid, lines=[x for x in a if x]))
+            out.append(Cue(start=mid, end=hi, lines=[x for x in b if x]))
+        else:
+            warn.append(
+                f"cue {i + 1} đọc nhanh nhưng ít hơn 2 từ — kéo dài thời gian")
+            cue.lines = lines
+            cue.start, cue.end = lo, hi
+            out.append(cue)
+    return normalize_cues(out)
+
+
 def _fix_windows(segments: list[TranscriptSegment]) -> list[TranscriptSegment]:
     """Chặn `end <= start` và thời lượng bằng 0.
 
@@ -158,8 +275,15 @@ def _fix_windows(segments: list[TranscriptSegment]) -> list[TranscriptSegment]:
 
 def render(segments: list[TranscriptSegment], fmt: str = DEFAULT_FORMAT, *,
            translations: list[str] | None = None, bilingual: bool = False,
-           show_speaker: bool = True) -> str:
-    """Xuất phụ đề ở định dạng `fmt`. Trả về CHUỖI (chưa ghi ra storage)."""
+           show_speaker: bool = True, max_line_chars: int | None = None,
+           max_cps: float | None = None,
+           warnings: list[str] | None = None) -> str:
+    """Xuất phụ đề ở định dạng `fmt`. Trả về CHUỖI (chưa ghi ra storage).
+
+    GD2 — `max_line_chars`/`max_cps` bật khung dễ đọc (chia dòng + mượn giờ
+    trống để hạ tốc độ đọc); None = bỏ qua hoàn toàn (mọi caller cũ + selftest
+    giữ output nguyên vẹn). Cảnh báo chia/không-tách-được trả qua `warnings`.
+    """
     if fmt not in FORMATS:
         raise ValueError(f"định dạng không hỗ trợ: {fmt!r} (chọn trong {list(FORMATS)})")
 
@@ -168,6 +292,13 @@ def render(segments: list[TranscriptSegment], fmt: str = DEFAULT_FORMAT, *,
     segments = _fix_windows(segments)
     cues = normalize_cues(build_cues(segments, translations, bilingual=bilingual,
                                      show_speaker=show_speaker))
+    if max_line_chars is not None or max_cps is not None:
+        cues = enforce_limits(
+            cues,
+            max_line_chars=max_line_chars
+            if max_line_chars is not None else DEFAULT_MAX_LINE_CHARS,
+            max_cps=max_cps if max_cps is not None else DEFAULT_MAX_CPS,
+            warnings=warnings)
 
     subs = pysubs2.SSAFile()
     if fmt == "ass":
@@ -272,12 +403,43 @@ def _selftest() -> None:
     bi_long = render([long_seg], "srt", translations=["x"], bilingual=True)
     assert "00:00:00,000 --> 00:00:02,530" in bi_long, bi_long
 
+    # --- GD2: chia dòng theo ranh giới từ — mọi dòng ≤ hạn ký tự
+    fits = enforce_limits([Cue(0.0, 5.0, ["Mười chín khâu " * 4])],
+                          max_line_chars=20, max_cps=0)
+    assert all(len(ln) <= 20 for c in fits for ln in c.lines), fits
+
+    # --- GD2: cue đọc nhanh (100 ký tự / 2 giây = 50 cps) + chỗ trống phía sau
+    #     → mượn giờ + tách 2 cue, mỗi cue ≤ 21 cps
+    warns: list[str] = []
+    fast = enforce_limits([Cue(0.0, 2.0, ["a " * 50]), Cue(30.0, 31.0, ["x"])],
+                          max_line_chars=42, max_cps=21, warnings=warns)
+    assert len(fast) == 3, fast
+    for c in fast[:2]:
+        chars = sum(len(ln) for ln in c.lines)
+        assert chars / (c.end - c.start) <= 21 + 1e-6, (chars, c)
+    assert fast[0].end <= fast[1].start + 1e-9, fast
+    assert not warns, warns
+
+    # --- GD2: không đủ chỗ trống (cue kế dính sát) → giữ mốc giờ + cảnh báo
+    dense = enforce_limits([Cue(0.0, 2.0, ["a " * 50]), Cue(2.0, 3.0, ["x"])],
+                           max_line_chars=42, max_cps=21, warnings=warns)
+    assert dense[0].start == 0.0 and dense[0].end <= 2.0, dense
+    assert any("không đủ chỗ trống" in w for w in warns), warns
+
+    # --- GD2: render với cấu hình — dòng xuất ra ≤ hạn ký tự
+    fitted = render([TranscriptSegment(0.0, 4.0, "từ " * 40)], "srt",
+                    max_line_chars=42, max_cps=21)
+    body = [ln for ln in fitted.splitlines()
+            if ln and "-->" not in ln and not ln.strip().isdigit()]
+    assert all(len(ln) <= 42 for ln in body), fitted
+
     print("SRT ....................... OK")
     print("VTT ....................... OK")
     print("ASS ....................... OK")
     print("song ngữ .................. OK")
     print("A6 normalize (overlap/300ms) OK")
     print("A4 tách cue theo từ ....... OK")
+    print("GD2 giới hạn dòng + cps ... OK")
     print("SUBTITLE SELFTEST PASSED")
 
 

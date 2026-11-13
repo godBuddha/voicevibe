@@ -20,6 +20,25 @@ Lỗi chuẩn HTTP: 401 (key sai) · 402 (thiếu credits) · 404 · 409 (job ch
 
 Trạng thái job đầy đủ: `queued → running → done | failed | cancelled | **interrupted**` (interrupted = server/workspace khởi động lại giữa chừng job đang chạy — tự thấy lúc boot, retry là chạy lại).
 
+### GD2 — thuật ngữ bắt buộc (glossary) + khung phụ đề dễ đọc
+- `JobIn.glossary` (translate/dub/subtitle; type khác → 422): text mỗi dòng
+  `gốc=bản dịch` (dòng `#` = chú thích). Sai format → 422 kèm số dòng
+  (`parse_glossary`) — chặn LÚC TẠO JOB, không để worker chết giữa đường.
+- Chèn `glossary_block()` CUỐI system prompt (ràng buộc cứng — override Thư
+  viện Prompt không xoá được); vi phạm CHỈ CẢNH BÁO vào
+  `params["glossary_warnings"]` (job vẫn done — không assert cứng trên đầu ra
+  LLM). Đường dịch: translate text (`_run_translate`), dub (`dub_audio
+  glossary=`), subtitle (BatchTranslator). Đường từng-cue (Marian local)
+  chưa ăn glossary — ghi chú trong code.
+- Khung phụ đề dễ đọc (subtitle.py `enforce_limits`): settings
+  `subtitle.max_line_chars` (42) + `subtitle.max_cps` (21 ký tự/giây; **0 = tắt**).
+  Dòng vượt hạn → wrap theo từ; cue đọc nhanh hơn cps → **mượn thời gian từ
+  khoảng trống trước/sau** (tách cue đơn thuần không giảm cps — ký tự và giờ
+  cùng chia đôi) rồi tách theo từ; không đủ chỗ → giữ mốc giờ + cảnh báo
+  `params["subtitle_fit_warnings"]`. `render()` kwargs None = bỏ qua (caller
+  cũ + selftest giữ output nguyên vẹn).
+
+
 ## Media
 | Method | Path | Mô tả |
 |---|---|---|

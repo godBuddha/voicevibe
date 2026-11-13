@@ -32,6 +32,7 @@ export default function Dub() {
   const [subSource, setSubSource] = useState('auto');
   const [fromLang, setFromLang] = useState('en');
   const [toLang, setToLang] = useState('vi');
+  const [glossary, setGlossary] = useState(''); // GD2 — thuật ngữ bắt buộc
   const [voiceOption, setVoiceOption] = useState('original');
   const [demucsEnabled, setDemucsEnabled] = useState(false);
   const [voices, setVoices] = useState([]);
@@ -135,6 +136,8 @@ export default function Dub() {
       if (voiceOption === 'clone' && cloneVoice) {
         payload.speaker_voices = { '*': cloneVoice.name };
       }
+      // GD2 — thuật ngữ bắt buộc: mỗi dòng "gốc=bản dịch" hệ luôn dịch theo.
+      if (glossary.trim()) payload.glossary = glossary;
       const created = await createJob(payload);
       // Lồng tiếng CPU chạy nhiều phút — hẹn giờ rộng, không bỏ giữa chừng.
       const done = await pollJob(created.jobId, {
@@ -272,6 +275,26 @@ export default function Dub() {
                   ))}
                 </select>
               </div>
+            </div>
+            {/* GD2 — thuật ngữ bắt buộc: LLM luôn dịch theo danh sách */}
+            <div style={{ marginTop: '12px' }}>
+              <label style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '6px' }}>
+                Thuật ngữ bắt buộc (mỗi dòng: gốc=bản dịch)
+              </label>
+              <textarea
+                value={glossary}
+                onChange={(e) => setGlossary(e.target.value)}
+                placeholder={'OpenAI=OpenAI (công ty)\nGióng=Thánh Gióng'}
+                rows={3}
+                style={{
+                  width: '100%', boxSizing: 'border-box',
+                  padding: '10px', borderRadius: 'var(--radius)',
+                  border: '1px solid var(--border)',
+                  fontSize: 'var(--text-sm)',
+                  background: 'var(--bg)', color: 'var(--text)',
+                  resize: 'vertical',
+                }}
+              />
             </div>
           </div>
 

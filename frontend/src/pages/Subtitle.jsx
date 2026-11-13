@@ -27,6 +27,7 @@ export default function Subtitle() {
   const [sourceUrl, setSourceUrl] = useState('');
   const [subSource, setSubSource] = useState('auto');
   const [useCookies, setUseCookies] = useState(false); // GB8 — tải bằng cookies
+  const [glossary, setGlossary] = useState(''); // GD2 — thuật ngữ bắt buộc
 
   const handleFile = (f) => {
     if (f && (f.type.startsWith('video/') || f.type.startsWith('audio/'))) {
@@ -54,6 +55,8 @@ export default function Subtitle() {
       if (sourceUrl.trim()) payload.source_url = sourceUrl.trim();
       else payload.media_url = await uploadMedia(file);
       if (isBilingual) payload.target_lang = targetLang;
+      // GD2 — thuật ngữ bắt buộc: mỗi dòng "gốc=bản dịch" hệ luôn dịch theo.
+      if (glossary.trim()) payload.glossary = glossary;
       const created = await createJob(payload);
       const done = await pollJob(created.jobId, {
         onUpdate: setJob, timeoutMs: 30 * 60 * 1000,
@@ -258,26 +261,48 @@ export default function Subtitle() {
                   <span style={{ fontSize: 'var(--text-base)' }}>Phụ đề song ngữ (nguồn + dịch)</span>
                 </label>
                 {isBilingual && (
-                  <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <label style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
-                      Dịch ra:
-                    </label>
-                    <select
-                      value={targetLang}
-                      onChange={(e) => setTargetLang(e.target.value)}
-                      style={{
-                        padding: '8px 10px',
-                        borderRadius: 'var(--radius)',
-                        border: '1px solid var(--border)',
-                        fontSize: 'var(--text-sm)',
-                        background: 'var(--bg)',
-                        color: 'var(--text)',
-                      }}
-                    >
-                      {Object.entries(LANGUAGES).map(([code, name]) => (
-                        <option key={code} value={code}>{name}</option>
-                      ))}
-                    </select>
+                  <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <label style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)' }}>
+                        Dịch ra:
+                      </label>
+                      <select
+                        value={targetLang}
+                        onChange={(e) => setTargetLang(e.target.value)}
+                        style={{
+                          padding: '8px 10px',
+                          borderRadius: 'var(--radius)',
+                          border: '1px solid var(--border)',
+                          fontSize: 'var(--text-sm)',
+                          background: 'var(--bg)',
+                          color: 'var(--text)',
+                        }}
+                      >
+                        {Object.entries(LANGUAGES).map(([code, name]) => (
+                          <option key={code} value={code}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* GD2 — thuật ngữ bắt buộc: LLM luôn dịch theo danh sách */}
+                    <div>
+                      <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-dim)', marginBottom: '4px' }}>
+                        Thuật ngữ bắt buộc (mỗi dòng: gốc=bản dịch)
+                      </div>
+                      <textarea
+                        value={glossary}
+                        onChange={(e) => setGlossary(e.target.value)}
+                        placeholder={'OpenAI=OpenAI (công ty)\nGióng=Thánh Gióng'}
+                        rows={3}
+                        style={{
+                          width: '100%', boxSizing: 'border-box',
+                          padding: '8px 10px', borderRadius: 'var(--radius)',
+                          border: '1px solid var(--border)',
+                          fontSize: 'var(--text-sm)',
+                          background: 'var(--bg)', color: 'var(--text)',
+                          resize: 'vertical',
+                        }}
+                      />
+                    </div>
                   </div>
                 )}
               </div>

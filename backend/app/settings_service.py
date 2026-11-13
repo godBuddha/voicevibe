@@ -48,6 +48,14 @@ SETTING_DEFS: list[dict] = [
      "default": "./media"},
     {"key": "max_speed", "category": "dubbing", "secret": False,
      "label": "Max speech tempo before re-translate", "default": 1.35},
+    # GD2 — phụ đề dễ đọc: hạn độ dài mỗi dòng và tốc độ đọc (ký tự/giây).
+    # 0 = tắt kiểm tra (mọi cue giữ nguyên mốc giờ như trước GD2).
+    {"key": "subtitle.max_line_chars", "category": "subtitle", "secret": False,
+     "label": "Số ký tự tối đa mỗi dòng phụ đề (tự chia dòng, 0 = tắt)",
+     "default": 42},
+    {"key": "subtitle.max_cps", "category": "subtitle", "secret": False,
+     "label": "Tốc độ đọc tối đa — ký tự/giây, vượt thì mượn giờ trống + tách cue (0 = tắt)",
+     "default": 21},
     {"key": "auth.allow_signup", "category": "security", "secret": False,
      "label": "Cho phép đăng ký công khai", "default": False},
     {"key": "admin.api_key", "category": "security", "secret": True,

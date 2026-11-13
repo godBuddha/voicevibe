@@ -226,6 +226,25 @@ def _record_stt_stats(job_id: str, stats: dict) -> None:
         pass
 
 
+def _record_job_warnings(job_id: str, key: str, warnings: list[str]) -> None:
+    """Ghi cảnh báo (thuật ngữ GD2 / phụ đề quá nhanh) vào `job.params[key]`
+    — pattern `_record_stt_stats`: quyết định ảnh hưởng tới kết quả thì người
+    dùng phải NHÌN THẤY, nhưng là thông tin phụ → lỗi không được giết job."""
+    if not warnings:
+        return
+    try:
+        from .db import SessionLocal
+        from .models import Job
+
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            if job is not None:
+                job.params = {**(job.params or {}), key: warnings[:20]}
+                db.commit()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _abort_probe(job_id: str, ttl: float = 2.0):
     """Probe trả True khi job ĐÃ bị hủy — đọc DB có cache `ttl` giây.
 
@@ -367,6 +386,7 @@ def _run_dub(job_id: str, params: dict) -> dict:
             progress_cb=lambda pct, msg: _record_progress(job_id, pct, msg),
             key_prefix=f"jobs/{job_id}/",
             system_prompt=override,
+            glossary=str(params.get("glossary") or "") or None,
             batch_size=bs,
             context_sentences=ctx,
             source_url=params.get("source_url"),
@@ -785,6 +805,7 @@ def _run_subtitle(job_id: str, params: dict) -> dict:
         fmt = params.get("format") or DEFAULT_FORMAT
         bilingual = bool(params.get("bilingual"))
         show_speaker = params.get("show_speaker", True)
+        glossary_text = str(params.get("glossary") or "")
 
         translations = None
         if bilingual or params.get("target_lang"):
@@ -799,12 +820,14 @@ def _run_subtitle(job_id: str, params: dict) -> dict:
             # A3 — dịch LOẠT (LLM) thay vì từng cue: giữ nguyên số lượng + thứ
             # tự, có ngữ cảnh ±2 câu nên bản dịch mạch lạc hơn hẳn; LLM hỏng
             # một lô thì bisect chia nhỏ, cùng đáy là dịch từng cue như cũ.
-            # Marian local không batch được → giữ đường từng cue.
+            # Marian local không batch được → giữ đường từng cue (GD2: đường
+            # này chưa ăn glossary — thuật ngữ chỉ áp cho đường batch).
             chat = batch_capable(tr)
             if chat is not None:
                 bt = BatchTranslator(chat, source, target, fallback=tr,
-                                     config=BatchConfig())
+                                     config=BatchConfig(), glossary=glossary_text)
                 translations = bt.translate_all([s.text for s in attributed])
+                _record_job_warnings(job_id, "glossary_warnings", bt.warnings)
             else:
                 # Dịch từng cue MỘT, giữ nguyên số lượng và thứ tự — ghép lại
                 # theo chỉ số. Dịch gộp cả khối rồi tách lại sẽ lệch số dòng
@@ -812,8 +835,24 @@ def _run_subtitle(job_id: str, params: dict) -> dict:
                 translations = [tr.translate(s.text) if s.text.strip() else ""
                                 for s in attributed]
 
+        # GD2 — khung phụ đề dễ đọc: hạn dòng + tốc độ đọc đọc từ Settings
+        # (0 = tắt). Sai kiểu giá trị admin nhập → coi như tắt, không chết job.
+        from .settings_service import get_setting
+
+        def _num(key, cast, floor):
+            try:
+                v = cast(get_setting(key, 0) or 0)
+                return v if v >= floor else None
+            except (TypeError, ValueError):
+                return None
+
+        fit_warn: list[str] = []
         out = render(attributed, fmt, translations=translations,
-                     bilingual=bilingual, show_speaker=show_speaker)
+                     bilingual=bilingual, show_speaker=show_speaker,
+                     max_line_chars=_num("subtitle.max_line_chars", int, 1),
+                     max_cps=_num("subtitle.max_cps", float, 1.0),
+                     warnings=fit_warn)
+        _record_job_warnings(job_id, "subtitle_fit_warnings", fit_warn)
         key = f"jobs/{job_id}/subtitle.{extension(fmt)}"
         storage.put(key, out.encode("utf-8"))
 
@@ -901,8 +940,24 @@ def _run_translate(job_id: str, params: dict) -> dict:
         # dùng chung `_resolve_prompt_override` — cả dub dùng).
         override = _resolve_prompt_override(job_id, owner_id, params.get("prompt_id"),
                                            source, target)
+        # GD2 — thuật ngữ bắt buộc: nối CUỐI system prompt (override hoặc
+        # mặc định), chèn sau cùng để ràng buộc không bị override xoá nhầm.
+        glossary_text = str(params.get("glossary") or "")
+        if glossary_text:
+            from .pipelines.glossary import glossary_block, parse_glossary
+            from .prompts import render as _render_prompt
+
+            base = override or _render_prompt("translate", source=source,
+                                              target=target)
+            override = f"{base}\n\n{glossary_block(parse_glossary(glossary_text))}"
         tr = build_translator(source, target, system_prompt=override)
         out = tr.translate(text)
+        if glossary_text:
+            from .pipelines.glossary import check_translations, parse_glossary
+
+            _record_job_warnings(
+                job_id, "glossary_warnings",
+                check_translations([text], [out], parse_glossary(glossary_text)))
         key = f"jobs/{job_id}/translated.txt"
         get_storage().put(key, out.encode("utf-8"))
         with SessionLocal() as db:

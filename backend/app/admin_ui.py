@@ -606,7 +606,7 @@ function renderAi() {
       <div class="grid2">${prompts}</div>
     </div>
     <div class="card"><h2>Prompt của người dùng (thư viện)</h2>
-      <p class="hint">Mỗi user có thư viện prompt riêng (xem đúng người dùng tại trang "Prompt của tôi").
+      <p class="hint">Mỗi user có thư viện prompt riêng (xem đúng người dùng tại Cài đặt → "Prompt của tôi").
         Danh sách này CHỈ ĐỌC — admin không sửa/xoá hộ.</p>
       <div class="row-actions">
         <button class="ghost" onclick="loadUserPrompts()">Tải danh sách</button>

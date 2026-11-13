@@ -7,8 +7,10 @@ import {
 import { useApi } from '../../hooks/useApi.jsx';
 
 // Thư viện Prompt — prompt CÁ NHÂN theo user (khác Prompt hệ thống trong tab
-// Prompts). Component dùng chung 2 nơi: trang /prompts (mọi user) + tab
-// "Prompt của tôi" trong AI Model Hub (admin) — props `embedded` chỉ ẩn header.
+// Prompts). Component dùng chung 2 nơi (GF1 — trang /prompts cũ đã dồn vào
+// Cài đặt): section "prompts" trong SettingsHub (/settings/prompts — mọi
+// user) + tab "Prompt của tôi" trong AI Model Hub (admin) — props `embedded`
+// chỉ ẩn header.
 //
 // Giao diện (Compact UI): filter bar + list row card (tên + chips + hành động),
 // modal tạo/sửa (textarea lớn + biến tự dò), modal chi tiết (content + Lịch sử

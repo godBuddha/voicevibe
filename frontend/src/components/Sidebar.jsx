@@ -7,7 +7,6 @@ import {
   AudioLines,
   Clapperboard,
   FileText,
-  Sparkles,
   History,
   KeyRound,
   Settings,
@@ -42,7 +41,9 @@ const navigation = [
       { label: 'Dịch phụ đề', to: '/subtitle', Icon: Captions },
       { label: 'Dịch âm thanh', to: '/translate-audio', Icon: AudioLines },
       { label: 'Dịch video', to: '/dub', Icon: Clapperboard },
-      { label: 'Prompt của tôi', to: '/prompts', Icon: Sparkles },
+      // GF1: mục "Prompt của tôi" đã dồn vào Cài đặt (/settings/prompts —
+      // nhóm CÁ NHÂN, mọi user) + tab trong AI Model Hub. Sidebar không còn
+      // 2 chỗ cùng lúc; /prompts cũ redirect về /settings/prompts.
     ],
   },
   {

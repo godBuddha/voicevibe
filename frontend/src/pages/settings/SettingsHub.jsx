@@ -3,13 +3,14 @@ import { Navigate, NavLink, useParams } from 'react-router-dom';
 import {
   Bell, Boxes, Braces, Building2, Database, Download, FileClock, Fingerprint,
   KeyRound, Lock, MonitorCog, ScrollText, Settings as SettingsIcon,
-  ShieldCheck, UserRound, UsersRound,
+  ShieldCheck, Sparkles, UserRound, UsersRound,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth.jsx';
 import AdminUsers from '../admin/Users.jsx';
 import AdminModelHub from '../admin/ModelHub.jsx';
 import AdminSettings from '../admin/Settings.jsx';
 import ApiKeys from '../ApiKeys.jsx';
+import PromptLibrary from '../prompts/PromptLibrary.jsx';
 import Profile from './Profile.jsx';
 import Appearance from './Appearance.jsx';
 import Notifications from './Notifications.jsx';
@@ -35,6 +36,7 @@ const GROUPS = [
     key: 'personal', label: 'CÁ NHÂN', scope: 'personal', adminOnly: false,
     items: [
       ['profile', 'Hồ sơ', UserRound],
+      ['prompts', 'Prompt của tôi', Sparkles],
       ['appearance', 'Giao diện', SettingsIcon],
       ['notifications', 'Thông báo', Bell],
       ['sessions', 'Phiên đăng nhập', MonitorCog],
@@ -104,6 +106,7 @@ const SECTION_COMPONENTS = {
   'notifications': Notifications,
   'sessions': SessionsTab,
   'ai-platform': AdminModelHub,
+  'prompts': PromptLibrary,
   'members': AdminUsers,
   'api-keys': ApiKeys,
   'webhooks': Webhooks,
@@ -120,7 +123,7 @@ const SECTION_COMPONENTS = {
 
 // Section nào NHÚNG component cũ (đã có h1 + padding riêng) → bỏ h1/padding
 // qua prop embedded, đúng như hai lớp đã thống nhất.
-const EMBEDDED_SECTIONS = new Set(['ai-platform', 'members', 'config', 'api-keys']);
+const EMBEDDED_SECTIONS = new Set(['ai-platform', 'members', 'config', 'api-keys', 'prompts']);
 
 const itemStyle = (active, soon) => ({
   display: 'flex',

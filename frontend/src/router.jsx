@@ -16,8 +16,6 @@ import Download from './pages/Download.jsx';
 import Render from './pages/Render.jsx';
 import Summary from './pages/Summary.jsx';
 import Jobs from './pages/Jobs.jsx';
-import ApiKeys from './pages/ApiKeys.jsx';
-import Prompts from './pages/Prompts.jsx';
 import SettingsHub from './pages/settings/SettingsHub.jsx';
 
 function protectedLoader() {
@@ -79,7 +77,9 @@ export default createBrowserRouter([
       { path: 'render', element: <Render /> },
       { path: 'summary', element: <Summary /> },
       { path: 'jobs', element: <Jobs /> },
-      { path: 'prompts', element: <Prompts /> },
+      // GF1: trang /prompts dồn vào Cài đặt — link cũ/bookmark redirect giữ
+      // tương thích (mục "Prompt của tôi" giờ ở nhóm CÁ NHÂN + tab Model Hub).
+      { path: 'prompts', element: <Navigate to="/settings/prompts" replace /> },
       // SETTINGS HUB — Control Center cho cả user thường lẫn admin. Sidebar
       // riêng theo scope (Cá nhân / Hệ thống); section không hợp lệ → hồ sơ.
       { path: 'settings', element: <SettingsHub /> },

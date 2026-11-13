@@ -165,7 +165,8 @@ export default function TranslateText() {
                   ))}
                 </select>
               </label>
-              <Link to="/prompts" style={{ fontSize: 'var(--text-xs)', fontWeight: 600 }}>
+              {/* GF1: trang /prompts dồn vào Cài đặt — link trỏ section mới */}
+              <Link to="/settings/prompts" style={{ fontSize: 'var(--text-xs)', fontWeight: 600 }}>
                 Quản lý prompt →
               </Link>
             </div>

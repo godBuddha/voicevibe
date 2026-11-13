@@ -71,6 +71,8 @@ const SHOTS = [
   ['28-settings-system', '/settings/system', true],
   ['29-settings-audit', '/settings/audit', true],
   ['30-settings-advanced', '/settings/import-export', true],
+  // GF1 — section "Prompt của tôi" mới trong Settings Hub (nhóm CÁ NHÂN)
+  ['32-settings-prompts', '/settings/prompts', true],
 ];
 
 const browser = await launch({

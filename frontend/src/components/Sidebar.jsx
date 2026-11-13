@@ -52,7 +52,7 @@ const navigation = [
       // Giai đoạn B — tính năng mới có pipeline thật (download/render/summary
       // jobs); các mục mock cũ không pipeline đã bỏ và giữ nguyên lý do.
       { label: 'Tải video từ link', to: '/download', Icon: Download },
-      { label: 'Xử lý video (phụ đề + 9:16)', to: '/render', Icon: Scissors },
+      { label: 'Xử lý video (phụ đề + tỉ lệ khung)', to: '/render', Icon: Scissors },
       // GD1 — Bàn điều khiển FFmpeg: dịch yêu cầu bằng lời thành lệnh ffmpeg
       { label: 'Bàn điều khiển FFmpeg', to: '/ffmpeg', Icon: Terminal },
     ],

@@ -558,13 +558,23 @@ def _run_render(job_id: str, params: dict) -> dict:
             if ext not in ("srt", "vtt", "ass"):
                 raise ValueError(
                     f"phụ đề phải là .srt/.vtt/.ass — nhận .{ext}")
-            cues_text = storage.get_to_temp(sub_key)
+            # get_to_temp trả ĐƯỜNG DẪN file tạm (cả Local lẫn S3) — đọc NỘI
+            # DUNG chứ không truyền path vào load_cues_from_text (bug lộ khi
+            # E2E GE1: parse chuỗi path → 0 cue → "phụ đề rỗng").
+            try:
+                raw = storage.get(sub_key)
+            except FileNotFoundError as exc:
+                raise ValueError(
+                    f"file phụ đề không tồn tại trong kho: {sub_key}") from exc
+            cues_text = raw.decode("utf-8", errors="replace")
             cues_ext = ext
 
         key = run_render(
             src,
             burn_subtitles=bool(params.get("burn_subtitles")),
             vertical=bool(params.get("vertical")),
+            # GE1 — tỉ lệ khung tường minh (None = legacy, suy từ vertical)
+            aspect=params.get("aspect"),
             banner=params.get("banner") or None,
             cues_text=cues_text, cues_ext=cues_ext,
             workdir=work_dir(job_id), job_id=job_id,

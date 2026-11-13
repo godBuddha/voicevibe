@@ -296,13 +296,35 @@ setting.*, key.*, prompt.*, job.*, config.import).
   job_type="render", stage tắt KHÔNG mark). ASS 2 style 1 Dialogue
   (`{\rMajor}…\N{\rMinor}`, port srt_embed.go:767-778), không ghi PlayResX/Y
   (384×288 mặc định); wrap theo rune-width (port bảng hệ số) + MỞ RỘNG wrap
-  latin THEO TỪ. Vertical trước burn (phụ đề đo bề rộng theo frame dọc
-  720×1280). Banner Pillow→PNG→`overlay` qua `-filter_complex` (overlay là
+  latin THEO TỪ. Dựng khung trước burn (phụ đề đo bề rộng theo frame đích).
+  Banner Pillow→PNG→`overlay` qua `-filter_complex` (overlay là
   filter 2 input — không nhét `-vf` được, gặp thật). crf 20 thay bitrate.
   `render_fingerprint` SOI TOÀN BỘ material (params_fingerprint của dub bỏ
   qua key lạ — bẫy thật).
 - Nguồn phụ đề: `subtitle_key` XOR `subtitle_job_id` (422 khi cả hai; job
   phải done + cùng chủ + ext srt/vtt/ass).
+
+### GE1 — render chọn tỉ lệ khung (7 lựa chọn)
+- `JobIn.aspect`: `9:16 | 4:5 | 1:1 | 4:3 | 16:9 | 21:9 | original` — người
+  dùng tự chọn, UI chỉ GỢI Ý theo khung nguồn (client-side probe,
+  ngưỡng trung điểm: <0.7→9:16, <0.9→4:5, <1.15→1:1, <1.55→4:3, <2.05→16:9,
+  còn lại→21:9). Mục tiêu: 9:16=(720,1280) nguyên vẹn, 4:5=(864,1080),
+  1:1=(1080,1080), 4:3=(960,720), 16:9=(1280,720), 21:9=(1680,720);
+  "original" = không dựng khung.
+- Tương thích: `vertical: bool` giữ làm cờ legacy (True không aspect → 9:16);
+  `aspect≠9:16` đi cùng `vertical=True` → 422; aspect sai tập → 422 liệt kê
+  7 giá trị. Fingerprint: key `aspect` CHỈ thêm khi truyền tường minh → job
+  cũ giữ vân tay byte-for-byte. Stage/file giữ tên "vertical" (resume cũ
+  không vỡ) — hàm `vertical_cmd` đổi thành `frame_cmd(w, h, strip,
+  banner, scale_h)`, filter (720,1280,250) byte-identical bản cũ.
+- Banner áp MỌI tỉ lệ: dải đen cao = `round(H×250/1280)` (≈20%), chữ/y co
+  giãn theo `k=strip/250`; "original" + banner vẫn dựng khung với target =
+  dims nguồn, nội dung co vào phần còn lại (`scale_h = h − strip`).
+- **Behavior change (bug fix)**: trước đây banner-only (không vertical) bị
+  BỎ QUA âm thầm (banner nằm trọn trong nhánh `if vertical:`) — giờ banner
+  đơn lẻ có tác dụng thật.
+- MarginV phụ đề dọc/ngang giờ suy từ khung đích (`frame_h > frame_w`) thay
+  cờ `vertical` — burn-only trên nguồn dọc được margin dọc (hợp lý hơn).
 
 ### B4b — dub with_subs + quyền đọc output phụ
 - dub kwarg `with_subs` → `bilingual.srt` sau mux (stage "subs"); KHÔNG nằm

@@ -173,7 +173,7 @@ __THEME_CSS__
       <a data-page="stt" onclick="go('stt')">📝 Chuyển giọng nói thành văn bản</a>
       <a data-page="download" onclick="go('download')">⬇️ Tải video từ link</a>
       <a data-page="ffmpeg" onclick="go('ffmpeg')">⌨️ Bàn điều khiển FFmpeg</a>
-      <a data-page="render" onclick="go('render')">✂️ Xử lý video (phụ đề + 9:16)</a>
+      <a data-page="render" onclick="go('render')">✂️ Xử lý video (phụ đề + tỉ lệ khung)</a>
       <div class="group">Tóm tắt</div>
       <a data-page="summary" onclick="go('summary')">🗒️ Tóm tắt nội dung</a>
       <a class="soon" onclick="soon('Tạo video bằng AI')">🎥 Tạo video bằng AI</a>
@@ -376,16 +376,17 @@ __THEME_CSS__
       </div>
     </section>
 
-    <!-- RENDER (B3+B4) -->
+    <!-- RENDER (B3+B4 + GE1: 7 tỉ lệ khung, hệ gợi ý theo nguồn) -->
     <section id="page-render" class="page">
       <div class="card">
         <h2>✂️ Xử lý video</h2>
-        <p class="mut">In phụ đề song ngữ 2 dòng + cắt dọc 9:16 + banner tiêu đề — gộp một job.</p>
+        <p class="mut">In phụ đề song ngữ 2 dòng + chọn tỉ lệ khung (hệ gợi ý theo video nguồn, bạn tự chọn) + banner tiêu đề — gộp một job.</p>
         <label>Video gốc</label>
-        <input type="file" id="rfile" accept="video/*">
+        <input type="file" id="rfile" accept="video/*" onchange="renderProbe()">
+        <div id="raspect-hint" class="mut" style="font-size:12px;margin-top:4px">Chọn video để hệ gợi ý tỉ lệ phù hợp — chọn xong vẫn đổi tự do.</div>
         <div class="row">
           <div><label>In phụ đề</label><select id="rburn"><option value="0">Không</option><option value="1">Có — 2 dòng song ngữ</option></select></div>
-          <div><label>Cắt dọc 9:16</label><select id="rvert"><option value="1">Có (TikTok/Shorts)</option><option value="0">Không</option></select></div>
+          <div><label>Tỉ lệ khung</label><select id="raspect"><option value="9:16">9:16 — Dọc (TikTok/Shorts)</option><option value="4:5">4:5 — Dọc (Feed)</option><option value="1:1">1:1 — Vuông</option><option value="4:3">4:3 — Tỉ lệ cũ</option><option value="16:9">16:9 — Ngang (YouTube)</option><option value="21:9">21:9 — Siêu rộng</option><option value="original">Giữ nguyên khung (chỉ phụ đề/banner)</option></select></div>
         </div>
         <div class="row">
           <div><label>File phụ đề (khi bật In phụ đề)</label><input type="file" id="rsub" accept=".srt,.vtt,.ass"></div>
@@ -395,6 +396,7 @@ __THEME_CSS__
           <div><label>Banner dòng chính (vàng lớn)</label><input id="rmajor" placeholder="Tiêu đề chính"></div>
           <div><label>Banner dòng phụ (vàng nhỏ)</label><input id="rminor" placeholder="Tiêu đề phụ"></div>
         </div>
+        <p class="mut" style="font-size:12px;margin:6px 0 0">Banner: dải đen cao ≈20% khung, chữ co theo chiều cao khung — áp mọi tỉ lệ.</p>
         <button class="go" onclick="submitRender()">✂️ Bắt đầu xử lý</button>
         <div id="rmsg" class="status"></div>
       </div>
@@ -791,13 +793,48 @@ async function submitDownload() {
   } catch (e) { flash("✗ " + e.message, "err"); }
 }
 
+// GE1 — gợi ý tỉ lệ theo khung nguồn: ngưỡng = trung điểm giữa các tỉ lệ kề
+// (0.9 giữa 4:5/1:1, 1.55 giữa 4:3/16:9, 2.05 giữa 16:9/21:9). CHỈ GỢI Ý —
+// người dùng vẫn tự chọn trong #raspect.
+function suggestAspect(w, h) {
+  const r = w / h;
+  if (r < 0.7) return "9:16";
+  if (r < 0.9) return "4:5";
+  if (r < 1.15) return "1:1";
+  if (r < 1.55) return "4:3";
+  if (r < 2.05) return "16:9";
+  return "21:9";
+}
+
+function renderProbe() {
+  const f = $("rfile").files[0];
+  const hint = $("raspect-hint");
+  if (!f) { hint.textContent = "Chọn video để hệ gợi ý tỉ lệ phù hợp — chọn xong vẫn đổi tự do."; return; }
+  const url = URL.createObjectURL(f);
+  const el = document.createElement("video");
+  el.preload = "metadata";
+  el.onloadedmetadata = () => {
+    if (el.videoWidth && el.videoHeight) {
+      const sug = suggestAspect(el.videoWidth, el.videoHeight);
+      $("raspect").value = sug;   // gợi ý = mặc định ban đầu, đổi tự do
+      hint.textContent = "Gợi ý theo video nguồn: " + el.videoWidth + "×" + el.videoHeight + " → " + sug + ". Bạn có thể chọn tỉ lệ khác.";
+    }
+    URL.revokeObjectURL(url);
+  };
+  el.onerror = () => URL.revokeObjectURL(url);
+  el.src = url;
+}
+
 async function submitRender() {
   flash("⏳ tạo job xử lý video…");
   try {
+    const aspect = $("raspect").value;
+    const major = $("rmajor").value.trim(), minor = $("rminor").value.trim();
+    if (aspect === "original" && $("rburn").value !== "1" && !major && !minor)
+      throw new Error("Chọn ít nhất một: in phụ đề / tỉ lệ khác «Giữ nguyên» / banner");
     const up = $("rfile").files[0] ? await uploadTo("/v1/media/upload", "rfile") : null;
-    const body = { type:"render",
-      burn_subtitles: $("rburn").value === "1",
-      vertical: $("rvert").value === "1" };
+    const body = { type:"render", aspect: aspect,
+      burn_subtitles: $("rburn").value === "1" };
     if (up) body.media_url = up.media_key;
     if ($("rburn").value === "1") {
       const sub = $("rsub").files[0] ? await uploadTo("/v1/media/upload", "rsub") : null;
@@ -805,7 +842,6 @@ async function submitRender() {
       else if ($("rjob").value.trim()) body.subtitle_job_id = $("rjob").value.trim();
       else throw new Error("In phụ đề cần file phụ đề hoặc ID job phụ đề đã xong");
     }
-    const major = $("rmajor").value.trim(), minor = $("rminor").value.trim();
     if (major || minor) body.banner = { major: major, minor: minor };
     const r = await fetch("/v1/jobs", { method:"POST", headers:H(), credentials:"same-origin", body: JSON.stringify(body) });
     const d = await r.json();

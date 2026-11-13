@@ -93,7 +93,7 @@ Kiểm chứng trên GPU thật: `docs/verification/subtitle.{srt,vtt,ass}` và
 | B1 | **Tải video từ link** (yt-dlp, Unlicense) | `/download` — dán link, xem trước (title/duration), tải 1080p/720p/480p/MP3 về kho; giới hạn 2 giờ; lỗi được dịch tiếng Việt có gợi ý |
 | B2 | **Phụ đề YouTube sẵn có** | Dán link ở trang Dịch phụ đề / Dịch video — hệ lấy phụ đề `nguyên bản → người làm → tự động`, không có mới nghe lại Whisper (tiết kiệm GPU) |
 | B3 | **In phụ đề song ngữ vào video** | `/render` — 2 dòng Major/Minor không chồng nhau, wrap theo chiều rộng hiển thị (tiếng Việt wrap theo từ) |
-| B4 | **Cắt dọc 9:16 + banner tiêu đề** | `/render` — 720×1280 cho TikTok/Shorts, banner dải đen 250px 2 dòng chữ vàng |
+| B4 | **Chọn tỉ lệ khung + banner tiêu đề** (GE1 mở rộng) | `/render` — 7 tỉ lệ: 9:16 (TikTok/Shorts), 4:5, 1:1, 4:3, 16:9 (YouTube), 21:9, Giữ nguyên; hệ gợi ý theo video nguồn, bạn tự chọn; banner dải đen ≈20% khung 2 dòng chữ vàng áp mọi tỉ lệ |
 | B5 | **Đa giọng đọc**: VieNeu (local, mặc định) / **edge-tts** (Microsoft, miễn phí qua mạng) / cloud | `/tts` + Lồng tiếng — chọn trong danh sách; VieNeu vẫn mặc định |
 | B6 | **AI tóm tắt** video/âm thanh/văn bản | `/summary` — map-reduce xử lý được transcript dài cả giờ; kết quả Markdown kèm mốc [hh:mm:ss]; chống prompt injection 3 lớp |
 

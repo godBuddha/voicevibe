@@ -798,7 +798,7 @@ const FLOWS = [
     let okAll = true; const seen = [];
     for (const [route, mustHave] of [
       ['/download', ['Tải video từ link', 'Chất lượng']],
-      ['/render', ['Xử lý video', 'Cắt dọc 9:16']],
+      ['/render', ['Xử lý video', 'Tỉ lệ khung']],
       ['/summary', ['Tóm tắt nội dung', 'Tóm tắt ngay']],
       // GD1 — Bàn điều khiển FFmpeg: dịch lệnh bằng lời
       ['/ffmpeg', ['Bàn điều khiển FFmpeg', 'Dịch thành lệnh']],

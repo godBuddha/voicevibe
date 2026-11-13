@@ -226,7 +226,7 @@ class JobIn(BaseModel):
         "local", description="B5: engine giọng đọc — local (VieNeu, mặc định) | "
                              "edge (Microsoft miễn phí qua mạng) | cloud "
                              "(model gán trong Model Hub)")
-    # --- riêng cho type=render (B3+B4: burn phụ đề + dọc 9:16 + banner)
+    # --- riêng cho type=render (B3+B4: burn phụ đề + dựng khung + banner)
     subtitle_key: str | None = Field(
         None, description="render: storage key file phụ đề (.srt/.vtt/.ass)")
     subtitle_job_id: str | None = Field(
@@ -235,10 +235,18 @@ class JobIn(BaseModel):
     burn_subtitles: bool = Field(
         False, description="render: in phụ đề vào video (ASS 2 style song ngữ)")
     vertical: bool = Field(
-        False, description="render: cắt dọc 9:16 (720×1280, Shorts/TikTok)")
+        False, description="render (legacy): dựng khung 9:16 720×1280 — dùng "
+                           "aspect='9:16'; giữ lại để job cũ/nhân bản vẫn "
+                           "validate được")
+    aspect: str | None = Field(
+        None, description="render (GE1): tỉ lệ khung — 9:16 | 4:5 | 1:1 | 4:3 "
+                          "| 16:9 | 21:9 | original (giữ nguyên khung, chỉ "
+                          "in phụ đề/banner); hệ thống UI chỉ GỢI Ý theo video "
+                          "nguồn, người dùng tự chọn")
     banner: dict | None = Field(
         None, description="render: banner tiêu đề — {'major': 'Chính', "
-                          "'minor': 'Phụ'} (dải đen 250px phía trên)")
+                          "'minor': 'Phụ'} (dải đen ≈20% chiều cao khung, áp "
+                          "mọi tỉ lệ)")
     with_subs: bool = Field(
         False, description="dub (B4b): xuất thêm phụ đề song ngữ bilingual.srt "
                            "kèm video — tái dùng được cho job render")
@@ -344,12 +352,24 @@ def _validate_job_in(job: JobIn, user: User, db: Session) -> None:
                 detail="summary cần text (dán văn bản) hoặc media_url/source_url "
                        "(video/âm thanh để hệ tự nghe)")
     if job.type == "render":
-        # B3+B4: ít nhất 1 toggle; burn phụ đề cần NGUỒN (key XOR job id)
-        if not (job.burn_subtitles or job.vertical or job.banner):
+        from .pipelines.render import ASPECT_CHOICES as _RENDER_ASPECTS
+        # B3+B4 + GE1: ít nhất 1 lựa chọn; burn phụ đề cần NGUỒN (key XOR job id)
+        has_frame = job.aspect not in (None, "original")   # tỉ lệ ≠ giữ nguyên
+        if not (job.burn_subtitles or job.vertical or job.banner or has_frame):
             raise HTTPException(
                 status_code=422,
-                detail="render cần ít nhất một lựa chọn: burn phụ đề / cắt dọc "
-                       "9:16 / banner tiêu đề")
+                detail="render cần ít nhất một lựa chọn: in phụ đề / tỉ lệ khung "
+                       "khác «Giữ nguyên» / banner tiêu đề")
+        if job.aspect is not None and job.aspect not in _RENDER_ASPECTS:
+            raise HTTPException(
+                status_code=422,
+                detail="aspect phải là một trong: " + ", ".join(_RENDER_ASPECTS))
+        if job.aspect is not None and job.vertical and job.aspect != "9:16":
+            # vertical là cờ legacy của 9:16 — đi cùng tỉ lệ khác là mâu thuẫn
+            raise HTTPException(
+                status_code=422,
+                detail="vertical=True chỉ đi cùng aspect='9:16' — hãy bỏ "
+                       "vertical và chọn aspect")
         if job.burn_subtitles and not (job.subtitle_key or job.subtitle_job_id):
             raise HTTPException(
                 status_code=422,

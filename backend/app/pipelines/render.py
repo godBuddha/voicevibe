@@ -499,9 +499,11 @@ def selftest() -> None:
         or "00BFFF" in txt.upper(), txt.splitlines()[4:12]
     print("4. ASS 2 style 1 Dialogue + màu #FFBF00 .......... OK")
 
-    # 5. load cues từ SRT + strip tag
-    srt = ("1\n00:00:00,000 --> 00:00:02,000\nDòng <c>tag</c> một\n"
-           "2\n00:00:02,000 --> 00:00:04,000\nDòng hai\n")
+    # 5. load cues từ SRT + strip tag (SRT ĐÚNG CHUẨN: dòng trống giữa 2 cue —
+    # pysubs2 1.9.1 siết parser, thiếu dòng trống thì chỉ số cue kế bị nuốt
+    # vào text cue trước — fixture cũ từng "xanh vì may" với 1.9.0 của image)
+    srt = ("1\n00:00:00,000 --> 00:00:02,000\nDòng <c>tag</c> một\n\n"
+           "2\n00:00:02,000 --> 00:00:04,000\nDòng hai\n\n")
     cues = load_cues_from_text(srt, ext="srt")
     assert len(cues) == 2 and cues[0][2] == ["Dòng tag một"], cues
     print("5. load cues SRT + strip tag ...................... OK")

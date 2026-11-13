@@ -30,7 +30,9 @@ vieneu                       # Vietnamese TTS + instant cloning (Apache-2.0), v3
 transformers==4.57.6         # vieneu GPU path dependency (pinned per upstream)
 # chatterbox-tts: CẦN VENV RIÊNG nếu dùng (pin torch==2.6.0, xung đột pyannote>=2.8)
 srt>=3.5
-pysubs2>=1.8              # xuất phụ đề SRT/VTT/ASS + song ngữ (MIT, thuần Python)
+pysubs2>=1.8,<2           # xuất phụ đề SRT/VTT/ASS + song ngữ (MIT, thuần Python)
+                          #   1.9.1 siết parser SRT: cue PHẢI cách nhau dòng trống
+                          #   (fixture render selftest từng "xanh vì may" trên 1.9.0)
                           #   dùng thay vì tự nối chuỗi: pysubs2 xử lý đúng escape
                           #   khối `{...}` của ASS và `\N` xuống dòng cứng
 soundfile>=0.12              # nạp audio in-memory cho pyannote (bypass torchcodec)

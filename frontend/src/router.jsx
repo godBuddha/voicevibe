@@ -9,6 +9,7 @@ import TTS from './pages/TTS.jsx';
 import Voices from './pages/Voices.jsx';
 import STT from './pages/STT.jsx';
 import Subtitle from './pages/Subtitle.jsx';
+import Ffmpeg from './pages/Ffmpeg.jsx';
 import TranslateText from './pages/TranslateText.jsx';
 import TranslateAudio from './pages/TranslateAudio.jsx';
 import Download from './pages/Download.jsx';
@@ -74,6 +75,7 @@ export default createBrowserRouter([
       { path: 'translate-text', element: <TranslateText /> },
       { path: 'translate-audio', element: <TranslateAudio /> },
       { path: 'download', element: <Download /> },
+      { path: 'ffmpeg', element: <Ffmpeg /> },
       { path: 'render', element: <Render /> },
       { path: 'summary', element: <Summary /> },
       { path: 'jobs', element: <Jobs /> },

@@ -15,6 +15,7 @@ import {
   Download,
   Scissors,
   NotebookText,
+  Terminal,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth.jsx';
 
@@ -52,6 +53,8 @@ const navigation = [
       // jobs); các mục mock cũ không pipeline đã bỏ và giữ nguyên lý do.
       { label: 'Tải video từ link', to: '/download', Icon: Download },
       { label: 'Xử lý video (phụ đề + 9:16)', to: '/render', Icon: Scissors },
+      // GD1 — Bàn điều khiển FFmpeg: dịch yêu cầu bằng lời thành lệnh ffmpeg
+      { label: 'Bàn điều khiển FFmpeg', to: '/ffmpeg', Icon: Terminal },
     ],
   },
   {

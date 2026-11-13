@@ -56,7 +56,7 @@ export function adaptJob(j) {
   };
 }
 
-const TYPE_LABELS = { dub: 'Lồng tiếng', tts: 'Văn bản → giọng nói', stt: 'Giọng nói → văn bản', translate: 'Dịch văn bản', subtitle: 'Tạo phụ đề', download: 'Tải video từ link', render: 'Xử lý video', summary: 'Tóm tắt nội dung' };
+const TYPE_LABELS = { dub: 'Lồng tiếng', tts: 'Văn bản → giọng nói', stt: 'Giọng nói → văn bản', translate: 'Dịch văn bản', subtitle: 'Tạo phụ đề', download: 'Tải video từ link', render: 'Xử lý video', summary: 'Tóm tắt nội dung', ffmpeg: 'Bàn điều khiển FFmpeg' };
 
 // GET /v1/voices: {voices: [{id, name, lang, engine, created_at}]}
 //   → {id, name, lang, engine, isClone} (engine vieneu = giọng clone/từ mẫu)

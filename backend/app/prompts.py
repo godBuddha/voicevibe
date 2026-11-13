@@ -107,6 +107,24 @@ DEFAULT_PROMPTS: dict[str, dict] = {
             "chỉ một nguồn: các phần tóm tắt — không bịa thêm."
         ),
     },
+    "ffmpeg_cmd": {
+        "description": (
+            "Bàn điều khiển FFmpeg (GD1): dịch yêu cầu bằng lời thành lệnh "
+            "ffmpeg — HỆ THỐNG; quy ước path /work/… và format JSON là phần "
+            "giao thức cứng, hệ thống dựng ở message người dùng."
+        ),
+        "variables": [],
+        "content": (
+            "Bạn là bộ dịch «yêu cầu bằng lời» → «lệnh ffmpeg». Nhận một yêu "
+            "cầu tiếng Việt tự nhiên về xử lý video/âm thanh, trả về MỘT lệnh "
+            "ffmpeg đúng đắn nhất, kèm giải thích ngắn gọn tiếng Việt cho "
+            "người dùng và cảnh báo nếu yêu cầu chưa chắc chắn (thiếu mốc giờ, "
+            "đuôi xuất bất thường...). Chỉ trả JSON đúng cấu trúc được yêu "
+            "cầu. Nếu yêu cầu nằm ngoài khả năng của ffmpeg (chèn ảnh bìa từ "
+            "file thứ hai, tải từ mạng...), trả lệnh khả dĩ gần nhất và ĐẶT "
+            "CẢNH BÁO rõ ràng trong warnings."
+        ),
+    },
 }
 
 

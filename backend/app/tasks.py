@@ -62,7 +62,7 @@ celery_app.conf.update(
 PIPELINES: dict[str, str] = {
     "tts": "done", "stt": "done", "translate": "done", "dub": "done",
     "subtitle": "done", "download": "done", "render": "done",
-    "summary": "done",
+    "summary": "done", "ffmpeg": "done",
 }
 
 
@@ -601,6 +601,160 @@ def _run_render(job_id: str, params: dict) -> dict:
         return {"ok": False, "error": str(exc)[:200]}
 
 
+def _ensure_downloaded_extra(job_id: str, params: dict, storage,
+                             extra: list[str] | None) -> str:
+    """Wrapper `_download_source` + `extra_args` (GD1) — giữ cookies/proxy.
+
+    `extra_args` nằm trong vân tay marker của ensure_downloaded (đổi cờ
+    SponsorBlock → tải lại, không tái dùng file đã tải theo cờ khác).
+    """
+    from .pipelines.manifest import work_dir
+
+    if not extra or not params.get("source_url"):
+        return _download_source(job_id, params, storage)
+    from .pipelines.download import ensure_downloaded
+
+    marker = ensure_downloaded(
+        params["source_url"], work_dir(job_id),
+        params.get("quality") or "1080",
+        progress_cb=lambda pct, msg: _record_progress(job_id, pct, msg),
+        abort_check=_abort_probe(job_id),
+        cookies_file=(get_setting_safe("download.cookies_file") or None)
+        if params.get("use_cookies") else None,
+        proxy=get_setting_safe("download.proxy") or None,
+        extra_args=extra,
+    )
+    return os.path.join(work_dir(job_id), f"source.{marker.get('ext') or 'mp4'}")
+
+
+def _run_ffmpeg(job_id: str, params: dict) -> dict:
+    """GD1 — job `ffmpeg`: chạy lệnh đã dịch từ yêu cầu bằng lời.
+
+    - argv BẮT BUỘC qua `validate_argv` LẦN HAI ở worker (không tin gì đã
+      qua tay mạng — preview trả về qua client có thể bị sửa).
+    - Path hợp đồng `/work/input.<ext>`: operand input rewrite thành path
+      nguồn THẬT (`src`) — không copy 200MB vào workdir vô ích; operand
+      output rewrite vào workdir.
+    - Manifest stage "encode": encode 2h chết giữa đường → "Chạy lại" dùng
+      lại output đã encode (cùng argv + cùng file nguồn = cùng vân tay).
+    """
+    from .db import SessionLocal
+    from .jobstate import transition
+    from .models import Job, JobStatus
+    from .pipelines import ffmpeg_cmd as FC
+    from .pipelines.manifest import (JobCancelled, Manifest,
+                                     params_fingerprint, work_dir)
+    from .storage import get_storage
+
+    with SessionLocal() as db:
+        job = db.get(Job, job_id)
+        if job is None:
+            return {"ok": False, "error": "job not found"}
+        if _aborted(db, job_id):
+            return {"ok": False, "error": "cancelled"}
+        transition(db, job, JobStatus.running, progress=5)
+        db.commit()
+    try:
+        storage = get_storage()
+        wd = work_dir(job_id)
+        extra = (["--sponsorblock-remove", "sponsor,selfpromo"]
+                 if params.get("remove_sponsor") and params.get("source_url")
+                 else None)
+        src = _ensure_downloaded_extra(job_id, params, storage, extra)
+        _record_progress(job_id, 10, "đã có file nguồn")
+        if not os.path.exists(src):
+            raise ValueError("file nguồn không tìm thấy trên đĩa — nộp lại file")
+
+        in_ext = (src.rsplit(".", 1)[-1].lower()
+                  if "." in src.rsplit("/", 1)[-1] else "mp4")
+        argv = [str(a) for a in (params.get("ffmpeg_argv") or [])]
+        if not argv:
+            raise ValueError("job ffmpeg thiếu ffmpeg_argv")
+        # operand input của LLM (preview có thể đo sai ext) → chuẩn hóa về
+        # ext THẬT rồi validate lần hai
+        from .pipelines.ffmpeg_cmd import INPUT_PREFIX, OUTPUT_PREFIX
+        argv = [INPUT_PREFIX + "." + in_ext
+                if a.startswith(INPUT_PREFIX + ".") else a for a in argv]
+        clean, _norm_warns = FC.validate_argv(argv, in_ext)
+
+        out_name = f"output.{clean[-1].rsplit('.', 1)[-1]}"
+        # rewrite operand: input → path nguồn thật; output → workdir thật
+        run_argv = [clean[0]]
+        for a in clean[1:]:
+            if a.startswith(INPUT_PREFIX + "."):
+                run_argv.append(src)
+            elif a.startswith(OUTPUT_PREFIX + "."):
+                run_argv.append(os.path.join(wd, out_name))
+            else:
+                run_argv.append(a)
+        # -progress pipe:1 PHẢI đứng TRƯỚC operand output (đặt sau output URL
+        # là ffmpeg coi nó là output thứ hai — đã gặp kiểu parse lệnh này)
+        k = run_argv.index(os.path.join(wd, out_name))
+        run_argv.insert(k, "-progress")
+        run_argv.insert(k + 1, "pipe:1")
+
+        duration = FC.probe_duration(src) or 0.0
+        fp = params_fingerprint({"argv": clean, "media_url": src,
+                                 "extra_args": extra}, "ffmpeg")
+        manifest = Manifest.load_or_none(wd, fp) or Manifest.create(
+            wd, job_id, fp, "ffmpeg")
+        if manifest.stage_ok("encode", out_name):
+            # encode xong từ lần trước còn nguyên — dùng lại (retry nhanh)
+            _record_progress(job_id, 90, "lần trước đã encode xong — dùng lại kết quả")
+        else:
+            _record_progress(job_id, 20, "bắt đầu xử lý ffmpeg")
+            code, err_tail = FC.run_ffmpeg(
+                run_argv, wd, duration=duration,
+                progress_cb=lambda pct, msg: _record_progress(
+                    job_id, pct, msg),
+                abort_check=_abort_probe(job_id))
+            if code != 0:
+                msg = FC.human_error(err_tail) or (
+                    err_tail.strip().splitlines()[-1] if err_tail.strip()
+                    else "ffmpeg thoát mã lỗi " + str(code))
+                raise RuntimeError(f"ffmpeg thất bại: {msg[:300]}")
+            out_path = os.path.join(wd, out_name)
+            if not os.path.exists(out_path) or os.path.getsize(out_path) <= 0:
+                raise RuntimeError(
+                    "ffmpeg báo xong nhưng file xuất trống — thử lệnh khác")
+            manifest.mark("encode")
+
+        out_path = os.path.join(wd, out_name)
+        key = f"jobs/{job_id}/{out_name}"
+        storage.put_from_file(key, out_path)
+        manifest.outputs["result_key"] = key
+        manifest.save()
+
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            ok = transition(db, job, JobStatus.done, progress=100,
+                            result_key=key)
+            if ok:
+                _publish_outputs(db, job, key)
+            db.commit()
+        if ok:
+            _notify(params.get("webhook_url"),
+                    {"job_id": job_id, "status": "done", "result_key": key})
+        return {"ok": True, "key": key}
+    except JobCancelled:
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            if job is not None:
+                transition(db, job, JobStatus.cancelled,
+                           error=("Đã hủy giữa đường — bấm Chạy lại để "
+                                  "tiếp tục từ công đoạn đã xong"))
+                db.commit()
+        return {"ok": False, "error": "cancelled"}
+    except Exception as exc:  # noqa: BLE001
+        with SessionLocal() as db:
+            job = db.get(Job, job_id)
+            if job is not None:
+                _set_failed(job, exc, db)
+                db.commit()
+        return {"ok": False, "error": str(exc)[:200]}
+
+
+
 def _run_summary(job_id: str, params: dict) -> dict:
     """B6 — job `summary`: text dán sẵn HOẶC media/link (tự nghe trước).
 
@@ -1036,6 +1190,8 @@ def dispatch_inline(job_id: str, params: dict) -> dict:
         return _run_render(job_id, params)
     if jtype == "summary":
         return _run_summary(job_id, params)
+    if jtype == "ffmpeg":
+        return _run_ffmpeg(job_id, params)
     return _run_stub(job_id, params)
 
 

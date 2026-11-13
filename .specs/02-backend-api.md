@@ -339,3 +339,50 @@ setting.*, key.*, prompt.*, job.*, config.import).
 |---|---|---|
 | POST | /v1/download/preview | Metadata link trước khi tải (title/duration/thumbnail) |
 | GET | /v1/tts/presets | Catalog giọng theo backend local/edge/cloud |
+
+## Giai đoạn D — bàn điều khiển FFmpeg + agent actions (11/2026)
+
+### GD1 — Bàn điều khiển FFmpeg bằng lời
+- `pipelines/ffmpeg_cmd.py` — module thuần: `validate_argv(argv, input_ext)`
+  5 lớp chặn (chỉ binary `ffmpeg`; cấm `://` — SSRF; cấm `..` trong `/work/…`;
+  cấm `-f <device grabber>` + `-` trần stdin/stdout; đúng 1 operand input
+  `/work/input.<ext>` + 1 operand output `/work/output.<ext>` là arg CUỐI,
+  ext trong allowlist). Chuẩn hóa: bỏ `-progress` của LLM + tự chèn `-y`,
+  MỌI can thiệp đều ghi warning (không im lặng).
+- `POST /v1/ffmpeg/preview` (`ffmpeg_api.py`): `{instruction, media_url?,
+  source_url?, remove_sponsor?}` → LLM (tái dùng `summary.build_chat()` —
+  stage summarize/translate settings; KHÔNG stage mới) trả JSON
+  `{command, explanation, warnings}` → `command_to_argv` (shlex.split KHÔNG
+  shell) → validate → trả `{command, explanation, warnings, ffmpeg_argv,
+  input_name, output_ext}`. LLM JSON bẩn / lệnh vi phạm hợp đồng → 502 kèm
+  hướng dẫn "Dịch lại". Rate limit 20/phút. KHÔNG audit preview (đọc-like).
+- Job `type=ffmpeg`: `JobIn.ffmpeg_argv` (bắt buộc — chỉ nhận từ preview) +
+  `remove_sponsor` (chỉ với link). `_validate_job_in`: nguồn XOR, validate
+  argv lần 1 + `_owns_media` bắt buộc (admin bypass — pattern chung). Worker
+  `_run_ffmpeg` validate LẦN HAI với ext THẬT của file nguồn (rewrite operand
+  input khi LLM đo sai ext), `-progress pipe:1` chèn TRƯỚC operand output
+  (đặt sau = output thứ hai — quirk ffmpeg), `_kill_group` khi hủy, timeout
+  2h, manifest stage `encode` (retry encode dài KHÔNG encode lại — cùng argv
+  + cùng file nguồn = cùng vân tay), publish GC3.
+- `remove_sponsor`: `ensure_downloaded(..., extra_args=["--sponsorblock-remove",
+  "sponsor,selfpromo"])` — extra_args nằm trong marker (đổi cờ → tải lại);
+  SponsorBlock là tùy chọn yt-dlp, KHÔNG phải ffmpeg. "Chèn thumbnail"
+  KHÔNG hỗ trợ (cần 2 file input — LLM được dặn trả warning khi yêu cầu đó).
+- UI: SPA `pages/Ffmpeg.jsx` (2 cột: nguồn+yêu cầu trái, kết quả dịch phải
+  sticky) + route `/ffmpeg` + Sidebar `Terminal` + UI inline `page-ffmpeg`
+  (preview → Chạy lệnh này, argv server-side only).
+
+### GD4 — agent actions (C5)
+- `Job.revision` Integer — tăng MỖI lần `transition()` THÀNH CÔNG,
+  `claim_job` thắng lease, actions `set_params`; guard False không tăng.
+- `POST /v1/jobs/{id}/actions` `{action, patch, expected_revision}`:
+  cancel/retry/duplicate (refactor `_do_cancel/_do_retry/_do_duplicate` —
+  endpoint cũ gọi lại) + `set_params` CHỈ terminal failed/cancelled/
+  interrupted (dispatch cầm snapshot params; done → dùng duplicate);
+  merge params - `_DUP_STRIP_KEYS` + patch → `JobIn` + `_validate_job_in`
+  (một đường validate). `expected_revision` lệch → **409 JSONResponse
+  `{detail, revision}`** (HTTPException chỉ mang detail — hợp đồng agent cần
+  revision mới). JobEvent `kind="action"` → SSE refetch; audit `job.set_params`.
+- Agent 3 bước: `GET /v1/jobs/{id}` → revision; `POST /actions` kèm
+  `expected_revision`; 409 → đọc lại, thử lại. Auth: cookie HOẶC X-API-Key
+  (key /v1/keys). KHÔNG MCP/websocket — REST + SSE có sẵn là đủ.

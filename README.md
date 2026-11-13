@@ -118,6 +118,17 @@ vẫn là local VieNeu.
 | C3 | **Lưu nhiều phiên bản kết quả** | Mỗi lần chạy lại tạo 1 **version** mới, không đè mất kết quả cũ; **Nhân bản job** copy nguyên cấu hình thành job mới để chỉnh sửa nhẹ rồi chạy |
 | C4 | **Tự cập nhật yt-dlp** | yt-dlp hỏng dần khi YouTube đổi API — hệ tự cập nhật qua kênh `stable`/`nightly` (chọn trong Cài đặt → tải video), không cần vào container chạy tay |
 
+| C4 | **Tự cập nhật yt-dlp** | yt-dlp hỏng dần khi YouTube đổi API — hệ tự cập nhật qua kênh `stable`/`nightly` (chọn trong Cài đặt → tải video), không cần vào container chạy tay |
+
+### Giai đoạn D — bàn điều khiển + hoàn thiện (11/2026)
+
+| # | Tính năng | Trang / cách dùng |
+|---|---|---|
+| GD2 | **Thuật ngữ bắt buộc (glossary)** | Nhập danh sách `gốc=bản dịch` ở Dịch văn bản / Dịch video / Phụ đề song ngữ — AI luôn dịch đúng tên riêng, thuật ngữ; vi phạm chỉ cảnh báo trong job, không chết job |
+| GD2 | **Phụ đề dễ đọc** | Hạn ký tự mỗi dòng + tốc độ đọc (ký tự/giây) cấu hình được ở Cấu hình hệ thống — dòng dài tự xuống hàng, cue đọc nhanh tự "mượn giờ trống" để người xem kịp đọc |
+| GD4 | **API hành động cho AI agent** | `POST /v1/jobs/{id}/actions` — agent bên ngoài (qua `X-API-Key`) hủy/chạy lại/nhân bản/đổi tham số job, kèm `expected_revision` chống xung đột (lệch → 409 trả phiên bản mới, đọc lại rồi thử) |
+| GD1 | **Bàn điều khiển FFmpeg** | Trang mới: gõ yêu cầu bằng tiếng Việt ("cắt từ 2:00 đến 2:10") → AI dịch thành lệnh ffmpeg kèm giải thích, bạn **xem trước lệnh rồi mới chạy** — lệnh bị khoá trong thư mục làm việc, không truy cập mạng; có tùy chọn xoá quảng cáo SponsorBlock khi dùng link |
+
 ### Cài đặt — Settings Hub `/settings`
 
 **Control Center cho cả người dùng lẫn quản trị viên**, phân nhóm theo **scope** (mỗi

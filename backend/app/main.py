@@ -71,7 +71,7 @@ from .storage import get_storage
 from .tasks import dispatch
 
 VALID_TYPES = {"tts", "stt", "translate", "dub", "subtitle", "download",
-               "render", "summary"}
+               "render", "summary", "ffmpeg"}
 
 # Docs công khai mặc định TẮT: schema API lộ toàn bộ bề mặt tấn công. Bật khi cần
 # xem Swagger trên máy cá nhân: VOICEVIBE_ENABLE_DOCS=1
@@ -160,6 +160,8 @@ app.include_router(ai_admin_router)
 app.include_router(prompt_library_router)
 # Settings Hub (hồ sơ/mật khẩu/phiên cá nhân + audit/overview/system/export-import)
 app.include_router(settings_hub_router)
+from .ffmpeg_api import router as ffmpeg_router  # noqa: E402 — GD1
+app.include_router(ffmpeg_router)
 
 
 def _hash_key(raw: str) -> str:
@@ -245,6 +247,14 @@ class JobIn(BaseModel):
         None, description="thuật ngữ bắt buộc — mỗi dòng 'gốc=bản dịch' "
                           "(dòng # là chú thích); LLM luôn dịch theo danh sách "
                           "này, vi phạm chỉ cảnh báo trong job")
+    # --- riêng cho type=ffmpeg (GD1: bàn điều khiển ffmpeg bằng lời)
+    ffmpeg_argv: list[str] | None = Field(
+        None, description="ffmpeg: argv ĐÃ qua preview + validate — KHÔNG "
+                          "nhận argv từ nguồn nào khác (worker chạy validate "
+                          "lần hai)")
+    remove_sponsor: bool = Field(
+        False, description="ffmpeg: xoá quảng cáo SponsorBlock trước khi chạy "
+                           "(chỉ khi dùng link — yt-dlp gắn cờ khi tải)")
 
 
 class VoiceIn(BaseModel):
@@ -367,6 +377,36 @@ def _validate_job_in(job: JobIn, user: User, db: Session) -> None:
         except ValueError as exc:
             raise HTTPException(
                 status_code=422, detail=f"Thuật ngữ sai định dạng: {exc}") from exc
+
+    if job.type == "ffmpeg":
+        # GD1 — job điều khiển argv: nguồn XOR (upload hoặc link), argv BẮT
+        # BUỘC và phải qua validate (worker chạy validate lần hai — không tin
+        # gì đã qua tay mạng), quyền sở hữu media bắt buộc (argv tham chiếu
+        # file — cho file người khác là đọc hộ người khác).
+        if bool(job.media_url) == bool(job.source_url):
+            raise HTTPException(
+                status_code=422,
+                detail="ffmpeg cần ĐÚNG MỘT nguồn: file upload (media_url) "
+                       "hoặc link (source_url)")
+        if not job.ffmpeg_argv:
+            raise HTTPException(
+                status_code=422,
+                detail="ffmpeg cần ffmpeg_argv từ bước «Dịch thành lệnh» — "
+                       "hãy dùng nút Dịch trên trang Bàn điều khiển")
+        from .pipelines.ffmpeg_cmd import validate_argv as _vv_argv
+        in_ext = (job.media_url.rsplit(".", 1)[-1].lower()
+                  if job.media_url and "." in job.media_url.rsplit("/", 1)[-1]
+                  else "mp4")
+        try:
+            _vv_argv(job.ffmpeg_argv, in_ext)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        if job.remove_sponsor and not job.source_url:
+            raise HTTPException(
+                status_code=422,
+                detail="«Xoá quảng cáo SponsorBlock» chỉ áp dụng khi dùng link")
+        if job.media_url and not _owns_media(db, user, job.media_url):
+            raise HTTPException(status_code=404, detail="file not found")
 
     if job.voice_id:
         voice = db.get(Voice, job.voice_id)

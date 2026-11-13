@@ -800,6 +800,8 @@ const FLOWS = [
       ['/download', ['Tải video từ link', 'Chất lượng']],
       ['/render', ['Xử lý video', 'Cắt dọc 9:16']],
       ['/summary', ['Tóm tắt nội dung', 'Tóm tắt ngay']],
+      // GD1 — Bàn điều khiển FFmpeg: dịch lệnh bằng lời
+      ['/ffmpeg', ['Bàn điều khiển FFmpeg', 'Dịch thành lệnh']],
     ]) {
       await navTo(page, `${BASE}${route}`);
       await sleep(500);
@@ -846,6 +848,7 @@ const NAV_ROUTES = [
   ['06b-download', '/download', true, null],
   ['06c-render', '/render', true, null],
   ['06d-summary', '/summary', true, null],
+  ['06e-ffmpeg', '/ffmpeg', true, null],
   ['07-jobs', '/jobs', true, null],
   ['08-api-keys', '/api-keys', true, null],
   ['10-admin-users', '/settings/members', true, null],

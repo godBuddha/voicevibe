@@ -172,6 +172,7 @@ __THEME_CSS__
       <div class="group">AI Giọng nói &amp; Video</div>
       <a data-page="stt" onclick="go('stt')">📝 Chuyển giọng nói thành văn bản</a>
       <a data-page="download" onclick="go('download')">⬇️ Tải video từ link</a>
+      <a data-page="ffmpeg" onclick="go('ffmpeg')">⌨️ Bàn điều khiển FFmpeg</a>
       <a data-page="render" onclick="go('render')">✂️ Xử lý video (phụ đề + 9:16)</a>
       <div class="group">Tóm tắt</div>
       <a data-page="summary" onclick="go('summary')">🗒️ Tóm tắt nội dung</a>
@@ -345,8 +346,33 @@ __THEME_CSS__
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer" title="Tắt: tải ẩn danh (public video tải được, an toàn hơn). Bật: dùng cookies admin đặt ở Cài đặt — bắt buộc với video riêng tư / giới hạn tuổi.">
           <input type="checkbox" id="dlcookies" style="margin:0">
           <span>Dùng cookies đăng nhập (video riêng tư / giới hạn tuổi — mặc định tải ẩn danh)</span></label>
-        <button class="go" onclick="submitDownload()">⬇️ Bắt đầu tải</button>
-        <div id="dlmsg" class="status"></div>
+    </section>
+
+    <!-- FFMPEG CONSOLE (GD1) -->
+    <section id="page-ffmpeg" class="page">
+      <div class="card">
+        <h2>⌨️ Bàn điều khiển FFmpeg</h2>
+        <p class="mut">Gõ yêu cầu bằng lời (ví dụ: «cắt từ 2:00 đến 2:10») — hệ dịch thành lệnh, bạn xem lại rồi mới chạy. Chỉ chạy được ffmpeg trong thư mục làm việc, không truy cập mạng.</p>
+        <label>Nguồn — upload file HOẶC dán link</label>
+        <input type="file" id="fffile" accept="video/*,audio/*">
+        <label>Hoặc link video</label>
+        <input id="ffurl" placeholder="https://…">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer" title="Xoá các đoạn quảng cáo SponsorBlock TRƯỚC khi chạy lệnh (chỉ áp dụng khi dùng link)">
+          <input type="checkbox" id="ffsb" style="margin:0">
+          <span>Xoá quảng cáo theo SponsorBlock (chỉ khi dùng link)</span></label>
+        <label>Yêu cầu bằng lời</label>
+        <textarea id="ffask" rows="3" placeholder="ví dụ: cắt từ 2:00 đến 2:10, xuất MP3 320kbps"></textarea>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="go" onclick="ffPreview()">🧠 Dịch thành lệnh</button>
+          <button class="ghost" onclick="ffRun()" id="ffrun" disabled>▶️ Chạy lệnh này</button>
+        </div>
+        <div id="ffmsg" class="status"></div>
+        <div id="ffprev" style="display:none;margin-top:10px">
+          <div class="mut" style="font-size:12px">Lệnh hệ thống sẽ chạy:</div>
+          <pre id="ffcmd" style="background:#1e293b;color:#e2e8f0;padding:8px;border-radius:6px;font-size:12px;white-space:pre-wrap"></pre>
+          <div class="mut" id="ffexplain" style="font-size:12px"></div>
+          <div id="ffwarn" class="err" style="margin-top:6px"></div>
+        </div>
       </div>
     </section>
 
@@ -465,7 +491,7 @@ const $ = (id) => document.getElementById(id);
 // Xác thực qua COOKIE PHIÊN do server đặt (HttpOnly) — JS không đọc/không lưu token.
 // `credentials:"same-origin"` để fetch gửi kèm cookie.
 const H = () => ({ "Content-Type": "application/json" });
-const PAGES = ["dashboard","dub","tts","voices","stt","subtitle","jobs","api","settings","download","render","summary"];
+const PAGES = ["dashboard","dub","tts","voices","stt","subtitle","jobs","api","settings","download","render","summary","ffmpeg"];
 let POLL = null, ME = {};
 
 function esc(s){ const d=document.createElement("div"); d.textContent=s==null?"":String(s); return d.innerHTML; }
@@ -700,6 +726,54 @@ async function submitSTT() {
     const d = await r.json();
     if (!r.ok) throw new Error(d.detail || r.status);
     flash("✔ Job " + d.job_id + " đã tạo. SRT sẽ hiện ở tab Jobs.");
+    go("jobs");
+  } catch (e) { flash("✗ " + e.message, "err"); }
+}
+
+
+// GD1 — Bàn điều khiển FFmpeg: preview (dịch lệnh) → user xem → tạo job.
+// argv chỉ nhận từ server preview (đã validate) — client không tự chế lệnh.
+let FF_ARGV = null;
+async function ffPreview() {
+  flash("⏳ đang dịch yêu cầu thành lệnh…");
+  try {
+    let body = { instruction: $("ffask").value.trim() };
+    if (!$("ffask").value.trim()) throw new Error("gõ yêu cầu trước");
+    if ($("fffile").files[0]) {
+      const up = await uploadTo("/v1/media/upload", "fffile");
+      body.media_url = up.media_key;
+    } else if ($("ffurl").value.trim()) {
+      body.source_url = $("ffurl").value.trim();
+    } else { throw new Error("chọn file hoặc dán link trước"); }
+    if ($("ffsb").checked) body.remove_sponsor = true;
+    const r = await fetch("/v1/ffmpeg/preview", { method:"POST", headers:H(), credentials:"same-origin", body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || r.status);
+    FF_ARGV = d.ffmpeg_argv;
+    $("ffcmd").textContent = "ffmpeg " + d.ffmpeg_argv.slice(1).join(" ");
+    $("ffexplain").textContent = d.explanation || "";
+    $("ffwarn").textContent = (d.warnings||[]).length ? "⚠️ " + d.warnings.join(" ⚠️ ") : "";
+    $("ffprev").style.display = "block";
+    $("ffrun").disabled = false;
+    flash("✔ Đã dịch — xem lại lệnh rồi bấm «Chạy lệnh này».");
+  } catch (e) { flash("✗ " + e.message, "err"); }
+}
+async function ffRun() {
+  if (!FF_ARGV) { flash("✗ chưa có lệnh — dịch yêu cầu trước", "err"); return; }
+  flash("⏳ tạo job…");
+  try {
+    const body = { type:"ffmpeg", ffmpeg_argv: FF_ARGV };
+    if ($("fffile").files[0]) {
+      const up = await uploadTo("/v1/media/upload", "fffile");
+      body.media_url = up.media_key;
+    } else if ($("ffurl").value.trim()) {
+      body.source_url = $("ffurl").value.trim();
+      if ($("ffsb").checked) body.remove_sponsor = true;
+    }
+    const r = await fetch("/v1/jobs", { method:"POST", headers:H(), credentials:"same-origin", body: JSON.stringify(body) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || r.status);
+    flash("✔ Job " + d.job_id + " đã tạo. Xem tab Jobs.");
     go("jobs");
   } catch (e) { flash("✗ " + e.message, "err"); }
 }

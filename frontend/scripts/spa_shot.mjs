@@ -55,6 +55,8 @@ const SHOTS = [
   ['06d-summary', '/summary', true],
   ['15-translate-text', '/translate-text', true],
   ['16-translate-audio', '/translate-audio', true],
+  ['17-ffmpeg', '/ffmpeg', true],
+  ['18-ffmpeg-dark', '/ffmpeg', true, 'dark'],
   ['07-jobs', '/jobs', true],
   ['08-api-keys', '/api-keys', true],
   // SETTINGS HUB: route /admin/* cũ tự redirect về hub — chụp thẳng section mới.

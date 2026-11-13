@@ -181,11 +181,15 @@ def _maybe_autorefresh() -> None:
 
 def build_argv(url: str, dest_dir: str, quality: str, *,
                cookies_file: str | None = None, proxy: str | None = None,
-               prefix: list[str] | None = None) -> list[str]:
+               prefix: list[str] | None = None,
+               extra_args: list[str] | None = None) -> list[str]:
     """Lệnh yt-dlp đầy đủ. `--newline` để mỗi progress là MỘT dòng (parse %).
 
     `prefix` (GC4): None → tự chọn theo kênh (binary tự cập nhật hoặc pip) —
     selftest/test truyền prefix tường minh để không đụng môi trường thật.
+    `extra_args` (GD1): cờ bổ sung nối TRƯỚC URL (vd
+    `--sponsorblock-remove sponsor,selfpromo` cho job ffmpeg remove_sponsor).
+    None = nguyên vẹn — mọi caller cũ giữ hành vi.
     """
     if quality not in FORMAT_LADDER:
         raise ValueError(f"quality phải là một trong {list(QUALITIES)}")
@@ -206,6 +210,8 @@ def build_argv(url: str, dest_dir: str, quality: str, *,
     if proxy:
         argv += ["--proxy", proxy]
     argv += _yt_extractor_args(url)
+    if extra_args:
+        argv += list(extra_args)
     argv.append(url)
     return argv
 
@@ -308,7 +314,8 @@ def _progress_map(line: str, stream_idx: int, streams_seen: int) -> int | None:
 def ensure_downloaded(url: str, workdir: str, quality: str = "1080", *,
                       progress_cb=None, abort_check=None,
                       cookies_file: str | None = None, proxy: str | None = None,
-                      max_duration: int = MAX_DURATION_S, runner=None) -> dict:
+                      max_duration: int = MAX_DURATION_S, runner=None,
+                      extra_args: list[str] | None = None) -> dict:
     """Tải 1 lần rồi ghi marker — lần sau khớp url+quality là SKIP.
 
     Marker nằm trong workdir bền (MEDIA_ROOT/jobs/{id}/work) — đúng nguyên liệu
@@ -340,7 +347,8 @@ def ensure_downloaded(url: str, workdir: str, quality: str = "1080", *,
     except Exception:  # noqa: BLE001 — thiếu/corrupt = chưa có
         marker = None
     if (marker and marker.get("url") == url and marker.get("quality") == quality
-            and marker.get("cookies", False) == bool(cookies_file)):
+            and marker.get("cookies", False) == bool(cookies_file)
+            and marker.get("extra_args") == (list(extra_args) if extra_args else [])):
         # ".get('cookies', False)": marker cũ (trước GB8) không có khoá này —
         # coi như ẩn danh, khớp khi lần này cũng ẩn danh (nâng cấp không
         # phá resume của job cũ).
@@ -358,7 +366,8 @@ def ensure_downloaded(url: str, workdir: str, quality: str = "1080", *,
     if progress_cb:
         progress_cb(5, "Đang tải: đã đọc thông tin video")
 
-    argv = build_argv(url, workdir, quality, cookies_file=cookies_file, proxy=proxy)
+    argv = build_argv(url, workdir, quality, cookies_file=cookies_file,
+                      proxy=proxy, extra_args=extra_args)
     streams_seen = 1 if quality == "audio" else 2
     code, err_tail = _run_stream(argv, workdir=workdir, streams_seen=streams_seen,
                                  progress_cb=progress_cb, abort_check=abort_check,
@@ -377,6 +386,7 @@ def ensure_downloaded(url: str, workdir: str, quality: str = "1080", *,
         # là tải lại (marker ẩn danh 360p không được reuse thành "đã có 1080p
         # cookies"); marker cũ không có khoá này coi như ẩn danh.
         "cookies": bool(cookies_file),
+        "extra_args": list(extra_args) if extra_args else [],
         "ext": os.path.splitext(out)[1].lstrip("."),
         "size": os.path.getsize(out),
         "title": info.get("title") or "",
